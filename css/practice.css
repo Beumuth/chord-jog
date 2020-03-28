@@ -4,19 +4,18 @@
 
 #numChordsContainer {
 	cursor: default;
-	position: relative;
-	top: -6px;
+	font-size: 18px;
+	font-family: monospace;
 }
 
 #numChordsLabel, #numChordsList {
-	font-family: "Courier New";
 	display:inline-block;
 	position:relative;
 	top: -12px;
 }
 
 #numChordsLabel {
-	font-size: 20px;
+	margin-right: 5px;
 }
 
 #numChordsList {
@@ -28,14 +27,13 @@
 
 .numChordsOption {
 	position:relative;
-	padding-right:2px;
-	padding-top:2.5px;
-	padding-left:2.5px;
-	padding-bottom: 1px;
 	display: inline-block;
-	font-weight: bold;
-	width: 18px;
+	width: 22px;
 	text-align: center;
+	padding-top: .25px;
+	padding-right: .25px;
+	padding-left: .5px;
+	padding-bottom: 1px;
 	border: 2px solid rgba(255,255,255,0);
 }
 
@@ -48,7 +46,7 @@
 .numChordsOption[data-selected='true'] {
 	border-radius: 50%;
 	behavior: url(PIE.htc);
-	border: 2px solid black;
+	border: 1.5px solid #303030;
 }
 
 .numChordsOption:focus[data-selected='true'], .numChordsOption:active {
@@ -60,6 +58,10 @@
 	border-radius: 50%;
 	behavior: url(PIE.htc);
 	border: 2px dashed #A0A0A0;
+}
+
+.numChordsOption:not(:last-child) {
+	margin-right: 2px;
 }
 
 #rerollButton {
@@ -87,7 +89,7 @@
 	-o-transform:       rotate(-5deg) scale(1.1);
 }
 
-#rerollButton:focus.active, #rerollButton:focus:active {
+#rerollButton:focus[data-active='true'], #rerollButton:focus:active {
 	transform:          rotate(5deg) scale(.9);
 	-ms-transform:      rotate(5deg) scale(.9);
 	-moz-transform:     rotate(5deg) scale(.9);

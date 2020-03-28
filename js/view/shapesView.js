@@ -4,19 +4,13 @@ class ShapesView {
 	}
 	
 	onPageLoad() {
-		pageView.onPageLoad();
+		pageView.render("Shapes");
 		
 		//Container
 		this.container = document.createElement("div");
 		this.container.className = "manageShapesContainer";
 		this.container.classList.add("sectionContainer");
 		pageView.container.append(this.container);
-		
-		//	Header
-		let header = document.createElement("h2");
-		header.className = "sectionHeader";
-		header.textContent = "Shapes";
-		this.container.append(header);
 		
 		this.createImportExportView();
 		this.createShapesEditorView();
@@ -28,6 +22,7 @@ class ShapesView {
 		this.importExportContainer = document.createElement("div");
 		this.importExportContainer.className = "importExportContainer";
 		this.importExportContainer.classList.add("sectionContainer");
+		this.importExportContainer.dataset.border = "none";
 		this.container.append(this.importExportContainer);
 		
 		//	Import

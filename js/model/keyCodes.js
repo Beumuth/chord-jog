@@ -1,0 +1,1 @@
+const KEY_CODE_SPACE = 32;

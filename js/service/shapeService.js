@@ -56,16 +56,38 @@ class ShapeService {
 		return ids.map(id => this.shapes[id]);
 	}
 	
-	getNRandomShapes(n) {
-		let ids = new Array();
-		let id = null;
+	getNRandomFixedShapes(n) {
+		let fixedShapes = new Array();
+		let candidate = null;
 		for(let i = 0; i < n; ++i) {
-			while(id == null || ids.includes(id)) {
-				id = Math.random * this.shapes.length;
+			while(
+				candidate == null || (
+					fixedShapes.filter(chosen =>
+						this.equals(
+							chosen.shape,
+							candidate.shape
+						) &&
+						chosen.fret === candidate.fret
+					).length > 0
+				)
+			){
+				const shape = this.getShape(
+					Math.floor(
+						Math.random() * this.shapes.length
+					)
+				);
+				candidate = {
+					shape: shape,
+					fret: Math.floor(
+						Math.random() * 
+						(shape.range[1] - shape.range[0]) +
+						shape.range[0]
+					)
+				};
 			}
-			ids.push(id);
+			fixedShapes.push(candidate);
 		}
-		return getShapes(ids);
+		return fixedShapes;
 	}
 	
 	createShape(shape) {
