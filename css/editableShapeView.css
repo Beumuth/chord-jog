@@ -1,0 +1,61 @@
+.editShapeControlsContainer {
+	display: inline-block;
+	margin: 0 auto;
+	margin-bottom: 2px;
+}
+
+.fretInput {
+	width: 23px;
+}
+
+.rangeContainer {
+	margin-bottom: 3px;
+}
+
+.shapeTypeSelect {
+	width: 60px;
+}
+
+.editableShapeView[data-is-open='true'] .minFretInput {
+	display: none;
+}
+
+.minFretContainer, .shapeTypeSelect {
+	margin-top: 3px;
+}
+
+.minFretLabel {
+	margin-right: 5px;
+}
+
+.minFretInput {
+    -moz-appearance:textfield;
+}
+
+.shapeMinFret {
+	width: 23px;
+}
+
+.shapeRangeDisplay {
+	display: inline-block;
+	margin: 0 auto;
+	font-family: monospace;
+}
+
+.fingerSelect:disabled {
+	background-color: #A0A0A0;
+	color: transparent;
+}
+
+.editShapeButtonRow div:not(:last-child) {
+	margin-bottom: 5px;
+}
+
+.editShapeEditButton {
+	margin-right: 10px;
+}
+
+.editShapeButtonRow button:not(:last-child),
+.editShapeButtonRow div button:not(:last-child) {
+	margin-right: 5px;
+}
