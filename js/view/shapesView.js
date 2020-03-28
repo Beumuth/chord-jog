@@ -1,22 +1,25 @@
-class ManageShapesView {
+class ShapesView {
 	constructor() {
+		
 	}
 	
 	onPageLoad() {
+		pageView.onPageLoad();
+		
 		//Container
 		this.container = document.createElement("div");
 		this.container.className = "manageShapesContainer";
 		this.container.classList.add("sectionContainer");
-		document.getElementById("container").append(this.container);
+		pageView.container.append(this.container);
 		
-		//Header
+		//	Header
 		let header = document.createElement("h2");
 		header.className = "sectionHeader";
 		header.textContent = "Shapes";
 		this.container.append(header);
 		
 		this.createImportExportView();
-		this.createEditShapesView();
+		this.createShapesEditorView();
 		this.createAddShapeView();
 	}
 	
@@ -52,7 +55,7 @@ class ManageShapesView {
 	
 	createImportExportFileInput(id, labelText, changeHandler) {
 		let inputLabel = document.createElement("label");
-		inputLabel.className = "fileInputLabel";
+		inputLabel.className = "buttonInput";
 		inputLabel.setAttribute("for", id);
 		inputLabel.textContent = labelText;
 		this.importExportContainer.append(inputLabel);
@@ -71,9 +74,9 @@ class ManageShapesView {
 		return input;
 	}
 	
-	createEditShapesView() {
-		this.editShapesView = new EditShapesView();
-		this.container.append(this.editShapesView.container);
+	createShapesEditorView() {
+		this.shapesEditor = new ShapesEditorView();
+		this.container.append(this.shapesEditor.container);
 	}
 	
 	createAddShapeView() {
@@ -101,21 +104,21 @@ class ManageShapesView {
 		let shape = this.addShapeView.shapeChartView.shape;
 		shapeService.createShape(shape);
 		this.addShapeView.reset();
-		this.editShapesView.displaySingleResult(shape);
+		this.shapesEditor.displaySingleResult(shape);
 		this.addShapeView.maxFretSelect.focus();
 	}
 	
 	importShapes() {
 		if(this.importInput.files.length > 0) {
 			shapeService.importShapes(this.importInput.files);
-			this.editShapesView.reset();
+			this.shapesEditor.reset();
 		}
 	}
 	
 	overwriteShapes() {
 		if(this.overwriteInput.files.length > 0) {
 			shapeService.overwriteShapes(this.overwriteInput.files);
-			this.editShapesView.reset();
+			this.shapesEditor.reset();
 		}
 	}
 	
@@ -124,4 +127,4 @@ class ManageShapesView {
 	}
 }
 
-const manageShapesView = new ManageShapesView();
+const shapesView = new ShapesView();

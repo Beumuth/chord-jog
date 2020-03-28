@@ -23,6 +23,7 @@ class EditableShapeView {
 		//		Select
 		this.maxFretSelect = document.createElement("select");
 		this.maxFretSelect.className = "shapeTypeSelect";
+		this.maxFretSelect.classList.add("enumSelect");
 		this.maxFretSelect.onchange = this.maxFretChanged.bind(this);
 		rangeContainer.append(this.maxFretSelect);
 		//		Open fret option

@@ -45,19 +45,24 @@ body {
 	padding: auto;
 }
 
-select {
+.enumSelect {
     -webkit-appearance: none;
     -moz-appearance: none;
     text-indent: 1px;
     text-overflow: '';
 	width: 23px;
+	cursor: pointer;
 }
 
-select:ms-expand {
+.enumSelect:disabled {
+	cursor: not-allowed;
+}
+
+.enumSelect:ms-expand {
 	display: none;
 }
 
-input[type='text'], select, option {
+input[type='text'], .enumSelect, .enumSelect option {
 	width: 25px;
 	background-color: #F7F7F7;
 	border: solid 1px black;
@@ -66,8 +71,56 @@ input[type='text'], select, option {
 	text-align-last: center;
 }
 
+.buttonInput, button {
+	font: bold 12px Arial;
+	text-decoration: none;
+	background-color: #EEEEEE;
+	color: #333333;
+	padding: 2px 6px 2px 6px;
+	border-top: 1px solid #CCCCCC;
+	border-left: 1px solid #CCCCCC;
+	border-right: 1px solid #333333;
+	border-bottom: 1px solid #333333;
+	cursor: pointer;
+	
+	-webkit-touch-callout: none; /* iOS Safari */
+    -webkit-user-select: none; /* Safari */
+     -khtml-user-select: none; /* Konqueror HTML */
+       -moz-user-select: none; /* Old versions of Firefox */
+        -ms-user-select: none; /* Internet Explorer/Edge */
+            user-select: none; /* Non-prefixed version, currently
+                                  supported by Chrome, Opera and Firefox */
+}
+
+button:not(:last-child), .buttonInput:not(:last-child) {
+	margin-right: 5px;
+}
+
+.buttonInput:hover, button:hover {
+	background-color: #F7F7F7;
+}
+
+.buttonInput:active, button:active {
+	background-color: #C0C0C0;
+	border-top: 1px solid #EEEEEE;
+	border-left: 1px solid #EEEEEE;
+	border-right: 1px solid #808080;
+	border-bottom: 1px solid #808080;
+}
+
+.buttonInput:disabled, button:disabled {
+	background-color: #C0C0C0;
+	border-right: 1px solid #808080;
+	border-bottom: 1px solid #808080;
+	cursor: not-allowed;
+}
+
+input[type='file'] {
+	width: 0px;
+}
+
 #pageHeaderContainer {
-	margin-bottom: 5px;
+	margin-bottom: 12px;
 	margin-left: 0px;
 	padding-top: 10px;
 	
@@ -110,6 +163,10 @@ input[type='text'], select, option {
 	transform: translate(0, -.5px) rotate(-.5deg) scale(1.005);
 }
 
+#navBar {
+	margin-bottom: 5px;
+}
+
 .sectionContainer {
 	padding-top: 5px;
 	padding-bottom: 5px;
@@ -126,6 +183,11 @@ input[type='text'], select, option {
 .sectionHeader {
 	margin-top: 0px;
 	margin-bottom: 5px;
+	font-family: Arial, Helvetica, sans-serif;
+}
+
+.sectionHeader:not(h2) {
+	color: #303030;
 }
 
 .shapeChartList {

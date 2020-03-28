@@ -1,4 +1,4 @@
-class EditShapesView {
+class ShapesEditorView {
 	constructor() {
 		this.initializeHtml();
 	}
@@ -6,7 +6,7 @@ class EditShapesView {
 	initializeHtml() {
 		//Container
 		this.container = document.createElement("div");
-		this.container.className = "editShapesContainer";
+		this.container.className = "shapesEditor";
 		this.container.classList.add("sectionContainer");
 		
 		this.createSearchContainer();

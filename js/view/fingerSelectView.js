@@ -16,6 +16,7 @@ class FingerSelectView {
 		//Create select
 		this.fingerSelect = document.createElement("select");
 		this.fingerSelect.className = "fingerSelect";
+		this.fingerSelect.classList.add("enumSelect");
 		this.fingerSelect.onchange = this.fingerSelectChanged.bind(this);
 		
 		//Create options

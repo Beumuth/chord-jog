@@ -15,6 +15,7 @@ class RelativeFretSelectView {
 	initializeHtml() {
 		this.fretSelect = document.createElement("select");
 		this.fretSelect.className = "relativeFretSelect";
+		this.fretSelect.classList.add("enumSelect");
 		this.fretSelect.dataset.string = this.string;
 		for(let i = 0; i < this.frets.length; ++i) {
 			let curOption = document.createElement("option");
