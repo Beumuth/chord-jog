@@ -306,6 +306,7 @@ class EditableShapeView {
 		this.shapeChartView.shape = this.initialShape.copy();
 		this.initialize();
 		this.validate();
+		this.maxFretSelect.focus();
 		this.shapeChartView.render();
 	}
 	

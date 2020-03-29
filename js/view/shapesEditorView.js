@@ -112,7 +112,7 @@ class ShapesEditorView {
 		) {
 			//The search is not all ANY_FRETs
 			//Get matches
-			let matches = shapeService.getShapesByFrets(search);
+			let matches = shapeService.searchShapesWithFrets(search);
 			
 			this.resultsContainer.dataset.isEmpty = matches.length === 0;
 			

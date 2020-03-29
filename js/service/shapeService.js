@@ -108,27 +108,34 @@ class ShapeService {
 	
 	/**
 	 * @param frets An array of 6 fret values. Can contain ANY_FRET on any string.
+	 * @return An array with a maximum of 6 results.
 	 */
-	getShapesByFrets(frets) {
-		//Filter the shapes
-		return this.shapes.filter(shape => {
+	searchShapesWithFrets(frets) {
+		let matches = [];
+		
+		//For each shape
+		for(let i = 0; i < this.shapes.length && matches.length < 6; ++i) {
+			let isAMatch = true;
 			//For each string
 			for(let string = 0; string < NUM_STRINGS; ++string) {
 				//Does search match the fret for this shape's string?
 				if(
 					frets[string] !== ANY_FRET &&
-					shape.schema[string][1] !== frets[string]
+					this.shapes[i].schema[string][1] !== frets[string]
 				) {
 					//No. This shape is not a match.
-					return false;
+					isAMatch = false;
+					break;
 				}
-				//Yes. Check next string.
+				//This string matches. Check the next one.
 			}
 			
-			//All strings match.
-			//This shape is a match.
-			return true;
-		});
+			if(isAMatch) {
+				matches.push(this.shapes[i]);
+			}
+		}
+		
+		return matches;
 	}
 	
 	validate(shape, id=null) {
