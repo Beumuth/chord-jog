@@ -36,7 +36,7 @@ class ShapesEditorView {
 		searchTable.append(headerRow);
 		
 		//		Fret inputs row
-		this.relativeFretSelectViews = new Array();
+		this.relativeFretSelects = new Array();
 		let searchFretInputsRow = document.createElement("tr");
 		searchTable.append(searchFretInputsRow);
 		for(let i = 0; i < NUM_STRINGS; ++i) {
@@ -47,16 +47,16 @@ class ShapesEditorView {
 			
 			//		Input cell and input
 			let inputCell = document.createElement("td");
-			let relativeFretSelectView = new RelativeFretSelectView({
+			let relativeFretSelect = new RelativeFretSelect({
 				string: i,
 				nullable: true
 			});
-			relativeFretSelectView.fretSelect.addEventListener(
+			relativeFretSelect.addEventListener(
 				"change",
 				this.search.bind(this)
 			);
-			this.relativeFretSelectViews.push(relativeFretSelectView);
-			inputCell.append(relativeFretSelectView.fretSelect);
+			this.relativeFretSelects.push(relativeFretSelect);
+			inputCell.append(relativeFretSelect);
 			searchFretInputsRow.append(inputCell);
 		}
 		
@@ -102,7 +102,7 @@ class ShapesEditorView {
 	
 	search() {
 		this.clearResults();
-		let search = this.relativeFretSelectViews.map(view => view.fret);
+		let search = this.relativeFretSelects.map(view => view.fret);
 		if(
 			! search
 				.map(string => string === ANY_FRET)
@@ -123,8 +123,8 @@ class ShapesEditorView {
 	
 	displaySingleResult(shape) {
 		this.clearResults();
-		shape.schema.forEach((stringAction, string) =>
-			this.relativeFretSelectViews[string].setFret(stringAction[1])
+		shape.strings.forEach((stringAction, string) =>
+			this.relativeFretSelects[string].fret = stringAction.fret
 		);
 		this.addResult(shape);
 		this.resultsContainer.dataset.isEmpty = false;
@@ -171,7 +171,7 @@ class ShapesEditorView {
 	}
 	
 	reset() {
-		this.relativeFretSelectViews.forEach(view => view.setFret(ANY_FRET));
+		this.relativeFretSelects.forEach(view => view.fret = ANY_FRET);
 		this.clearResults();
 		this.resultsContainer.dataset.isEmpty = true;
 	}

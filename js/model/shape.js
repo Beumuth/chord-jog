@@ -11,30 +11,32 @@ const STRING_NAMES = new Array("E", "A", "D", "G", "B", "e");
 const FINGERS = new Array(0, 1, 2, 3, 4);
 
 class Shape {
-	constructor(id=null, schema=null, range=null) {
+	constructor(
+		id=null,
+		strings=Shape.AllDeadStrings(),
+		range=Range.DefaultForMovableChord()
+	) {
 		this.id = id;
-		this.schema = schema != null ?
-			schema :
-			new Array(
-				new Array(null, null),	//E
-				new Array(null, null),	//A
-				new Array(null, null),	//D
-				new Array(null, null),	//G
-				new Array(null, null),	//B
-				new Array(null, null),	//e
-			);
-		this.range = range != null ?
-			range :
-			new Array(OPEN_FRET+1, MAX_ROOT_FRET);
+		this.strings = strings;
+		this.range = range;
 	}
 	
 	copy() {
 		return new Shape(
 			this.id,
-			this.schema.map(stringAction =>
-				new Array(stringAction[0], stringAction[1])
-			),
-			new Array(this.range[0], this.range[1])
+			this.strings.map(stringAction => stringAction.copy()),
+			this.range.copy()
+		);
+	}
+	
+	static AllDeadStrings() {
+		return new Array(
+			StringAction.DeadString(),
+			StringAction.DeadString(),
+			StringAction.DeadString(),
+			StringAction.DeadString(),
+			StringAction.DeadString(),
+			StringAction.DeadString()
 		);
 	}
 }

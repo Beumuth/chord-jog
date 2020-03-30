@@ -97,8 +97,8 @@ class ShapeChartView {
 			return Math.max(this.fixedMin, 1);
 		}
 		let min = Infinity;
-		for(let i = 0; i < this.shape.schema.length; ++i) {
-			let fret = this.shape.schema[i][1];
+		for(let i = 0; i < this.shape.strings.length; ++i) {
+			let fret = this.shape.strings[i].fret;
 			min = fret < min ? fret : min;
 		}
 		return min;
@@ -145,10 +145,10 @@ class ShapeChartView {
 		};
 		
 		//Iterate through the shape's strings
-		for(let string = 0; string < this.shape.schema.length; ++string) {
-			let stringAction = this.shape.schema[string];
-			let finger = stringAction[0];
-			let fret = stringAction[1];
+		for(let string = 0; string < this.shape.strings.length; ++string) {
+			let stringAction = this.shape.strings[string];
+			let finger = stringAction.finger;
+			let fret = stringAction.fret;
 			
 			if(fret === null) {
 				//relative fret == null ==> dead string

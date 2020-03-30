@@ -67,12 +67,10 @@ class EditableShapeView {
 				.fingerSelect
 				.addEventListener("change", this.inputChanged.bind(this));
 			stringActionViews
-				.relativeFretSelectView
-				.fretSelect
+				.relativeFretSelect
 				.addEventListener("change", () => this.fretChanged(i));
 			stringActionViews
-				.relativeFretSelectView
-				.fretSelect
+				.relativeFretSelect
 				.addEventListener("change", this.inputChanged.bind(this));
 		}
 		
@@ -107,8 +105,7 @@ class EditableShapeView {
 				this
 					.shapeStringActionViews
 					.strings[i]
-					.relativeFretSelectView
-					.fretSelect
+					.relativeFretSelect
 			);
 			fretRow.append(fretCell);
 			
@@ -185,52 +182,49 @@ class EditableShapeView {
 		//If 'Open' is selected, minFretInput is hidden;
 		//OPEN_FRET is invalid if 'Movable' is selected;
 		//therefore, minFretInput's minimum value is OPEN_FRET + 1.
-		this.minFretInput.value = this.initialShape.range[0] === OPEN_FRET ?
-			OPEN_FRET + 1 : this.initialShape.range[0];
+		this.minFretInput.value = this.initialShape.range.min === OPEN_FRET ?
+			OPEN_FRET + 1 : this.initialShape.range.min;
 		this.updateRRangeLabel();
 		for(let i = 0; i < NUM_STRINGS; ++i) {
-			let finger = this.initialShape.schema[i][0];
+			let stringAction = this.initialShape.strings[i];
 			$(
 				this
 					.shapeStringActionViews
 					.strings[i]
 					.fingerSelectView
 					.fingerSelect
-			).val(finger === null ? "null" : finger);
-			this.shapeStringActionViews.strings[i].fingerSelectView.finger = finger;
-			
-			let fret = this.initialShape.schema[i][1];
+			).val(stringAction.finger === null ? "null" : stringAction.finger);
+			this.shapeStringActionViews.strings[i].fingerSelectView.finger = stringAction.finger;
 			$(
 				this
 					.shapeStringActionViews
 					.strings[i]
-					.relativeFretSelectView
-					.fretSelect
-			).val(fret === null ? "null" : fret);
-			this.shapeStringActionViews.strings[i].relativeFretSelectView.fret = fret;
+					.relativeFretSelect
+			).val(stringAction.fret === null ? "null" : stringAction.fret);
+			this.shapeStringActionViews.strings[i].relativeFretSelect.fret = stringAction.fret;
 			this.fretChanged(i);
 		}
 		this.maxFretChanged();
 	}
 	
 	maxFretChanged() {
-		this.shapeChartView.shape.range[1] = parseInt(
+		this.shapeChartView.shape.range.max = parseInt(
 			this.maxFretSelect.options[
 				this.maxFretSelect.selectedIndex
 			].value
 		);
 		
-		if(this.shapeChartView.shape.range[1] === OPEN_FRET) {
+		if(this.shapeChartView.shape.range.max === OPEN_FRET) {
 			//This is an open chord
 			this.container.dataset.isOpen = 'true';
 			//Set the min fret to 0
-			this.shapeChartView.shape.range[0] = OPEN_FRET;
+			this.shapeChartView.shape.range.min = OPEN_FRET;
 			
 		} else {
 			//This is a movable chord
 			this.container.dataset.isOpen = 'false';
 			//Set the min fret to the input value
-			this.shapeChartView.shape.range[0] = parseInt(this.minFretInput.value);
+			this.shapeChartView.shape.range.min = parseInt(this.minFretInput.value);
 		}
 		
 		this.updateRRangeLabel();
@@ -257,10 +251,10 @@ class EditableShapeView {
 			)
 		) {
 			//No, reset
-			minFret = this.shapeChartView.shape.range[0];
+			minFret = this.shapeChartView.shape.range.min;
 		} else {
 			//Yes, update
-			this.shapeChartView.shape.range[0] = minFret;
+			this.shapeChartView.shape.range.min = minFret;
 			this.updateRRangeLabel();
 			this.inputChanged();
 		}
@@ -279,7 +273,7 @@ class EditableShapeView {
 		let fret = this
 			.shapeStringActionViews
 			.strings[stringIndex]
-			.relativeFretSelectView
+			.relativeFretSelect
 			.fret;
 		let isFingerless =
 			fret === null ||
@@ -324,18 +318,17 @@ class EditableShapeView {
 				.strings
 				.map(stringActionViews => {
 					let finger = stringActionViews.fingerSelectView.finger;
-					let fret = stringActionViews.relativeFretSelectView.fret;
-					
+					let fret = stringActionViews.relativeFretSelect.fret;
 					//If open shape and open fret, force the finger to null
-					return new Array(
+					return StringAction.WithFretAndFinger(
+						fret,
 						fret === DEAD_STRING ||
 						(isOpenShape && fret === ROOT_FRET) ?
 							null :
 							finger,
-						fret
 					);
 				}),
-			new Array(
+			new Range(
 				maxFret === OPEN_FRET ?
 					OPEN_FRET :
 					parseInt(this.minFretInput.value),
@@ -346,7 +339,7 @@ class EditableShapeView {
 	}
 	
 	getFixedMin() {
-		if(this.shapeChartView.shape.range[0] === MAX_ROOT_FRET) {
+		if(this.shapeChartView.shape.range.min === MAX_ROOT_FRET) {
 			return MAX_ROOT_FRET;
 		}
 		if(shapeService.isOpenShape(this.shapeChartView.shape)) {

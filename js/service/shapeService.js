@@ -9,15 +9,11 @@ class ShapeService {
 	 * Determine if Shape a equals Shape b.
 	 */
 	equals(a, b) {
-		//Are the schemas the same?
+		//Are the strings the same?
 		for(let i = 0; i < NUM_STRINGS; ++i) {
-			var aStringAction = a.schema[i];
-			var bStringAction = b.schema[i];
-			for(let j = 0; j < aStringAction.length; ++j) {
-				if(aStringAction[j] != bStringAction[j]) {
-					//Different string action value
-					return false;
-				}
+			if(! a.strings[i].equals(b.strings[i])) {
+				//Different string action value
+				return false;
 			}
 		}
 		
@@ -26,7 +22,7 @@ class ShapeService {
 	}
 	
 	isOpenShape(shape) {
-		return 0 === shape.range[0] && 0 === shape.range[1];
+		return OPEN_FRET === shape.range.min && OPEN_FRET === shape.range.max;
 	}
 	
 	doesShapeExist(shape) {
@@ -60,6 +56,8 @@ class ShapeService {
 		let fixedShapes = new Array();
 		let candidate = null;
 		for(let i = 0; i < n; ++i) {
+			//If the candidate is either null or
+			//equals another chosen shape with the same fret
 			while(
 				candidate == null || (
 					fixedShapes.filter(chosen =>
@@ -71,6 +69,7 @@ class ShapeService {
 					).length > 0
 				)
 			){
+				//Pick another candidate
 				const shape = this.getShape(
 					Math.floor(
 						Math.random() * this.shapes.length
@@ -80,8 +79,8 @@ class ShapeService {
 					shape: shape,
 					fret: Math.floor(
 						Math.random() * 
-						(shape.range[1] - shape.range[0]) +
-						shape.range[0]
+						(shape.range.max - shape.range.min) +
+						shape.range.min
 					)
 				};
 			}
@@ -107,21 +106,21 @@ class ShapeService {
 	}
 	
 	/**
-	 * @param frets An array of 6 fret values. Can contain ANY_FRET on any string.
-	 * @return An array with a maximum of 6 results.
+	 * @param frets An array of 9 fret values. Can contain ANY_FRET on any string.
+	 * @return An array with a maximum of 9 results.
 	 */
 	searchShapesWithFrets(frets) {
 		let matches = [];
 		
 		//For each shape
-		for(let i = 0; i < this.shapes.length && matches.length < 6; ++i) {
+		for(let i = 0; i < this.shapes.length && matches.length < 9; ++i) {
 			let isAMatch = true;
 			//For each string
 			for(let string = 0; string < NUM_STRINGS; ++string) {
 				//Does search match the fret for this shape's string?
 				if(
 					frets[string] !== ANY_FRET &&
-					this.shapes[i].schema[string][1] !== frets[string]
+					this.shapes[i].strings[string].fret !== frets[string]
 				) {
 					//No. This shape is not a match.
 					isAMatch = false;
@@ -148,14 +147,13 @@ class ShapeService {
 		let containsRootFret = false;
 		let isOpenShape = this.isOpenShape(shape);
 		let fingerFrets = [{},{},{},{},{}];
-		for(let string = 0; string < shape.schema.length; ++string) {
-			let finger = shape.schema[string][0];
-			let fret = shape.schema[string][1];
+		for(let string = 0; string < shape.strings.length; ++string) {
+			let stringAction = shape.strings[string];
 			
 			//Every dead string must have no finger
 			if(
-				fret === DEAD_STRING &&
-				finger !== NO_FINGER
+				stringAction.fret === DEAD_STRING &&
+				stringAction.finger !== NO_FINGER
 			) {
 				return "Dead string has finger";
 			}
@@ -164,25 +162,25 @@ class ShapeService {
 			//	a) Must be an open shape, and
 			//	b) Must be the root fret.
 			if(
-				fret !== DEAD_STRING &&
-				finger === NO_FINGER && ! (
+				stringAction.fret !== DEAD_STRING &&
+				stringAction.finger === NO_FINGER && ! (
 					isOpenShape &&
-					fret === ROOT_FRET
+					stringAction.fret === ROOT_FRET
 				)
 			) {
 				return "Finger missing";
 			}
 			
 			//A finger can be placed on at most one fret
-			if(finger !== null && fret !== null) {
-				fingerFrets[finger][fret] = true;
-				if(Object.keys(fingerFrets[finger]).length > 1) {
+			if(stringAction.finger !== null && stringAction.fret !== null) {
+				fingerFrets[stringAction.finger][stringAction.fret] = true;
+				if(Object.keys(fingerFrets[stringAction.finger]).length > 1) {
 					return "Finger on multiple frets";
 				}
 			}
 			
 			//Check if this string is at the root fret
-			if(fret === ROOT_FRET) {
+			if(stringAction.fret === ROOT_FRET) {
 				containsRootFret = true;
 			}
 		}
@@ -193,12 +191,12 @@ class ShapeService {
 		}
 		
 		//min <= max
-		if(shape.range[0] > shape.range[1]) {
+		if(shape.range.min > shape.range.max) {
 			return "min > max";
 		}
 		
 		//Either an open or min > 0
-		if(! (isOpenShape || shape.range[0] > OPEN_FRET)) {
+		if(! (isOpenShape || shape.range.min > OPEN_FRET)) {
 			return "A movable shape cannot be played in open position";
 		}
 		
@@ -211,33 +209,25 @@ class ShapeService {
 	 */
 	shapeFromString(string, id=null) {
 		let shapeProperties = string.split(":");
-				
-		let stringActions = new Array();
-		let stringActionProperties = shapeProperties[0].split(";");
-		for(let j = 0; j < stringActionProperties.length; ++j) {
-			let stringAction = stringActionProperties[j].split(",");
-			stringActions.push(
-				new Array(
+		let rangeProperties = shapeProperties[1].split(";");
+		let strings = shapeProperties[0]
+			.split(";")
+			.map(stringActionProperties => {
+				let stringAction = stringActionProperties.split(",");
+				return StringAction.WithFretAndFinger(
 					stringAction[0] === "" ? null : parseInt(stringAction[0]),
 					stringAction[1] === "" ? null : parseInt(stringAction[1])
-				)
-			);
-		}
-		
-		let range = new Array();
-		let rangeProperties = shapeProperties[1].split(";");
-		range.push(
+				);
+			});
+		let range = new Range(
 			rangeProperties[0] == "" ?
 				null :
-				parseInt(rangeProperties[0])
-		);
-		range.push(
+				parseInt(rangeProperties[0]),
 			rangeProperties[1] == "" ?
 				null :
 				parseInt(rangeProperties[1])
 		);
-		
-		return new Shape(id, stringActions, range);
+		return new Shape(id, strings, range);
 	}
 	
 	shapesFromString(string) {
@@ -250,15 +240,13 @@ class ShapeService {
 	 * Convert a shape to a string
 	 */
 	shapeToString(shape) {
-		return shape.schema.map(stringAction =>
-			stringAction.map(value =>
-				value == null ? "" : value
-			).join(',')
+		return shape.strings.map(stringAction =>
+			(stringAction.fret === null ? "" : stringAction.fret) + "," +
+			(stringAction.finger === null ? "" : stringAction.finger)
 		).join(";") +
 		":" +
-		shape.range.map(value =>
-			value == null ? "" : value
-		).join(';');
+		(shape.range.min === null ? "" : shape.range.min + ";") +
+		(shape.range.max === null ? "" : shape.range.max + ";");
 	}
 	
 	shapesToString(shapes) {

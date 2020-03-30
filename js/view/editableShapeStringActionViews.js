@@ -15,9 +15,10 @@ class EditableStringActionViews {
 	constructor(
 		stringLabel,
 		stringIndex,
-		stringAction=new Array(null, null)
+		stringAction = StringAction.DeadString()
 	) {
 		this.stringLabel = stringLabel;
+		this.stringIndex = stringIndex;
 		this.stringAction = stringAction;
 		this.initializeHtml();
 	}
@@ -26,10 +27,10 @@ class EditableStringActionViews {
 		this.label = document.createElement("span");
 		this.label.className = "stringActionInputLabel";
 		this.label.textContent = this.stringLabel;
-		this.fingerSelectView = new FingerSelectView(this.stringAction[0])
-		this.relativeFretSelectView = new RelativeFretSelectView({
+		this.fingerSelectView = new FingerSelectView(this.stringAction.finger)
+		this.relativeFretSelect = new RelativeFretSelect({
 			string: this.stringIndex,
-			fret: this.stringAction[1]
+			fret: this.stringAction.fret
 		});
 	}
 }
