@@ -63,7 +63,7 @@ class FingerSelect extends HTMLSelectElement {
 	}
 }
 
-window.customElements.define(
+customElements.define(
 	"finger-select",
 	FingerSelect,
 	{extends: "select"}

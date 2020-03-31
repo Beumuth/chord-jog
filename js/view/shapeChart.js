@@ -1,9 +1,17 @@
-class ShapeChartView {
-	constructor(shape=new Shape(), fixedMin=null) {
-		this.shape = shape;
-		this.fixedMin = fixedMin;
+class ShapeChart extends HTMLCanvas {
+	constructor(options) {
+		super();
+		this.initialOptions = {
+			shape: options.shape ? options.shape : new Shape(),
+			fixedMin: options.fixedMin ? options.fixedMin : null
+		};
 		this.initializeConstants();
-		this.initializeHtml();
+	}
+	
+	connectedCallback() {
+		this.width = this.canvasWidth;
+		this.height = this.canvasHeight;
+		this.context = this.getContext("2d");
 		this.render();
 	}
 	
@@ -24,22 +32,6 @@ class ShapeChartView {
 		this.fingerOnStringCircleRadius=8;
 		
 		this.textHeight=10;
-	}
-	
-	initializeHtml() {
-		//Container
-		this.container = document.createElement("div");
-		this.container.className = "shapeChartView";
-		this.container.dataset.idShape = this.shape.id;
-		this.container.dataset.fixedMin = this.fixedMin == null;
-		
-		//Canvas
-		this.canvas = document.createElement('canvas');
-		this.canvas.width = this.canvasWidth;
-		this.canvas.height = this.canvasHeight;
-		this.container.append(this.canvas);
-		
-		this.context = this.canvas.getContext("2d");
 	}
 	
 	render() {
@@ -334,3 +326,9 @@ class ShapeChartView {
 		);
 	}
 }
+
+customElements.define(
+	"shape-chart",
+	ShapeChart,
+	{extends: "canvas"}
+);

@@ -1,43 +1,78 @@
-class EditableShapeView {
-	constructor(options = {}) {
-		this.initialShape = options.shape != null ? options.shape : new Shape();
-		this.initializeHtml(options);
+class EditableShape extends HTMLFormElement {
+	constructor(options) {
+		super()
+		this.initialOptions = {
+			shape: options.shape != null ? options.shape : new Shape(),
+			saveButton: {
+				text: options.saveButton.text ?
+					options.saveButton.text :
+					"Save",
+				callback: options.saveButton.callback
+			},
+			deleteButton: options.deleteButton ?
+				options.deleteButton :
+				null
+		};
+	}
+	
+	connectedCallback() {
+		this.initializeHtml();
 		this.initialize();
 		this.validate();
 	}
 	
-	initializeHtml(options){	
-		//Container
-		this.container = document.createElement("div");
-		this.container.className = "editableShapeView";
-		
+	get shapeChart() {
+		return $(this).find("[is='shape-chart']").get(0);
+	}
+	
+	get minFretSelect() {
+		return getElementsByClassName("minFretInput").get(0);
+	}
+	
+	get maxFretSelect() {
+		return getElementsByClassName("shapeTypeSelect")[0];
+	}
+	
+	get rRangeLabel() {
+		return getElementsByClassName("rRangeLabel")[0];
+	}
+	
+	get editableShapeStrings() {
+		return $(this).find("[is='editable-shape-strings']").get(0);
+	}
+	
+	initializeHtml(){			
 		//Shape chart
-		this.shapeChartView = new ShapeChartView(this.initialShape.copy());
-		this.container.append(this.shapeChartView.container);
+		this.append(new ShapeChart({
+			shape: this.initialOptions.shape.copy()
+		}));
 		
 		//Min and max fret inputs
 		let rangeContainer = document.createElement("div");
 		rangeContainer.className = "rangeContainer";
-		this.container.append(rangeContainer);
+		this.append(rangeContainer);
 		//	Max
 		//		Select
-		this.maxFretSelect = document.createElement("select");
-		this.maxFretSelect.className = "shapeTypeSelect";
-		this.maxFretSelect.classList.add("enumSelect");
-		this.maxFretSelect.onchange = this.maxFretChanged.bind(this);
-		rangeContainer.append(this.maxFretSelect);
+		let maxFretSelect = document.createElement("select");
+		maxFretSelect.className = "shapeTypeSelect";
+		maxFretSelect.classList.add("enumSelect");
+		maxFretSelect.onchange = this.maxFretChanged.bind(this);
+		rangeContainer.append(maxFretSelect);
 		//		Open fret option
 		let openFretOption = document.createElement("option");
 		openFretOption.className = "maxFretOpenOption";
 		openFretOption.value = 0;
 		openFretOption.textContent = "Open";
-		this.maxFretSelect.append(openFretOption);
+		maxFretSelect.append(openFretOption);
 		//		Max root fret option
 		let maxRootFretOption = document.createElement("option");
 		maxRootFretOption.className = "maxFretMaxRootOption";
 		maxRootFretOption.value = 11;
 		maxRootFretOption.textContent = "Movable";
-		this.maxFretSelect.append(maxRootFretOption);
+		maxFretSelect.append(maxRootFretOption);
+		//		Selected index
+		maxFretSelect.selectedIndex = shapeService.isOpenShape(this.initialShape) ?
+			1 : 0;
 		//	Min
 		//		Container
 		let minFretContainer = document.createElement("div");
@@ -45,102 +80,57 @@ class EditableShapeView {
 		minFretContainer.classList.add("rangeSubcontainer");
 		rangeContainer.append(minFretContainer);
 		//		Input
-		this.minFretInput = document.createElement("input");
-		this.minFretInput.type = "text";
-		this.minFretInput.className = "minFretInput";
-		this.minFretInput.maxLength = 2;
-		this.minFretInput.onclick = this.minFretClicked.bind(this);
-		this.minFretInput.onchange = this.minFretChanged.bind(this);
+		let minFretInput = document.createElement("input");
+		minFretInput.type = "text";
+		minFretInput.className = "minFretInput";
+		minFretInput.maxLength = 2;
+		minFretInput.onclick = minFretClicked.bind(this);
+		minFretInput.onchange = minFretChanged.bind(this);
 		minFretContainer.append(this.minFretInput);
 		
 		//R range label
-		this.rRangeLabel = document.createElement("span");
-		this.rRangeLabel.className = "rRangeLabel";
-		minFretContainer.append(this.rRangeLabel);
+		let rRangeLabel = document.createElement("span");
+		rRangeLabel.className = "rRangeLabel";
+		minFretContainer.append(rRangeLabel);
 		
-		//Controls table
-		this.shapeStringActionViews = new EditableShapeStringActionViews();
-		for(let i = 0; i < this.shapeStringActionViews.strings.length; ++i) {
-			let stringActionViews = this.shapeStringActionViews.strings[i];
-			stringActionViews
-				.fingerSelect
-				.addEventListener("change", this.inputChanged.bind(this));
-			stringActionViews
-				.relativeFretSelect
-				.addEventListener("change", () => this.fretChanged(i));
-			stringActionViews
-				.relativeFretSelect
-				.addEventListener("change", this.inputChanged.bind(this));
-		}
-		
-		//Table
-		this.controlsContainer = document.createElement("table");
-		this.controlsContainer.className = "editShapeControlsContainer";
-		this.container.append(this.controlsContainer);
-		
-		//Rows
-		let labelRow = document.createElement("tr");
-		let fretRow = document.createElement("tr");
-		let fingerRow = document.createElement("tr");
-		this.controlsContainer.append(labelRow);
-		this.controlsContainer.append(fretRow);
-		this.controlsContainer.append(fingerRow);
-		
-		//Columns
-		for(let i = 0; i < this.shapeStringActionViews.strings.length; ++i) {
-			//Label cell
-			let labelCell = document.createElement("th");
-			labelCell.append(
-				this
-					.shapeStringActionViews
-					.strings[i]
-					.label
-			);
-			labelRow.append(labelCell);
-			
-			//Fret cell
-			let fretCell = document.createElement("td");
-			fretCell.append(
-				this
-					.shapeStringActionViews
-					.strings[i]
-					.relativeFretSelect
-			);
-			fretRow.append(fretCell);
-			
-			//Finger cell
-			let fingerCell = document.createElement("td");
-			fingerCell.append(
-				this
-					.shapeStringActionViews
-					.strings[i]
+		//Editable shape strings
+		let editableShapeStrings = new EditableShapeStrings();
+		Integer
+			.range(0, NUM_STRINGS)
+			.forEach(string => {
+				let editableShapeString = editableShapeStrings.strings[i];
+				editableShapeString
 					.fingerSelect
-			);
-			fingerRow.append(fingerCell);
-		}
+					.addEventListener("change", this.inputChanged.bind(this));
+				editableShapeString
+					.relativeFretSelect
+					.addEventListener("change", () => this.fretChanged(i));
+				editableShapeString
+					.relativeFretSelect
+					.addEventListener("change", this.inputChanged.bind(this));
+			});
+		this.append(editableShapeStrings);
 		
 		//Buttons
 		let buttonContainer = document.createElement("div");
 		buttonContainer.className = "editShapeButtonRow";
-		this.container.append(buttonContainer);
+		this.append(buttonContainer);
 		
 		//Save button
-		this.saveButton = document.createElement("button");
-		this.saveButton.type = "button";
-		this.saveButton.className = "editShapeEditButton";
-		this.saveButton.textContent = options.saveButtonText !== undefined ?
-			options.saveButtonText :
-			"Save";
-		this.saveButton.onclick = options.saveButtonHandler;
+		let saveButton = document.createElement("button");
+		saveButton.type = "button";
+		saveButton.className = "editShapeEditButton";
+		saveButton.textContent = this.initialOptions.saveButton.text;
+		saveButton.onclick = this.initialOptions.saveButton.callback;
 		
 		//Reset button
-		this.resetButton = document.createElement("button");
-		this.resetButton.type = "button";
-		this.resetButton.className = "editShapeResetButton";
-		this.resetButton.textContent = "Reset";
-		this.resetButton.onclick = this.resetButtonClicked.bind(this);
+		let resetButton = document.createElement("button");
+		resetButton.type = "button";
+		resetButton.className = "editShapeResetButton";
+		resetButton.textContent = "Reset";
+		resetButton.onclick = this.resetButtonClicked.bind(this);
 		
-		if(options.includesDeleteButton === true) {
+		if(this.initialOptions.deleteButton) {
 			//There is a delete button. Use a two-row button scheme,
 			//with the edit button on the top row and the reset and
 			//delete buttons on the bottom.
@@ -149,34 +139,29 @@ class EditableShapeView {
 			let topRow = document.createElement("div");
 			topRow.className = "editShapeButtonRowTop";
 			buttonContainer.append(topRow);
-			topRow.append(this.saveButton);
+			topRow.append(saveButton);
 			
 			//Bottom row
 			let bottomRow = document.createElement("div");
 			bottomRow.className = "editShapeButtonRowBottom";
 			buttonContainer.append(bottomRow);
-			bottomRow.append(this.resetButton);
+			bottomRow.append(resetButton);
 			
 			//	Delete button
-			this.deleteButton = document.createElement("button");
-			this.deleteButton.type = "button";
-			this.deleteButton.className = "editShapeDeleteButton";
-			this.deleteButton.textContent = "Delete";
-			this.deleteButton.onclick = options.deleteButtonHandler;
-			bottomRow.append(this.deleteButton);
+			let deleteButton = document.createElement("button");
+			deleteButton.type = "button";
+			deleteButton.className = "editShapeDeleteButton";
+			deleteButton.textContent = "Delete";
+			deleteButton.onclick = this.initialOptions.deleteButton.callback;
+			bottomRow.append(deleteButton);
 		} else {
 			//There is no delete button. Use a one-row button scheme.
-			buttonContainer.append(this.saveButton);
-			buttonContainer.append(this.resetButton);
+			buttonContainer.append(saveButton);
+			buttonContainer.append(resetButton);
 		}
 	}
 	
 	initialize() {
-		this.container.dataset.isOpen = 
-			shapeService.isOpenShape(this.initialShape) ? 'true' : 'false';
-		this.maxFretSelect.selectedIndex =
-			shapeService.isOpenShape(this.initialShape) ? 0 : 1;
-			
 		//If 'Open' is selected, minFretInput is hidden;
 		//OPEN_FRET is invalid if 'Movable' is selected;
 		//therefore, minFretInput's minimum value is OPEN_FRET + 1.
@@ -366,3 +351,9 @@ class EditableShapeView {
 		return this.container.dataset.isOpen === "true";
 	}
 }
+
+customElements.define(
+	"editable-shape",
+	EditableShape,
+	{extends: "form"}
+);
