@@ -1,36 +1,35 @@
 class RelativeFretSelect extends HTMLSelectElement {
 	constructor(options) {
 		super();
-		
-		this.setAttribute("is", "relative-fret-select");
-		
-		this.setAttribute("string", options.string);
-		this.frets = [ANY_FRET, null, 0, 1, 2, 3, 4];
-		this.fretLabels = [ANY_FRET, "x", "0", "1", "2", "3", "4"];
-		if(options.nullable !== true) {
-			this.frets.splice(0, 1);
-			this.fretLabels.splice(0, 1);
-		}
-		
-		this.fret = options.fret !== undefined ? options.fret : this.frets[0];
-		this.className = "relativeFretSelect";
-		this.classList.add("enumSelect");
-		for(let i = 0; i < this.frets.length; ++i) {
-			let curOption = document.createElement("option");
-			curOption.className = "fretOption";
-			curOption.value = this.frets[i];
-			curOption.textContent = this.fretLabels[i];
-			this.append(curOption);
-		}
-		this.onchange = this.fretSelectOnChange.bind(this);
+		this.initialOptions = {
+			string: options.string,
+			selectedFret: options.selectedFret !== undefined ?
+				options.selectedFret :
+				null,
+			includeAnyFret: options.includeAnyFret ?
+				options.includeAnyFret :
+				false
+		};
 	}
 	
-	fretSelectOnChange() {
-		this.setAttribute("fret", this.options[this.selectedIndex].value);
+	connectedCallback() {
+		this.setAttribute("is", "relative-fret-select");
+		this.setAttribute("string", this.initialOptions.string);
+		if(this.initialOptions.includeAnyFret) {
+			this.append(new Option(ANY_FRET, ANY_FRET));
+		}
+		this.append(new Option(DEAD_STRING, DEAD_STRING));
+		Integer
+			.range(ROOT_FRET, MAX_SHAPE_RANGE)
+			.forEach(i => this.append(new Option(i, i)));
+		if(this.initialOptions.selectedFret !== null) {
+			this.fret = this.initialOptions.selectedFret;
+		}
+		this.classList.add("enumSelect");
 	}
 	
 	get fret() {
-		let fret = this.getAttribute("fret");
+		let fret = this.options[this.selectedIndex].value;
 		return fret === "null" ?
 			null :
 			fret === ANY_FRET ?
@@ -39,12 +38,17 @@ class RelativeFretSelect extends HTMLSelectElement {
 	}
 	
 	set fret(fret) {
-		this.setAttribute("fret", fret);
-		this.selectedIndex = this.frets.indexOf(fret);
+		this.selectedIndex = Integer
+			.range(0, this.initialOptions.length)
+			.find(i => this.initialOptions[i].value == fret);
+	}
+	
+	get string() {
+		return parseInt(this.getAttribute("string"));
 	}
 }
 
-customElements.define(
+window.customElements.define(
 	"relative-fret-select",
 	RelativeFretSelect,
 	{extends: "select"}

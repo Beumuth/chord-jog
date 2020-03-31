@@ -49,7 +49,8 @@ class ShapesEditorView {
 			let inputCell = document.createElement("td");
 			let relativeFretSelect = new RelativeFretSelect({
 				string: i,
-				nullable: true
+				selectedFret: null,
+				includeAnyFret: true
 			});
 			relativeFretSelect.addEventListener(
 				"change",

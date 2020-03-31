@@ -27,10 +27,13 @@ class EditableStringActionViews {
 		this.label = document.createElement("span");
 		this.label.className = "stringActionInputLabel";
 		this.label.textContent = this.stringLabel;
-		this.fingerSelectView = new FingerSelectView(this.stringAction.finger)
+		this.fingerSelect = new FingerSelect({
+			string: this.stringIndex,
+			selectedFinger: this.stringAction.finger
+		});
 		this.relativeFretSelect = new RelativeFretSelect({
 			string: this.stringIndex,
-			fret: this.stringAction.fret
+			selectedFret: this.stringAction.fret
 		});
 	}
 }

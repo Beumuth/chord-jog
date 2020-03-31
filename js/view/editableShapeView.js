@@ -63,7 +63,6 @@ class EditableShapeView {
 		for(let i = 0; i < this.shapeStringActionViews.strings.length; ++i) {
 			let stringActionViews = this.shapeStringActionViews.strings[i];
 			stringActionViews
-				.fingerSelectView
 				.fingerSelect
 				.addEventListener("change", this.inputChanged.bind(this));
 			stringActionViews
@@ -115,7 +114,6 @@ class EditableShapeView {
 				this
 					.shapeStringActionViews
 					.strings[i]
-					.fingerSelectView
 					.fingerSelect
 			);
 			fingerRow.append(fingerCell);
@@ -191,17 +189,18 @@ class EditableShapeView {
 				this
 					.shapeStringActionViews
 					.strings[i]
-					.fingerSelectView
 					.fingerSelect
 			).val(stringAction.finger === null ? "null" : stringAction.finger);
-			this.shapeStringActionViews.strings[i].fingerSelectView.finger = stringAction.finger;
-			$(
-				this
-					.shapeStringActionViews
-					.strings[i]
-					.relativeFretSelect
-			).val(stringAction.fret === null ? "null" : stringAction.fret);
-			this.shapeStringActionViews.strings[i].relativeFretSelect.fret = stringAction.fret;
+			this
+				.shapeStringActionViews
+				.strings[i]
+				.fingerSelect
+				.finger = stringAction.finger;
+			this
+				.shapeStringActionViews
+				.strings[i]
+				.relativeFretSelect
+				.fret = stringAction.fret;
 			this.fretChanged(i);
 		}
 		this.maxFretChanged();
@@ -281,7 +280,6 @@ class EditableShapeView {
 		this
 			.shapeStringActionViews
 			.strings[stringIndex]
-			.fingerSelectView
 			.fingerSelect
 			.disabled = isFingerless;
 	}
@@ -317,7 +315,7 @@ class EditableShapeView {
 				.shapeStringActionViews
 				.strings
 				.map(stringActionViews => {
-					let finger = stringActionViews.fingerSelectView.finger;
+					let finger = stringActionViews.fingerSelect.finger;
 					let fret = stringActionViews.relativeFretSelect.fret;
 					//If open shape and open fret, force the finger to null
 					return StringAction.WithFretAndFinger(
