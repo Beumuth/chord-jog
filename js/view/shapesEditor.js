@@ -14,6 +14,10 @@ class ShapesEditor extends HTMLElement {
 		return this.getElementByClassName("shapeChartList");
 	}
 	
+	get relativeFretSelects() {
+		return $("[is='relative-fret-select']").get();
+	}
+	
 	initializeHtml() {
 		this.classList.add("sectionContainer");
 		
@@ -111,7 +115,7 @@ class ShapesEditor extends HTMLElement {
 	
 	search() {
 		this.clearResults();
-		let search = this.relativeFretSelects.map(view => view.fret);
+		let search = this.relativeFretSelects.map(fretSelect => fretSelect.fret);
 		if(
 			! search
 				.map(string => string === ANY_FRET)
@@ -132,8 +136,9 @@ class ShapesEditor extends HTMLElement {
 	
 	displaySingleResult(shape) {
 		this.clearResults();
+		let relativeFretSelects = this.relativeFretSelects;
 		shape.strings.forEach((stringAction, string) =>
-			this.relativeFretSelects[string].fret = stringAction.fret
+			relativeFretSelects[string].fret = stringAction.fret
 		);
 		this.addResult(shape);
 		this.resultsContainer.dataset.isEmpty = false;
