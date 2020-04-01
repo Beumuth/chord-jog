@@ -16,11 +16,15 @@ class ShapesEditor extends HTMLDivElement {
 	}
 	
 	get relativeFretSelects() {
-		return this.querySelector("[is='relative-fret-select']");
+		return Array.from(
+			this.querySelectorAll("[is='relative-fret-select']").values()
+		);
 	}
 	
 	get editableShapes() {
-		return this.querySelector("[is='editable-shape']");
+		return Array.from(
+			this.querySelectorAll("[is='editable-shape']")
+		);
 	}
 	
 	initializeHtml() {
