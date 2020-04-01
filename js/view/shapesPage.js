@@ -1,4 +1,4 @@
-class ShapesView {
+class ShapesPage extends Page {
 	constructor() {
 		
 	}
@@ -13,8 +13,8 @@ class ShapesView {
 		pageView.container.append(this.container);
 		
 		this.createImportExportView();
-		this.createShapesEditorView();
-		this.createAddShapeView();
+		this.createShapesEditor();
+		this.createShapeCreator();
 	}
 	
 	createImportExportView() {
@@ -69,12 +69,12 @@ class ShapesView {
 		return input;
 	}
 	
-	createShapesEditorView() {
+	createShapesEditor() {
 		this.shapesEditor = new ShapesEditorView();
 		this.container.append(this.shapesEditor.container);
 	}
 	
-	createAddShapeView() {
+	createShapeCreator() {
 		//Container
 		let addShapeViewContainer = document.createElement("div");
 		addShapeViewContainer.id = "addShapeViewContainer";
@@ -122,4 +122,4 @@ class ShapesView {
 	}
 }
 
-const shapesView = new ShapesView();
+const shapesPage = new ShapesPage();

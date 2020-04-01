@@ -1,4 +1,4 @@
-class ShapeChart extends HTMLCanvas {
+class ShapeChart extends HTMLCanvasElement {
 	constructor(options) {
 		super();
 		this.initialOptions = {

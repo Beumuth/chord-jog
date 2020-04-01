@@ -1,4 +1,4 @@
-class PracticeView {
+class PracticePage extends Page {
 	constructor() {
 		this.MIN_NUM_CHORDS = 1;
 		this.MAX_NUM_CHORDS = 8;
@@ -143,4 +143,4 @@ class PracticeView {
 	}
 }
 
-const practiceView = new PracticeView();
+const practicePage = new PractiePage();

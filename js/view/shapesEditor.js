@@ -1,13 +1,21 @@
-class ShapesEditorView {
+class ShapesEditor extends HTMLElement {
 	constructor() {
+	}
+	
+	connectedCallback() {
 		this.initializeHtml();
 	}
 	
+	get resultsContainer() {
+		return this.getElementByClassName("editShapesResultsContainer");
+	}
+	
+	get resultsList() {
+		return this.getElementByClassName("shapeChartList");
+	}
+	
 	initializeHtml() {
-		//Container
-		this.container = document.createElement("div");
-		this.container.className = "shapesEditor";
-		this.container.classList.add("sectionContainer");
+		this.classList.add("sectionContainer");
 		
 		this.createSearchContainer();
 		this.createResultsContainer();
@@ -18,7 +26,7 @@ class ShapesEditorView {
 		let searchContainer = document.createElement("div");
 		searchContainer.className = "editShapesSearchContainer";
 		searchContainer.classList.add("sectionContainer");
-		this.container.append(searchContainer);
+		this.append(searchContainer);
 		
 		//	Search header
 		let header = document.createElement("h3");
@@ -36,7 +44,7 @@ class ShapesEditorView {
 		searchTable.append(headerRow);
 		
 		//		Fret inputs row
-		this.relativeFretSelects = new Array();
+		let relativeFretSelects = new Array();
 		let searchFretInputsRow = document.createElement("tr");
 		searchTable.append(searchFretInputsRow);
 		for(let i = 0; i < NUM_STRINGS; ++i) {
@@ -56,7 +64,7 @@ class ShapesEditorView {
 				"change",
 				this.search.bind(this)
 			);
-			this.relativeFretSelects.push(relativeFretSelect);
+			relativeFretSelects.push(relativeFretSelect);
 			inputCell.append(relativeFretSelect);
 			searchFretInputsRow.append(inputCell);
 		}
@@ -77,28 +85,28 @@ class ShapesEditorView {
 	
 	createResultsContainer() {
 		//Results container
-		this.resultsContainer = document.createElement("div");
-		this.resultsContainer.className = "editShapesResultsContainer";
-		this.resultsContainer.classList.add("sectionContainer");
-		this.resultsContainer.dataset.isEmpty = "true";
-		this.container.append(this.resultsContainer);
+		let resultsContainer = document.createElement("div");
+		resultsContainer.className = "editShapesResultsContainer";
+		resultsContainer.classList.add("sectionContainer");
+		resultsContainer.dataset.isEmpty = "true";
+		this.append(resultsContainer);
 		
 		//	Results header
 		let resultsHeader = document.createElement("h3");
 		resultsHeader.className = "sectionHeader";
 		resultsHeader.textContent = "Editor";
-		this.resultsContainer.append(resultsHeader);
+		resultsContainer.append(resultsHeader);
 		
 		//	'Search for a shape' message
 		let searchForShape = document.createElement("span");
 		searchForShape.className = "editShapesSearchForShapeMessage";
 		searchForShape.textContent = "Search for a shape to edit";
-		this.resultsContainer.append(searchForShape);
+		resultsContainer.append(searchForShape);
 		
 		//	Results list
-		this.resultsList = document.createElement("ul");
-		this.resultsList.className = "shapeChartList";
-		this.resultsContainer.append(this.resultsList);
+		let resultsList = document.createElement("ul");
+		resultsList.className = "shapeChartList";
+		resultsContainer.append(resultsList);
 	}
 	
 	search() {
@@ -199,3 +207,8 @@ class ShapesEditorView {
 		}
 	}
 }
+
+customElements.define(
+	"shapes-editor",
+	ShapesEditor
+);

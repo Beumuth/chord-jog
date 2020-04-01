@@ -1,4 +1,4 @@
-class PageView {
+class Page extends HTMLElement {
 	render(pageTitle) {
 		//Container
 		this.container = document.createElement("div");
@@ -54,5 +54,3 @@ class PageView {
 		navigationBar.append(shapesButton);
 	}
 }
-
-const pageView = new PageView();

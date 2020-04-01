@@ -41,7 +41,7 @@ class EditableShape extends HTMLFormElement {
 		return $(this).find("[is='editable-shape-strings']").get(0);
 	}
 	
-	initializeHtml(){			
+	initializeHtml(){
 		//Shape chart
 		this.append(new ShapeChart({
 			shape: this.initialOptions.shape.copy()
@@ -200,13 +200,13 @@ class EditableShape extends HTMLFormElement {
 		
 		if(this.shapeChartView.shape.range.max === OPEN_FRET) {
 			//This is an open chord
-			this.container.dataset.isOpen = 'true';
+			this.dataset.isOpen = 'true';
 			//Set the min fret to 0
 			this.shapeChartView.shape.range.min = OPEN_FRET;
 			
 		} else {
 			//This is a movable chord
-			this.container.dataset.isOpen = 'false';
+			this.dataset.isOpen = 'false';
 			//Set the min fret to the input value
 			this.shapeChartView.shape.range.min = parseInt(this.minFretInput.value);
 		}
@@ -293,7 +293,7 @@ class EditableShape extends HTMLFormElement {
 				this.maxFretSelect.selectedIndex
 			].value
 		);
-		let isOpenShape = this.container.dataset.isOpen === "true";
+		let isOpenShape = this.dataset.isOpen === "true";
 		this.shapeChartView.shape = new Shape(
 			this.initialShape.id,
 			this
@@ -337,18 +337,18 @@ class EditableShape extends HTMLFormElement {
 			this.initialShape.id
 		);
 		if(validationResult === true) {
-			this.container.dataset.isValid = true;
+			this.dataset.isValid = true;
 			this.saveButton.title = "";
 			this.saveButton.disabled = false;
 		} else {
-			this.container.dataset.isValid = false;
+			this.dataset.isValid = false;
 			this.saveButton.title = validationResult;
 			this.saveButton.disabled = true;
 		}
 	}
 	
 	isOpenSelected() {
-		return this.container.dataset.isOpen === "true";
+		return this.dataset.isOpen === "true";
 	}
 }
 
