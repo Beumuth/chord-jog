@@ -25,7 +25,7 @@ class EditableShapeStrings extends HTMLOListElement {
 	}
 	
 	get strings() {
-		return $(this).find("[is='editable-shape-string']").get();
+		return this.querySelectorAll("[is='editable-shape-string']");
 	}
 }
 

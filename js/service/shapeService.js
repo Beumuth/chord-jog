@@ -54,7 +54,7 @@ class ShapeService {
 	
 	getNRandomFixedShapes(n) {
 		const fixedShapes = new Array();
-		const candidate = null;
+		let candidate = null;
 		for(let i = 0; i < n; ++i) {
 			//If the candidate is either null or
 			//equals another chosen shape with the same fret

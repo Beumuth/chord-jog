@@ -23,27 +23,27 @@ class EditableShape extends HTMLFormElement {
 	}
 	
 	get shapeChart() {
-		return $(this).find("[is='shape-chart']").get(0);
+		return this.querySelector("[is='shape-chart']");
 	}
 	
 	get minFretInput() {
-		return $(this).find(".minFretInput").get(0);
+		return this.querySelector(".minFretInput");
 	}
 	
 	get maxFretSelect() {
-		return $(this).find(".shapeTypeSelect").get(0);
+		return this.querySelector(".shapeTypeSelect");
 	}
 	
 	get rRangeLabel() {
-		return $(this).find(".rRangeLabel").get(0);
+		return this.querySelector(".rRangeLabel");
 	}
 	
 	get editableShapeStrings() {
-		return $(this).find("[is='editable-shape-strings']").get(0);
+		return this.querySelector("[is='editable-shape-strings']");
 	}
 	
 	get saveButton() {
-		return $(this).find(".editShapeEditButton").get(0);
+		return this.querySelector(".editShapeEditButton");
 	}
 	
 	initializeHtml(){

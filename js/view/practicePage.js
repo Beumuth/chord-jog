@@ -1,24 +1,26 @@
 class PracticePage extends Page {
 	constructor() {
+		super("Practice");
+		this.initializeConstants();
+	}
+	
+	initializeConstants() {
 		this.MIN_NUM_CHORDS = 1;
 		this.MAX_NUM_CHORDS = 8;
 		this.DEFAULT_NUM_SELECTED = 4;
 		this.NUM_OPTIONS_KEY = "chord-jog-num-options";
 	}
 	
-	onPageLoad() {
-		pageView.render("Practice");
+	connectedCallback() {
+		super.connectedCallback();
 		
 		//Container
-		const container = document.createElement("div");
-		pageView.container.append(container);
-		container.id = "practiceView";
-		container.className = "sectionContainer";
+		this.className = "sectionContainer";
 		
 		//	Num chords selector
 		//		Container
 		const numChordsContainer = document.createElement("div");
-		container.append(numChordsContainer);
+		this.append(numChordsContainer);
 		numChordsContainer.id = "numChordsContainer";
 		numChordsContainer.dataset.noSelect = true;
 		//		Label
@@ -28,14 +30,14 @@ class PracticePage extends Page {
 		numChordsLabel.textContent = "# chords";
 		//		Options
 		//			List
-		this.numChordsList = document.createElement("ol");
-		numChordsContainer.append(this.numChordsList);
-		this.numChordsList.id = "numChordsList";
+		const numChordsList = document.createElement("ol");
+		numChordsContainer.append(numChordsList);
+		numChordsList.id = "numChordsList";
 		const numChords = this.loadNumChords();
 		for(let i = this.MIN_NUM_CHORDS; i <= this.MAX_NUM_CHORDS; ++i) {
 			//		List item
 			const listItem = document.createElement("li");
-			this.numChordsList.append(listItem);
+			numChordsList.append(listItem);
 			listItem.className = "numChordsOption";
 			listItem.dataset.selected = i === numChords;
 			listItem.dataset.value = i;
@@ -46,25 +48,41 @@ class PracticePage extends Page {
 			listItem.onclick = () => this.selectNumChordsOption(listItem);
 		}
 		//		Reroll button
-		this.rerollButton = document.createElement("img");
-		numChordsContainer.append(this.rerollButton);
-		this.rerollButton.id = "rerollButton";
-		this.rerollButton.src = "./images/rollingDice.png";
-		this.rerollButton.width = 35;
-		this.rerollButton.height = 35;
-		this.rerollButton.tabIndex = this.MAX_NUM_CHORDS + 1;
-		this.rerollButton.dataset.active = false;
-		this.rerollButton.onkeydown = this.rerollOnKeyDown.bind(this);
-		this.rerollButton.onkeyup = this.rerollOnKeyUp.bind(this);
-		this.rerollButton.onclick = this.rerollChords.bind(this);
+		const rerollButton = document.createElement("img");
+		numChordsContainer.append(rerollButton);
+		rerollButton.id = "rerollButton";
+		rerollButton.src = "./images/rollingDice.png";
+		rerollButton.width = 35;
+		rerollButton.height = 35;
+		rerollButton.tabIndex = this.MAX_NUM_CHORDS + 1;
+		rerollButton.dataset.active = false;
+		rerollButton.onkeydown = this.rerollOnKeyDown.bind(this);
+		rerollButton.onkeyup = this.rerollOnKeyUp.bind(this);
+		rerollButton.onclick = this.rerollChords.bind(this);
 		
 		//	Shape chart list
-		this.shapeChartList = document.createElement("ul");
-		container.append(this.shapeChartList);
-		this.shapeChartList.id = "shapeChartList";
+		const shapeChartList = document.createElement("ul");
+		this.append(shapeChartList);
+		shapeChartList.id = "shapeChartList";
 		
 		//Roll chords
 		this.rerollChords();
+	}
+	
+	get numChordsList() {
+		return document.getElementById("numChordsList");
+	}
+	
+	get rerollButton() {
+		return document.getElementById("rerollButton");
+	}
+	
+	get shapeChartList() {
+		return document.getElementById("shapeChartList");
+	}
+	
+	get numChords() {
+		return parseInt(this.getSelectedNumChordsListItem().dataset.value);
 	}
 	
 	numChordsOptionKeyDown(e) {
@@ -94,7 +112,10 @@ class PracticePage extends Page {
 	}
 	
 	selectNumChordsOption(numChordsListItem) {
-		$(".numChordsOption[data-selected='true']").attr("data-selected", "false");
+		this
+			.querySelector(".numChordsOption[data-selected='true']")
+			.dataset
+			.selected = false;
 		numChordsListItem.dataset.selected = true;
 		this.rerollChords();
 		this.saveNumChords(numChordsListItem.dataset.value);
@@ -109,15 +130,11 @@ class PracticePage extends Page {
 		}
 		return null;
 	}
-	
-	getNumChords() {
-		return parseInt(this.getSelectedNumChordsListItem().dataset.value);
-	}
 		
 	rerollChords() {
 		this.shapeChartList.innerHTML = "";
 		shapeService
-			.getNRandomFixedShapes(this.getNumChords())
+			.getNRandomFixedShapes(this.numChords)
 			.map(this.fixedShapeToListItem.bind(this))
 			.forEach(listItem => this.shapeChartList.append(listItem));
 	}
@@ -137,10 +154,16 @@ class PracticePage extends Page {
 		const listItem = document.createElement("li");
 		listItem.className = "shapechartListItem";
 		listItem.append(
-			new ShapeChartView(fixedShape.shape, fixedShape.fret).container
+			new ShapeChart({
+				shape: fixedShape.shape,
+				fixedMin: fixedShape.fret
+			})
 		);
 		return listItem;
 	}
 }
-
-const practicePage = new PractiePage();
+customElements.define(
+	"practice-page",
+	PracticePage,
+	{extends: "div"}
+);

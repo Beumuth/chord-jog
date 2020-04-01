@@ -40,11 +40,11 @@ class EditableShapeString extends HTMLLIElement {
 	}
 	
 	get fingerSelect() {
-		return $(this).find("[is='finger-select']").get(0);
+		return this.querySelector("[is='finger-select']");
 	}
 	
 	get relativeFretSelect() {
-		return $(this).find("[is='relative-fret-select']").get(0);
+		return this.querySelector("[is='relative-fret-select']");
 	}
 }
 

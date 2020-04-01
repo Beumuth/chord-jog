@@ -16,11 +16,11 @@ class ShapesEditor extends HTMLDivElement {
 	}
 	
 	get relativeFretSelects() {
-		return $(this).find("[is='relative-fret-select']").get();
+		return this.querySelector("[is='relative-fret-select']");
 	}
 	
 	get editableShapes() {
-		return $(this).find("[is='editable-shape']").get();
+		return this.querySelector("[is='editable-shape']");
 	}
 	
 	initializeHtml() {
