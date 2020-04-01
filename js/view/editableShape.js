@@ -16,6 +16,7 @@ class EditableShape extends HTMLFormElement {
 	}
 	
 	connectedCallback() {
+		this.setAttribute("is", "editable-shape");
 		this.initializeHtml();
 		this.initialize();
 		this.validate();
@@ -25,20 +26,24 @@ class EditableShape extends HTMLFormElement {
 		return $(this).find("[is='shape-chart']").get(0);
 	}
 	
-	get minFretSelect() {
-		return getElementsByClassName("minFretInput").get(0);
+	get minFretInput() {
+		return $(this).find(".minFretInput").get(0);
 	}
 	
 	get maxFretSelect() {
-		return getElementsByClassName("shapeTypeSelect")[0];
+		return $(this).find(".shapeTypeSelect").get(0);
 	}
 	
 	get rRangeLabel() {
-		return getElementsByClassName("rRangeLabel")[0];
+		return $(this).find(".rRangeLabel").get(0);
 	}
 	
 	get editableShapeStrings() {
 		return $(this).find("[is='editable-shape-strings']").get(0);
+	}
+	
+	get saveButton() {
+		return $(this).find(".editShapeEditButton").get(0);
 	}
 	
 	initializeHtml(){
@@ -48,83 +53,86 @@ class EditableShape extends HTMLFormElement {
 		}));
 		
 		//Min and max fret inputs
-		let rangeContainer = document.createElement("div");
+		const rangeContainer = document.createElement("div");
 		rangeContainer.className = "rangeContainer";
 		this.append(rangeContainer);
 		//	Max
 		//		Select
-		let maxFretSelect = document.createElement("select");
+		const maxFretSelect = document.createElement("select");
+		rangeContainer.append(maxFretSelect);
 		maxFretSelect.className = "shapeTypeSelect";
 		maxFretSelect.classList.add("enumSelect");
 		maxFretSelect.onchange = this.maxFretChanged.bind(this);
-		rangeContainer.append(maxFretSelect);
 		//		Open fret option
-		let openFretOption = document.createElement("option");
+		const openFretOption = document.createElement("option");
+		maxFretSelect.append(openFretOption);
 		openFretOption.className = "maxFretOpenOption";
 		openFretOption.value = 0;
 		openFretOption.textContent = "Open";
-		maxFretSelect.append(openFretOption);
 		//		Max root fret option
-		let maxRootFretOption = document.createElement("option");
+		const maxRootFretOption = document.createElement("option");
+		maxFretSelect.append(maxRootFretOption);
 		maxRootFretOption.className = "maxFretMaxRootOption";
 		maxRootFretOption.value = 11;
 		maxRootFretOption.textContent = "Movable";
-		maxFretSelect.append(maxRootFretOption);
 		//		Selected index
-		maxFretSelect.selectedIndex = shapeService.isOpenShape(this.initialShape) ?
-			1 : 0;
+		maxFretSelect.selectedIndex = shapeService.isOpenShape(
+			this.initialOptions.shape
+		) ? 1 : 0;
 		//	Min
 		//		Container
-		let minFretContainer = document.createElement("div");
+		const minFretContainer = document.createElement("div");
+		rangeContainer.append(minFretContainer);
 		minFretContainer.className = "minFretContainer";
 		minFretContainer.classList.add("rangeSubcontainer");
-		rangeContainer.append(minFretContainer);
 		//		Input
-		let minFretInput = document.createElement("input");
+		const minFretInput = document.createElement("input");
+		minFretContainer.append(minFretInput);
 		minFretInput.type = "text";
 		minFretInput.className = "minFretInput";
 		minFretInput.maxLength = 2;
-		minFretInput.onclick = minFretClicked.bind(this);
-		minFretInput.onchange = minFretChanged.bind(this);
-		minFretContainer.append(this.minFretInput);
+		minFretInput.onclick = this.minFretClicked.bind(this);
+		minFretInput.onchange = this.minFretChanged.bind(this);
 		
 		//R range label
-		let rRangeLabel = document.createElement("span");
-		rRangeLabel.className = "rRangeLabel";
+		const rRangeLabel = document.createElement("span");
 		minFretContainer.append(rRangeLabel);
+		rRangeLabel.className = "rRangeLabel";
 		
 		//Editable shape strings
-		let editableShapeStrings = new EditableShapeStrings();
+		const editableShapeStrings = new EditableShapeStrings();
+		this.append(editableShapeStrings);
 		Integer
 			.range(0, NUM_STRINGS)
 			.forEach(string => {
-				let editableShapeString = editableShapeStrings.strings[i];
-				editableShapeString
-					.fingerSelect
-					.addEventListener("change", this.inputChanged.bind(this));
-				editableShapeString
-					.relativeFretSelect
-					.addEventListener("change", () => this.fretChanged(i));
+				const editableShapeString = editableShapeStrings.strings[string];
+				editableShapeString.addEventListener(
+					"change",
+					this.inputChanged.bind(this)
+				);
+				editableShapeString.addEventListener(
+					"change",
+					() =>this.fretChanged(string)
+				);
 				editableShapeString
 					.relativeFretSelect
 					.addEventListener("change", this.inputChanged.bind(this));
 			});
-		this.append(editableShapeStrings);
 		
 		//Buttons
-		let buttonContainer = document.createElement("div");
-		buttonContainer.className = "editShapeButtonRow";
+		const buttonContainer = document.createElement("div");
 		this.append(buttonContainer);
+		buttonContainer.className = "editShapeButtonRow";
 		
 		//Save button
-		let saveButton = document.createElement("button");
+		const saveButton = document.createElement("button");
 		saveButton.type = "button";
 		saveButton.className = "editShapeEditButton";
 		saveButton.textContent = this.initialOptions.saveButton.text;
 		saveButton.onclick = this.initialOptions.saveButton.callback;
 		
 		//Reset button
-		let resetButton = document.createElement("button");
+		const resetButton = document.createElement("button");
 		resetButton.type = "button";
 		resetButton.className = "editShapeResetButton";
 		resetButton.textContent = "Reset";
@@ -136,24 +144,24 @@ class EditableShape extends HTMLFormElement {
 			//delete buttons on the bottom.
 			
 			//Top Row
-			let topRow = document.createElement("div");
-			topRow.className = "editShapeButtonRowTop";
+			const topRow = document.createElement("div");
 			buttonContainer.append(topRow);
+			topRow.className = "editShapeButtonRowTop";
 			topRow.append(saveButton);
 			
 			//Bottom row
-			let bottomRow = document.createElement("div");
-			bottomRow.className = "editShapeButtonRowBottom";
+			const bottomRow = document.createElement("div");
 			buttonContainer.append(bottomRow);
+			bottomRow.className = "editShapeButtonRowBottom";
 			bottomRow.append(resetButton);
 			
 			//	Delete button
-			let deleteButton = document.createElement("button");
+			const deleteButton = document.createElement("button");
+			bottomRow.append(deleteButton);
 			deleteButton.type = "button";
 			deleteButton.className = "editShapeDeleteButton";
 			deleteButton.textContent = "Delete";
 			deleteButton.onclick = this.initialOptions.deleteButton.callback;
-			bottomRow.append(deleteButton);
 		} else {
 			//There is no delete button. Use a one-row button scheme.
 			buttonContainer.append(saveButton);
@@ -165,24 +173,17 @@ class EditableShape extends HTMLFormElement {
 		//If 'Open' is selected, minFretInput is hidden;
 		//OPEN_FRET is invalid if 'Movable' is selected;
 		//therefore, minFretInput's minimum value is OPEN_FRET + 1.
-		this.minFretInput.value = this.initialShape.range.min === OPEN_FRET ?
-			OPEN_FRET + 1 : this.initialShape.range.min;
+		this.minFretInput.value = this.initialOptions.shape.range.min === OPEN_FRET ?
+			OPEN_FRET + 1 : this.initialOptions.shape.range.min;
 		this.updateRRangeLabel();
+		let editableShapeStrings = this.editableShapeStrings;
 		for(let i = 0; i < NUM_STRINGS; ++i) {
-			let stringAction = this.initialShape.strings[i];
-			$(
-				this
-					.shapeStringActionViews
-					.strings[i]
-					.fingerSelect
-			).val(stringAction.finger === null ? "null" : stringAction.finger);
-			this
-				.shapeStringActionViews
+			const stringAction = this.initialOptions.shape.strings[i];
+			editableShapeStrings
 				.strings[i]
 				.fingerSelect
 				.finger = stringAction.finger;
-			this
-				.shapeStringActionViews
+			editableShapeStrings
 				.strings[i]
 				.relativeFretSelect
 				.fret = stringAction.fret;
@@ -192,23 +193,23 @@ class EditableShape extends HTMLFormElement {
 	}
 	
 	maxFretChanged() {
-		this.shapeChartView.shape.range.max = parseInt(
+		this.shapeChart.shape.range.max = parseInt(
 			this.maxFretSelect.options[
 				this.maxFretSelect.selectedIndex
 			].value
 		);
 		
-		if(this.shapeChartView.shape.range.max === OPEN_FRET) {
+		if(this.shapeChart.shape.range.max === OPEN_FRET) {
 			//This is an open chord
 			this.dataset.isOpen = 'true';
 			//Set the min fret to 0
-			this.shapeChartView.shape.range.min = OPEN_FRET;
+			this.shapeChart.shape.range.min = OPEN_FRET;
 			
 		} else {
 			//This is a movable chord
 			this.dataset.isOpen = 'false';
 			//Set the min fret to the input value
-			this.shapeChartView.shape.range.min = parseInt(this.minFretInput.value);
+			this.shapeChart.shape.range.min = parseInt(this.minFretInput.value);
 		}
 		
 		this.updateRRangeLabel();
@@ -223,7 +224,7 @@ class EditableShape extends HTMLFormElement {
 	}
 	
 	minFretChanged() {
-		let minFret = parseInt(this.minFretInput.value);
+		const minFret = parseInt(this.minFretInput.value);
 		//Is the new min fret valid?
 		if(
 			isNaN(minFret) ||
@@ -235,10 +236,10 @@ class EditableShape extends HTMLFormElement {
 			)
 		) {
 			//No, reset
-			minFret = this.shapeChartView.shape.range.min;
+			minFret = this.shapeChart.shape.range.min;
 		} else {
 			//Yes, update
-			this.shapeChartView.shape.range.min = minFret;
+			this.shapeChart.shape.range.min = minFret;
 			this.updateRRangeLabel();
 			this.inputChanged();
 		}
@@ -248,22 +249,21 @@ class EditableShape extends HTMLFormElement {
 	
 	updateRRangeLabel() {
 		this.rRangeLabel.textContent =
-			shapeService.isOpenShape(this.shapeChartView.shape) ?
+			shapeService.isOpenShape(this.shapeChart.shape) ?
 				"r = 0" :
 				" <= r <= " + MAX_ROOT_FRET;
 	}
 	
 	fretChanged(stringIndex) {
-		let fret = this
-			.shapeStringActionViews
+		let editableShapeStrings = this.editableShapeStrings;
+		const fret = editableShapeStrings
 			.strings[stringIndex]
 			.relativeFretSelect
 			.fret;
-		let isFingerless =
+		const isFingerless =
 			fret === null ||
 			fret === ROOT_FRET && this.isOpenSelected();
-		this
-			.shapeStringActionViews
+		editableShapeStrings
 			.strings[stringIndex]
 			.fingerSelect
 			.disabled = isFingerless;
@@ -272,7 +272,7 @@ class EditableShape extends HTMLFormElement {
 	inputChanged() {
 		this.updateShape();
 		this.validate();
-		this.shapeChartView.render();
+		this.shapeChart.render();
 	}
 	
 	resetButtonClicked() {
@@ -280,28 +280,27 @@ class EditableShape extends HTMLFormElement {
 	}
 	
 	reset() {
-		this.shapeChartView.shape = this.initialShape.copy();
 		this.initialize();
 		this.validate();
 		this.maxFretSelect.focus();
-		this.shapeChartView.render();
+		this.shapeChart.reset();
 	}
 	
 	updateShape() {
-		let maxFret = parseInt(
+		const maxFret = parseInt(
 			this.maxFretSelect.options[
 				this.maxFretSelect.selectedIndex
 			].value
 		);
-		let isOpenShape = this.dataset.isOpen === "true";
-		this.shapeChartView.shape = new Shape(
-			this.initialShape.id,
+		const isOpenShape = this.dataset.isOpen === "true";
+		this.shapeChart.shape = new Shape(
+			this.initialOptions.shape.id,
 			this
-				.shapeStringActionViews
+				.editableShapeStrings
 				.strings
-				.map(stringActionViews => {
-					let finger = stringActionViews.fingerSelect.finger;
-					let fret = stringActionViews.relativeFretSelect.fret;
+				.map(editableString => {
+					const finger = editableString.fingerSelect.finger;
+					const fret = editableString.relativeFretSelect.fret;
 					//If open shape and open fret, force the finger to null
 					return StringAction.WithFretAndFinger(
 						fret,
@@ -318,23 +317,23 @@ class EditableShape extends HTMLFormElement {
 				maxFret
 			)
 		);
-		this.shapeChartView.fixedMin = this.getFixedMin();
+		this.shapeChart.fixedMin = this.getFixedMin();
 	}
 	
 	getFixedMin() {
-		if(this.shapeChartView.shape.range.min === MAX_ROOT_FRET) {
+		if(this.shapeChart.shape.range.min === MAX_ROOT_FRET) {
 			return MAX_ROOT_FRET;
 		}
-		if(shapeService.isOpenShape(this.shapeChartView.shape)) {
+		if(shapeService.isOpenShape(this.shapeChart.shape)) {
 			return OPEN_FRET;
 		}
 		return null;
 	}
 	
 	validate() {
-		let validationResult = shapeService.validate(
-			this.shapeChartView.shape,
-			this.initialShape.id
+		const validationResult = shapeService.validate(
+			this.shapeChart.shape,
+			this.initialOptions.shape.id
 		);
 		if(validationResult === true) {
 			this.dataset.isValid = true;

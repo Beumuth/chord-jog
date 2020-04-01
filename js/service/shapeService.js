@@ -53,8 +53,8 @@ class ShapeService {
 	}
 	
 	getNRandomFixedShapes(n) {
-		let fixedShapes = new Array();
-		let candidate = null;
+		const fixedShapes = new Array();
+		const candidate = null;
 		for(let i = 0; i < n; ++i) {
 			//If the candidate is either null or
 			//equals another chosen shape with the same fret
@@ -110,7 +110,7 @@ class ShapeService {
 	 * @return An array with a maximum of 9 results.
 	 */
 	searchShapesWithFrets(frets) {
-		let matches = [];
+		const matches = [];
 		
 		//For each shape
 		for(let i = 0; i < this.shapes.length && matches.length < 9; ++i) {
@@ -139,16 +139,16 @@ class ShapeService {
 	
 	validate(shape, id=null) {
 		//An equivalent shape with a different id must not exist.
-		let idOfShape = this.getIdOfShape(shape);
+		const idOfShape = this.getIdOfShape(shape);
 		if(idOfShape !== null && idOfShape !== id) {
 			return "Already exists";
 		}
 		
-		let containsRootFret = false;
-		let isOpenShape = this.isOpenShape(shape);
-		let fingerFrets = [{},{},{},{},{}];
+		const containsRootFret = false;
+		const isOpenShape = this.isOpenShape(shape);
+		const fingerFrets = [{},{},{},{},{}];
 		for(let string = 0; string < shape.strings.length; ++string) {
-			let stringAction = shape.strings[string];
+			const stringAction = shape.strings[string];
 			
 			//Every dead string must have no finger
 			if(
@@ -208,18 +208,18 @@ class ShapeService {
 	 * Convert a string to a shape
 	 */
 	shapeFromString(string, id=null) {
-		let shapeProperties = string.split(":");
-		let rangeProperties = shapeProperties[1].split(";");
-		let strings = shapeProperties[0]
+		const shapeProperties = string.split(":");
+		const rangeProperties = shapeProperties[1].split(";");
+		const strings = shapeProperties[0]
 			.split(";")
 			.map(stringActionProperties => {
-				let stringAction = stringActionProperties.split(",");
+				const stringAction = stringActionProperties.split(",");
 				return StringAction.WithFretAndFinger(
 					stringAction[0] === "" ? null : parseInt(stringAction[0]),
 					stringAction[1] === "" ? null : parseInt(stringAction[1])
 				);
 			});
-		let range = new Range(
+		const range = new Range(
 			rangeProperties[0] == "" ?
 				null :
 				parseInt(rangeProperties[0]),
@@ -254,7 +254,7 @@ class ShapeService {
 	}
 	
 	loadFromLocalStorage() {
-		let shapeString = localStorage.getItem(this.LOCAL_STORAGE_KEY);
+		const shapeString = localStorage.getItem(this.LOCAL_STORAGE_KEY);
 		this.shapes = shapeString === null || shapeString.length === 0 ?
 			[] : this.shapes = this.shapesFromString(shapeString);
 	}
@@ -267,9 +267,9 @@ class ShapeService {
 	}
 	
 	mergeShapeLists(a, b) {
-		let merged = a.slice();
+		const merged = a.slice();
 		for(let bShape of b) {
-			let unique = true;
+			const unique = true;
 			for(let aShape of merged) {
 				if(this.equals(bShape, aShape)) {
 					unique = false;
@@ -305,7 +305,7 @@ class ShapeService {
 	
 	redirectToShapesFile() {
 		//Convert the shapes to a text string and open in a new tab
-		let tempLink = document.createElement('a');
+		const tempLink = document.createElement('a');
 		tempLink.setAttribute(
 			'href',
 			'data:text/plain;charset=utf-8,' +

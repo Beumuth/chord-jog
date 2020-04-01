@@ -1,6 +1,6 @@
 class Integer {
 	static range(from, to) {
-		let array = [];
+		const array = [];
 		for(let i = from; i < to; ++i) {
 			array.push(i);
 		}

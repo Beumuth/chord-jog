@@ -29,7 +29,7 @@ class RelativeFretSelect extends HTMLSelectElement {
 	}
 	
 	get fret() {
-		let fret = this.options[this.selectedIndex].value;
+		const fret = this.options[this.selectedIndex].value;
 		return fret === "null" ?
 			null :
 			fret === ANY_FRET ?

@@ -23,7 +23,7 @@ body {
 	background-size:16px 16px;
 }
 
-#container {
+[is='page'] {
 	width: 750px;
 	min-height: 650px;
 	padding-bottom: 15px;
@@ -46,7 +46,7 @@ ul {
 	margin: 0;
 }
 
-#container > * {
+[is='page'] > * {
 	margin-left: 104px;
 	padding: auto;
 }
@@ -128,6 +128,8 @@ input[type='file'] {
 }
 
 #siteHeaderContainer {
+	position: relative;
+	top: -5px;
 	margin-left: 0px;
 	padding-top: 10px;
 	

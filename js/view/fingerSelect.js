@@ -1,4 +1,6 @@
 class FingerSelect extends HTMLSelectElement {
+	static FINGER_SELECT_CHANGED = "fingerSelectChanged";
+	
 	constructor(options) {
 		super();
 		this.initialOptions = {
@@ -18,19 +20,18 @@ class FingerSelect extends HTMLSelectElement {
 	}
 	
 	connectedCallback() {
+		this.setAttribute("is", "finger-select");
+		
 		//Create select
-		this.fingerSelect = document.createElement("select");
-		this.fingerSelect.className = "fingerSelect";
-		this.fingerSelect.classList.add("enumSelect");
-		this.fingerSelect.onchange = this.fingerSelectChanged.bind(this);
+		this.classList.add("enumSelect");
 		
 		//Create options
 		for(let [finger, label] of this.FINGER_LABELS.entries()) {
-			let curOption = document.createElement("option");
+			const curOption = document.createElement("option");
+			this.append(curOption);
 			curOption.className = "fingerOption";
 			curOption.value = finger;
 			curOption.textContent = label;
-			this.fingerSelect.append(curOption);
 		}
 		
 		//Optionally select an option
@@ -39,17 +40,8 @@ class FingerSelect extends HTMLSelectElement {
 		}
 	}
 	
-	fingerSelectChanged() {
-		let selectedOption = this.fingerSelect.options[
-			this.fingerSelect.selectedIndex
-		].value;
-		this.finger = selectedOption === "null" ? null : parseInt(selectedOption);
-	}
-	
 	get finger() {
-		let selectedOption = this.fingerSelect.options[
-			this.fingerSelect.selectedIndex
-		].value;
+		const selectedOption = this.options[this.selectedIndex].value;
 		return selectedOption === "null" ? null : parseInt(selectedOption);
 	}
 	

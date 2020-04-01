@@ -1,61 +1,73 @@
 class ShapesPage extends Page {
 	constructor() {
-		
+		super("Shapes");
 	}
 	
-	onPageLoad() {
-		pageView.render("Shapes");
+	connectedCallback() {
+		super.connectedCallback();
 		
-		//Container
-		this.container = document.createElement("div");
-		this.container.className = "manageShapesContainer";
-		this.container.classList.add("sectionContainer");
-		pageView.container.append(this.container);
-		
+		this.classList.add("sectionContainer");
 		this.createImportExportView();
 		this.createShapesEditor();
 		this.createShapeCreator();
 	}
 	
+	get importExportContainer() {
+		return document.getElementsByClassName("importExportContainer")[0];
+	}
+	
+	get importInput() {
+		return document.getElementById("importInput");
+	}
+	
+	get overwriteInput() {
+		return document.getElementById("overwriteInput");
+	}
+	
+	get shapeCreator() {
+		return document.getElementById("shapeCreator");
+	}
+	
 	createImportExportView() {
 		//Container
-		this.importExportContainer = document.createElement("div");
-		this.importExportContainer.className = "importExportContainer";
-		this.importExportContainer.classList.add("sectionContainer");
-		this.importExportContainer.dataset.border = "none";
-		this.container.append(this.importExportContainer);
+		const importExportContainer = document.createElement("div");
+		this.append(importExportContainer);
+		importExportContainer.className = "importExportContainer";
+		importExportContainer.classList.add("sectionContainer");
+		importExportContainer.dataset.border = "none";
 		
 		//	Import
-		this.importInput = this.createImportExportFileInput(
+		const importInput = this.createImportExportFileInput(
 			"importInput",
 			"Import",
 			this.importShapes.bind(this)
 		);
 		//	Overwrite
-		this.overwriteInput = this.createImportExportFileInput(
+		const overwriteInput = this.createImportExportFileInput(
 			"overwriteInput",
 			"Overwrite",
 			this.overwriteShapes.bind(this)
 		);
 		
 		//	Download
-		let downloadShapesButton = document.createElement("button");
+		const downloadShapesButton = document.createElement("button");
+		importExportContainer.append(downloadShapesButton);
 		downloadShapesButton.type = "button";
 		downloadShapesButton.id = "downloadShapesButton";
 		downloadShapesButton.className = "importExportInput";
 		downloadShapesButton.onclick = this.downloadShapes.bind(this);
 		downloadShapesButton.textContent = "Download";
-		this.importExportContainer.append(downloadShapesButton);
 	}
 	
 	createImportExportFileInput(id, labelText, changeHandler) {
-		let inputLabel = document.createElement("label");
+		const inputLabel = document.createElement("label");
+		this.importExportContainer.append(inputLabel);
 		inputLabel.className = "buttonInput";
 		inputLabel.setAttribute("for", id);
 		inputLabel.textContent = labelText;
-		this.importExportContainer.append(inputLabel);
 		
-		let input = document.createElement("input");
+		const input = document.createElement("input");
+		this.importExportContainer.append(input);
 		input.type = "file";
 		input.id = id;
 		input.name = id;
@@ -64,43 +76,44 @@ class ShapesPage extends Page {
 		input.multiple = true;
 		input.onchange = changeHandler;
 		input.style.opacity = 0;
-		this.importExportContainer.append(input);
 		
 		return input;
 	}
 	
 	createShapesEditor() {
-		this.shapesEditor = new ShapesEditorView();
-		this.container.append(this.shapesEditor.container);
+		this.append(new ShapesEditor());
 	}
 	
 	createShapeCreator() {
 		//Container
-		let addShapeViewContainer = document.createElement("div");
-		addShapeViewContainer.id = "addShapeViewContainer";
-		addShapeViewContainer.classList.add("sectionContainer");
-		this.container.append(addShapeViewContainer);
+		const shapeCreatorContainer = document.createElement("div");
+		this.append(shapeCreatorContainer);
+		shapeCreatorContainer.id = "shapeCreatorContainer";
+		shapeCreatorContainer.classList.add("sectionContainer");
 		
 		//Header
-		let header = document.createElement("h3");
+		const header = document.createElement("h3");
+		shapeCreatorContainer.append(header);
 		header.className = "sectionHeader";
 		header.textContent = "Creator";
-		addShapeViewContainer.append(header);
 		
-		//AddShapeView
-		this.addShapeView = new EditableShapeView({
-			saveButtonHandler: this.addShape.bind(this),
-			saveButtonText: "Add"
+		//EditableShape
+		const shapeCreator = new EditableShape({
+			saveButton: {
+				text:"Add",
+				callback:this.addShape.bind(this)
+			}
 		});
-		addShapeViewContainer.append(this.addShapeView.container);
+		shapeCreatorContainer.append(shapeCreator);
+		shapeCreator.id = "shapeCreator";
 	}
 	
 	addShape() {
-		let shape = this.addShapeView.shapeChartView.shape;
+		const shape = this.shapeCreator.shapeChart.shape;
 		shapeService.createShape(shape);
-		this.addShapeView.reset();
+		this.shapeCreator.reset();
 		this.shapesEditor.displaySingleResult(shape);
-		this.addShapeView.maxFretSelect.focus();
+		this.shapeCreator.maxFretSelect.focus();
 	}
 	
 	importShapes() {
@@ -121,5 +134,9 @@ class ShapesPage extends Page {
 		shapeService.redirectToShapesFile();
 	}
 }
-
+customElements.define(
+	"shapes-page",
+	ShapesPage,
+	{extends: "div"}
+);
 const shapesPage = new ShapesPage();

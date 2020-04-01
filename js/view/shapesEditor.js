@@ -1,5 +1,6 @@
-class ShapesEditor extends HTMLElement {
+class ShapesEditor extends HTMLDivElement {
 	constructor() {
+		super();
 	}
 	
 	connectedCallback() {
@@ -7,59 +8,61 @@ class ShapesEditor extends HTMLElement {
 	}
 	
 	get resultsContainer() {
-		return this.getElementByClassName("editShapesResultsContainer");
+		return this.getElementsByClassName("editShapesResultsContainer")[0];
 	}
 	
 	get resultsList() {
-		return this.getElementByClassName("shapeChartList");
+		return this.getElementsByClassName("shapeChartList")[0];
 	}
 	
 	get relativeFretSelects() {
-		return $("[is='relative-fret-select']").get();
+		return $(this).find("[is='relative-fret-select']").get();
+	}
+	
+	get editableShapes() {
+		return $(this).find("[is='editable-shape']").get();
 	}
 	
 	initializeHtml() {
 		this.classList.add("sectionContainer");
-		
 		this.createSearchContainer();
 		this.createResultsContainer();
 	}
 	
 	createSearchContainer() {
 		//Search container
-		let searchContainer = document.createElement("div");
+		const searchContainer = document.createElement("div");
+		this.append(searchContainer);
 		searchContainer.className = "editShapesSearchContainer";
 		searchContainer.classList.add("sectionContainer");
-		this.append(searchContainer);
 		
 		//	Search header
-		let header = document.createElement("h3");
+		const header = document.createElement("h3");
+		searchContainer.append(header);
 		header.className = "sectionHeader";
 		header.textContent = "Search";
-		searchContainer.append(header);
 		
 		//	Search table
-		let searchTable = document.createElement("table");
-		searchTable.className = "searchTable";
+		const searchTable = document.createElement("table");
 		searchContainer.append(searchTable);
+		searchTable.className = "searchTable";
 		
 		//		Header row
-		let headerRow = document.createElement("tr");
+		const headerRow = document.createElement("tr");
 		searchTable.append(headerRow);
 		
 		//		Fret inputs row
-		let relativeFretSelects = new Array();
-		let searchFretInputsRow = document.createElement("tr");
+		const searchFretInputsRow = document.createElement("tr");
 		searchTable.append(searchFretInputsRow);
 		for(let i = 0; i < NUM_STRINGS; ++i) {
 			//		Header cell
-			let headerCell = document.createElement("th");
-			headerCell.textContent = STRING_NAMES[i];
+			const headerCell = document.createElement("th");
 			headerRow.append(headerCell);
+			headerCell.textContent = STRING_NAMES[i];
 			
 			//		Input cell and input
-			let inputCell = document.createElement("td");
-			let relativeFretSelect = new RelativeFretSelect({
+			const inputCell = document.createElement("td");
+			const relativeFretSelect = new RelativeFretSelect({
 				string: i,
 				selectedFret: null,
 				includeAnyFret: true
@@ -68,54 +71,53 @@ class ShapesEditor extends HTMLElement {
 				"change",
 				this.search.bind(this)
 			);
-			relativeFretSelects.push(relativeFretSelect);
 			inputCell.append(relativeFretSelect);
 			searchFretInputsRow.append(inputCell);
 		}
 		
 		//	Button container
-		let searchButtonContainer = document.createElement("div");
-		searchButtonContainer.className = "searchButtonContainer";
+		const searchButtonContainer = document.createElement("div");
 		searchContainer.append(searchButtonContainer);
+		searchButtonContainer.className = "searchButtonContainer";
 		
 		//		Reset button
-		let resetButton = document.createElement("button");
+		const resetButton = document.createElement("button");
+		searchButtonContainer.append(resetButton);
 		resetButton.type = "button";
 		resetButton.className = "searchResetButton";
 		resetButton.textContent = "Reset";
 		resetButton.onclick = this.reset.bind(this);
-		searchButtonContainer.append(resetButton);
 	}
 	
 	createResultsContainer() {
 		//Results container
-		let resultsContainer = document.createElement("div");
+		const resultsContainer = document.createElement("div");
+		this.append(resultsContainer);
 		resultsContainer.className = "editShapesResultsContainer";
 		resultsContainer.classList.add("sectionContainer");
 		resultsContainer.dataset.isEmpty = "true";
-		this.append(resultsContainer);
 		
 		//	Results header
-		let resultsHeader = document.createElement("h3");
+		const resultsHeader = document.createElement("h3");
+		resultsContainer.append(resultsHeader);
 		resultsHeader.className = "sectionHeader";
 		resultsHeader.textContent = "Editor";
-		resultsContainer.append(resultsHeader);
 		
 		//	'Search for a shape' message
-		let searchForShape = document.createElement("span");
+		const searchForShape = document.createElement("span");
+		resultsContainer.append(searchForShape);
 		searchForShape.className = "editShapesSearchForShapeMessage";
 		searchForShape.textContent = "Search for a shape to edit";
-		resultsContainer.append(searchForShape);
 		
 		//	Results list
-		let resultsList = document.createElement("ul");
-		resultsList.className = "shapeChartList";
+		const resultsList = document.createElement("ul");
 		resultsContainer.append(resultsList);
+		resultsList.className = "shapeChartList";
 	}
 	
 	search() {
 		this.clearResults();
-		let search = this.relativeFretSelects.map(fretSelect => fretSelect.fret);
+		const search = this.relativeFretSelects.map(fretSelect => fretSelect.fret);
 		if(
 			! search
 				.map(string => string === ANY_FRET)
@@ -125,7 +127,7 @@ class ShapesEditor extends HTMLElement {
 		) {
 			//The search is not all ANY_FRETs
 			//Get matches
-			let matches = shapeService.searchShapesWithFrets(search);
+			const matches = shapeService.searchShapesWithFrets(search);
 			
 			this.resultsContainer.dataset.isEmpty = matches.length === 0;
 			
@@ -136,7 +138,7 @@ class ShapesEditor extends HTMLElement {
 	
 	displaySingleResult(shape) {
 		this.clearResults();
-		let relativeFretSelects = this.relativeFretSelects;
+		const relativeFretSelects = this.relativeFretSelects;
 		shape.strings.forEach((stringAction, string) =>
 			relativeFretSelects[string].fret = stringAction.fret
 		);
@@ -146,63 +148,62 @@ class ShapesEditor extends HTMLElement {
 	
 	addResult(shape) {
 		//List item
-		let listItem = this.shapeToResultListItem(shape);
+		const listItem = this.shapeToResultListItem(shape);
 		this.resultsList.append(listItem);
 		
-		//EditableShapeView
-		let editableShapeView = this.shapeToEditableShapeView(shape);
-		listItem.append(editableShapeView.container);
-		this.editableShapeViews.push(editableShapeView);
+		//EditableShape
+		const editableShape = this.shapeToEditableShape(shape);
+		listItem.append(editableShape);
 	}
 	
-	shapeToEditableShapeView(shape) {
-		return new EditableShapeView({
+	shapeToEditableShape(shape) {
+		return new EditableShape({
 			shape: shape,
-			saveButtonHandler: () => this.save(shape.id),
-			includesDeleteButton: true,
-			deleteButtonHandler: () => this.delete(shape.id)
+			saveButton: {
+				callback: () => this.save(shape.id)
+			},
+			deleteButton: {
+				callback:() => this.delete(shape.id)
+			}
 		});
 	}
 	
 	shapeToResultListItem(shape) {
 		//List item
-		let listItem = document.createElement("li");
+		const listItem = document.createElement("li");
 		listItem.className = "shapeChartListItem";
 		return listItem;
 	}
 	
 	getResultIndex(idShape) {
-		for(let i = 0; i < this.editableShapeViews.length; ++i) {
-			if(this.editableShapeViews[i].shapeChartView.shape.id === idShape) {
+		const editableShapes = this.editableShapes;
+		for(let i = 0; i < editableShapes.length; ++i) {
+			if(this.editableShapes[i].shapeChart.shape.id === idShape) {
 				return i;
 			}
 		}
 		return null;
 	}
 	
-	getEditableShapeView(idShape) {
-		return this.editableShapeViews[this.getResultIndex(idShape)];
-	}
-	
 	reset() {
-		this.relativeFretSelects.forEach(view => view.fret = ANY_FRET);
+		this.relativeFretSelects.forEach(fretSelect => fretSelect.fret = ANY_FRET);
 		this.clearResults();
 		this.resultsContainer.dataset.isEmpty = true;
 	}
 	
 	clearResults() {
 		this.resultsList.innerHTML = "";
-		this.editableShapeViews = [];
 	}
 	
 	save(idShape) {
-		let resultIndex = this.getResultIndex(idShape);
+		const editableShapeViews = this.editableShapeViews;
+		const resultIndex = this.getResultIndex(idShape);
 		shapeService.editShape(
 			idShape,
-			this.editableShapeViews[resultIndex].shapeChartView.shape
+			editableShapeViews[resultIndex].shapeChartView.shape
 		);
-		this.editableShapeViews[resultIndex].initialShape =
-			this.editableShapeViews[resultIndex].shapeChartView.shape;
+		editableShapeViews[resultIndex].initialShape =
+			editableShapeViews[resultIndex].shapeChartView.shape;
 	}
 	
 	delete(idShape) {
@@ -215,5 +216,6 @@ class ShapesEditor extends HTMLElement {
 
 customElements.define(
 	"shapes-editor",
-	ShapesEditor
+	ShapesEditor,
+	{extends: "div"}
 );

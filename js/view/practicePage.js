@@ -11,30 +11,31 @@ class PracticePage extends Page {
 		
 		//Container
 		const container = document.createElement("div");
+		pageView.container.append(container);
 		container.id = "practiceView";
 		container.className = "sectionContainer";
-		pageView.container.append(container);
 		
 		//	Num chords selector
 		//		Container
 		const numChordsContainer = document.createElement("div");
+		container.append(numChordsContainer);
 		numChordsContainer.id = "numChordsContainer";
 		numChordsContainer.dataset.noSelect = true;
-		container.append(numChordsContainer);
 		//		Label
 		const numChordsLabel = document.createElement("span");
+		numChordsContainer.append(numChordsLabel);
 		numChordsLabel.id = "numChordsLabel";
 		numChordsLabel.textContent = "# chords";
-		numChordsContainer.append(numChordsLabel);
 		//		Options
 		//			List
 		this.numChordsList = document.createElement("ol");
-		this.numChordsList.id = "numChordsList";
 		numChordsContainer.append(this.numChordsList);
+		this.numChordsList.id = "numChordsList";
 		const numChords = this.loadNumChords();
 		for(let i = this.MIN_NUM_CHORDS; i <= this.MAX_NUM_CHORDS; ++i) {
 			//		List item
-			let listItem = document.createElement("li");
+			const listItem = document.createElement("li");
+			this.numChordsList.append(listItem);
 			listItem.className = "numChordsOption";
 			listItem.dataset.selected = i === numChords;
 			listItem.dataset.value = i;
@@ -43,10 +44,10 @@ class PracticePage extends Page {
 			listItem.onkeydown = this.numChordsOptionKeyDown.bind(this);
 			listItem.onkeyup = this.numChordsOptionOnKeyUp.bind(this);
 			listItem.onclick = () => this.selectNumChordsOption(listItem);
-			this.numChordsList.append(listItem);
 		}
 		//		Reroll button
 		this.rerollButton = document.createElement("img");
+		numChordsContainer.append(this.rerollButton);
 		this.rerollButton.id = "rerollButton";
 		this.rerollButton.src = "./images/rollingDice.png";
 		this.rerollButton.width = 35;
@@ -56,12 +57,11 @@ class PracticePage extends Page {
 		this.rerollButton.onkeydown = this.rerollOnKeyDown.bind(this);
 		this.rerollButton.onkeyup = this.rerollOnKeyUp.bind(this);
 		this.rerollButton.onclick = this.rerollChords.bind(this);
-		numChordsContainer.append(this.rerollButton);
 		
 		//	Shape chart list
 		this.shapeChartList = document.createElement("ul");
-		this.shapeChartList.id = "shapeChartList";
 		container.append(this.shapeChartList);
+		this.shapeChartList.id = "shapeChartList";
 		
 		//Roll chords
 		this.rerollChords();
@@ -134,7 +134,7 @@ class PracticePage extends Page {
 	}
 	
 	fixedShapeToListItem(fixedShape) {
-		let listItem = document.createElement("li");
+		const listItem = document.createElement("li");
 		listItem.className = "shapechartListItem";
 		listItem.append(
 			new ShapeChartView(fixedShape.shape, fixedShape.fret).container

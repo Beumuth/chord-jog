@@ -9,10 +9,23 @@ class ShapeChart extends HTMLCanvasElement {
 	}
 	
 	connectedCallback() {
+		this.setAttribute("is", "shape-chart");
+		this.shape = this.initialOptions.shape;
+		this.fixedMin = this.initialOptions.fixedMin;
+		
 		this.width = this.canvasWidth;
 		this.height = this.canvasHeight;
 		this.context = this.getContext("2d");
 		this.render();
+	}
+	
+	get fixedMin() {
+		const fixedMin = this.dataset.fixedMin;
+		return fixedMin === "null" ? null : parseInt(fixedMin);
+	}
+	
+	set fixedMin(fixedMin) {
+		this.dataset.fixedMin = fixedMin;
 	}
 	
 	initializeConstants() {
@@ -32,6 +45,11 @@ class ShapeChart extends HTMLCanvasElement {
 		this.fingerOnStringCircleRadius=8;
 		
 		this.textHeight=10;
+	}
+	
+	reset() {
+		this.shape = this.initialOptions.shape.copy();;
+		this.render();
 	}
 	
 	render() {
@@ -70,7 +88,7 @@ class ShapeChart extends HTMLCanvasElement {
 		if(this.fixedMin == null) {
 			fretLabelProcess = i => i == 0 ? "r" : "+" + i;
 		} else {
-			let minFret = this.getMinLabelledFret();
+			const minFret = this.getMinLabelledFret();
 			fretLabelProcess = i => (minFret + i);
 		}
 		for(let i = 0; i < 5; ++i) {
@@ -88,9 +106,9 @@ class ShapeChart extends HTMLCanvasElement {
 		if(this.fixedMin != null) {
 			return Math.max(this.fixedMin, 1);
 		}
-		let min = Infinity;
+		const min = Infinity;
 		for(let i = 0; i < this.shape.strings.length; ++i) {
-			let fret = this.shape.strings[i].fret;
+			const fret = this.shape.strings[i].fret;
 			min = fret < min ? fret : min;
 		}
 		return min;
@@ -98,7 +116,7 @@ class ShapeChart extends HTMLCanvasElement {
 	
 	drawFingerIndicators() {
 		//Digest the shape into greater digestibility
-		let model = this.getFingerIndicatorModel();
+		const model = this.getFingerIndicatorModel();
 		
 		//Draw dead strings
 		model.deadStrings.forEach(this.drawDeadString.bind(this));
@@ -129,7 +147,7 @@ class ShapeChart extends HTMLCanvasElement {
 	
 	getFingerIndicatorModel() {
 		//Map<String, Object> of finger-fret types and their values
-		let model = {
+		const model = {
 			deadStrings: [],	//List<Int> of guitar string indices
 			openStrings: [],	//List<Int> of guitar string indices
 			singles: [],		//Map<Int, Map<Int, Int>> finger => fret => string
@@ -138,9 +156,9 @@ class ShapeChart extends HTMLCanvasElement {
 		
 		//Iterate through the shape's strings
 		for(let string = 0; string < this.shape.strings.length; ++string) {
-			let stringAction = this.shape.strings[string];
-			let finger = stringAction.finger;
-			let fret = stringAction.fret;
+			const stringAction = this.shape.strings[string];
+			const finger = stringAction.finger;
+			const fret = stringAction.fret;
 			
 			if(fret === null) {
 				//relative fret == null ==> dead string
@@ -161,7 +179,7 @@ class ShapeChart extends HTMLCanvasElement {
 			) {
 				//Finger is used on this fret with on one other string.
 				//Convert the finger-fret from a single to a bar.
-				let minMax = {
+				const minMax = {
 					0: Math.min(model.singles[finger][fret], string),
 					1: Math.max(model.singles[finger][fret], string)
 				};
@@ -214,8 +232,8 @@ class ShapeChart extends HTMLCanvasElement {
 	}
 	
 	drawDeadString(stringNumber) {
-		let centerX = this.horizontalFretboardPadding+stringNumber*this.horizontalStringSpacing;
-		let centerY = this.deadStringCircleRadius;
+		const centerX = this.horizontalFretboardPadding+stringNumber*this.horizontalStringSpacing;
+		const centerY = this.deadStringCircleRadius;
 		
 		//Draw x
 		this.context.beginPath();
@@ -247,8 +265,8 @@ class ShapeChart extends HTMLCanvasElement {
 			--relativeFret;
 		}
 		
-		let centerX = this.horizontalFretboardPadding+stringNumber*this.horizontalStringSpacing;
-		let centerY = this.verticalFretboardPadding+this.verticalFretSpacing*(relativeFret+.5);
+		const centerX = this.horizontalFretboardPadding+stringNumber*this.horizontalStringSpacing;
+		const centerY = this.verticalFretboardPadding+this.verticalFretSpacing*(relativeFret+.5);
 		
 		//Draw circle
 		this.context.beginPath();
@@ -281,8 +299,8 @@ class ShapeChart extends HTMLCanvasElement {
 			--relativeFret;
 		}
 		
-		let centerX = this.horizontalFretboardPadding+(startString+.5*(endString-startString))*this.horizontalStringSpacing;
-		let centerY = this.verticalFretboardPadding+this.verticalFretSpacing*(relativeFret+.5);
+		const centerX = this.horizontalFretboardPadding+(startString+.5*(endString-startString))*this.horizontalStringSpacing;
+		const centerY = this.verticalFretboardPadding+this.verticalFretSpacing*(relativeFret+.5);
 		
 		//Draw rectangle
 		this.context.fillStyle = "black";

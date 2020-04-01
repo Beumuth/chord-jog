@@ -14,6 +14,7 @@
 		<script src="js/view/fingerSelect.js"></script>
 		<script src="js/view/relativeFretSelect.js"></script>
 		<script src="js/view/editableShapeStrings.js"></script>
+		<script src="js/view/editableShapeString.js"></script>
 		<script src="js/view/shapesPage.js"></script>
 		<script src="js/service/integer.js"></script>
 		<script src="js/service/shapeService.js"></script>
@@ -23,6 +24,6 @@
 		<link href="css/shapes.css" rel="stylesheet" type="text/css" />
 		<link href="css/editableShapeView.css" rel="stylesheet" type="text/css" />
 	</head>
-	<body onload="shapesPage.onPageLoad();">
+	<body onload="document.body.append(shapesPage);">
 	</body>
 </html>
