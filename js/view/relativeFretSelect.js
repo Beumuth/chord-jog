@@ -3,8 +3,8 @@ class RelativeFretSelect extends HTMLSelectElement {
 		super();
 		this.initialOptions = {
 			string: options.string,
-			selectedFret: options.selectedFret !== undefined ?
-				options.selectedFret :
+			fret: options.fret !== undefined ?
+				options.fret :
 				null,
 			includeAnyFret: options.includeAnyFret ?
 				options.includeAnyFret :
@@ -22,25 +22,21 @@ class RelativeFretSelect extends HTMLSelectElement {
 		Integer
 			.range(ROOT_FRET, MAX_SHAPE_RANGE)
 			.forEach(i => this.append(new Option(i, i)));
-		if(this.initialOptions.selectedFret !== null) {
-			this.fret = this.initialOptions.selectedFret;
+		if(this.initialOptions.fret !== null) {
+			this.fret = this.initialOptions.fret;
 		}
 		this.classList.add("enumSelect");
 	}
 	
 	get fret() {
 		const fret = this.options[this.selectedIndex].value;
-		return fret === "null" ?
-			null :
-			fret === ANY_FRET ?
-				ANY_FRET :
-				parseInt(fret);
+		return isNaN(fret) ? fret : parseInt(fret);
 	}
 	
 	set fret(fret) {
 		this.selectedIndex = Integer
 			.range(0, this.initialOptions.length)
-			.find(i => this.initialOptions[i].value == fret);
+			.find(i => this.initialOptions[i].value === fret + "");
 	}
 	
 	get string() {

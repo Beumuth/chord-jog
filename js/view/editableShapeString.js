@@ -1,11 +1,16 @@
 class EditableShapeString extends HTMLLIElement {
+	static TYPE_OPEN_STRING = "open";
+	static TYPE_DEAD_STRING = "dead";
+	static TYPE_FINGER_ON_FRET = "fingerOnFret";
+	
 	constructor(options) {
 		super();
 		this.initialOptions = {
 			string: options.string,
 			label: options.label,
-			fret: options.fret,
-			finger: options.finger
+			stringAction: options.stringAction != null ?
+				options.stringAction :
+				StringAction.DEAD_STRING
 		};
 	}
 	
@@ -23,7 +28,7 @@ class EditableShapeString extends HTMLLIElement {
 		
 		const relativeFretSelect = new RelativeFretSelect({
 			string: this.initialOptions.string,
-			fret: this.initialOptions.fret
+			fret: StringAction.fret(this.initialOptions.stringAction)
 		});
 		this.append(relativeFretSelect);
 		relativeFretSelect.style.float = "right";
@@ -32,11 +37,32 @@ class EditableShapeString extends HTMLLIElement {
 		
 		const fingerSelect = new FingerSelect({
 			string: this.initialOptions.string,
-			finger: this.initialOptions.finger
+			finger: StringAction.finger(this.initialOptions.stringAction)
 		});
 		this.append(fingerSelect);
 		fingerSelect.style.float = "right";
 		fingerSelect.style.clear = "right";
+		fingerSelect.disabled = StringAction.isFingerless(
+			this.initialOptions.stringAction
+		);
+	}
+	
+	get type() {
+		return this.dataset.type;
+	}
+	
+	set type(type) {
+		switch(type) {
+			case EditableShapeString.TYPE_OPEN_STRING:
+				this.fret = OPEN_FRET;
+				this.finger = NO_FINGER;
+				break;
+			case EditableShapeString.TYPE_DEAD_STRING:
+				this.fret = DEAD_STRING;
+				this.finger = NO_FINGER;
+				break;
+		}
+		this.dataset.type = type;
 	}
 	
 	get fingerSelect() {
@@ -45,6 +71,22 @@ class EditableShapeString extends HTMLLIElement {
 	
 	get relativeFretSelect() {
 		return this.querySelector("[is='relative-fret-select']");
+	}
+	
+	get fret() {
+		return this.relativeFretSelect.fret;
+	}
+	
+	set fret(fret) {
+		this.relativeFretSelect.fret = fret;
+	}
+	
+	get finger() {
+		return this.fingerSelect.finger;
+	}
+	
+	set finger(finger) {
+		this.fingerSelect.finger = finger;
 	}
 }
 

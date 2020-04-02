@@ -1,7 +1,12 @@
-.editShapeControlsContainer {
+[is='editable-shape'] {
 	display: inline-block;
-	margin: 0 auto;
-	margin-bottom: 2px;
+	padding: 4px;
+	margin: 0;
+	border: solid 1px #A0A0A0;
+}
+
+[is='editable-shape'][data-is-open='true'] .minFretInput {
+	display: none;
 }
 
 .fretInput {
@@ -14,10 +19,6 @@
 
 .shapeTypeSelect {
 	width: 60px;
-}
-
-.editableShapeView[data-is-open='true'] .minFretInput {
-	display: none;
 }
 
 .minFretContainer, .shapeTypeSelect {
@@ -42,7 +43,11 @@
 	font-family: monospace;
 }
 
-.fingerSelect:disabled {
+.stringLabel {
+	font-weight: bold;
+}
+
+[is='finger-select']:disabled {
 	background-color: #A0A0A0;
 	color: transparent;
 }

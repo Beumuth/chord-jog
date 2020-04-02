@@ -4,6 +4,7 @@ class ShapesEditor extends HTMLDivElement {
 	}
 	
 	connectedCallback() {
+		this.setAttribute("is", "shapes-editor");
 		this.initializeHtml();
 	}
 	
@@ -68,7 +69,7 @@ class ShapesEditor extends HTMLDivElement {
 			const inputCell = document.createElement("td");
 			const relativeFretSelect = new RelativeFretSelect({
 				string: i,
-				selectedFret: null,
+				fret: ANY_FRET,
 				includeAnyFret: true
 			});
 			relativeFretSelect.addEventListener(
@@ -158,6 +159,7 @@ class ShapesEditor extends HTMLDivElement {
 		//EditableShape
 		const editableShape = this.shapeToEditableShape(shape);
 		listItem.append(editableShape);
+		const x = 1;
 	}
 	
 	shapeToEditableShape(shape) {

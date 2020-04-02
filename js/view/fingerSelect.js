@@ -5,18 +5,10 @@ class FingerSelect extends HTMLSelectElement {
 		super();
 		this.initialOptions = {
 			string: options.string,
-			selectedFinger: options.selecteFinger !== undefined ?
-				options.selectedFinger :
+			finger: options.finger !== undefined ?
+				options.finger :
 				null
 		};
-		this.FINGER_LABELS = new Map([
-			[null, '?'],
-			[0, 'T'],
-			[1, '1'],
-			[2, '2'],
-			[3, '3'],
-			[4, '4']
-		]);
 	}
 	
 	connectedCallback() {
@@ -25,33 +17,34 @@ class FingerSelect extends HTMLSelectElement {
 		//Create select
 		this.classList.add("enumSelect");
 		
-		//Create options
-		for(let [finger, label] of this.FINGER_LABELS.entries()) {
-			const curOption = document.createElement("option");
-			this.append(curOption);
-			curOption.className = "fingerOption";
-			curOption.value = finger;
-			curOption.textContent = label;
-		}
+		//Create finger options
+		[Finger.UNKNOWN_FINGER].concat(Finger.ALL_FINGERS).forEach(finger =>
+			this.createFingerOption(finger)
+		);
 		
 		//Optionally select an option
-		if(this.initialOptions.selectedFinger !== null) {
-			this.finger = this.initialOptions.selectedFinger;
+		if(this.initialOptions.finger !== null) {
+			this.finger = this.initialOptions.finger;
 		}
 	}
 	
 	get finger() {
 		const selectedOption = this.options[this.selectedIndex].value;
-		return selectedOption === "null" ? null : parseInt(selectedOption);
+		return isNaN(selectedOption) ? selectedOption : parseInt(selectedOption);
 	}
 	
 	set finger(finger) {
 		this.selectedIndex = Integer
 			.range(0, this.options.length)
-			.find(i =>
-				(this.options[i].value === "null" && finger === null) ||
-				this.options[i].value == finger
-			);
+			.find(i => this.options[i].value === finger + "");
+	}
+	
+	createFingerOption(finger) {
+		const option = document.createElement("option");
+		this.append(option);
+		option.className = "fingerOption";
+		option.value = finger;
+		option.textContent = finger;
 	}
 }
 

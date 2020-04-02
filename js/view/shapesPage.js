@@ -24,6 +24,10 @@ class ShapesPage extends Page {
 		return document.getElementById("overwriteInput");
 	}
 	
+	get shapesEditor() {
+		return document.querySelector("[is='shapes-editor']");
+	}
+	
 	get shapeCreator() {
 		return document.getElementById("shapeCreator");
 	}

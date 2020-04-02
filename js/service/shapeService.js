@@ -1,4 +1,6 @@
 class ShapeService {
+	static MAX_SEARCH_RESULTS = 12;
+	
 	constructor() {
 		this.LOCAL_STORAGE_KEY = "chord-jog-shapes";
 		this.loadFromLocalStorage();
@@ -11,7 +13,7 @@ class ShapeService {
 	equals(a, b) {
 		//Are the strings the same?
 		for(let i = 0; i < NUM_STRINGS; ++i) {
-			if(! a.strings[i].equals(b.strings[i])) {
+			if(! StringAction.equals(a.strings[i], b.strings[i])) {
 				//Different string action value
 				return false;
 			}
@@ -113,7 +115,12 @@ class ShapeService {
 		const matches = [];
 		
 		//For each shape
-		for(let i = 0; i < this.shapes.length && matches.length < 9; ++i) {
+		for(
+			let i = 0;
+			i < this.shapes.length &&
+				matches.length < ShapeService.MAX_SEARCH_RESULTS;
+			++i
+		) {
 			let isAMatch = true;
 			//For each string
 			for(let string = 0; string < NUM_STRINGS; ++string) {
@@ -144,50 +151,45 @@ class ShapeService {
 			return "Already exists";
 		}
 		
-		const containsRootFret = false;
-		const isOpenShape = this.isOpenShape(shape);
-		const fingerFrets = [{},{},{},{},{}];
-		for(let string = 0; string < shape.strings.length; ++string) {
-			const stringAction = shape.strings[string];
+		let containsRootFret = false;
+		const fingerActions = shape.fingerActions();
+		
+		//Does the unknown finger have any finger actions?
+		if(
+			FingerActions
+				.withFinger(fingerActions, Finger.UNKNOWN_FINGER)
+				.length !== 0
+		) {
+			//Yes. A finger is missing.
+			return "Finger missing";
+		}
+		
+		for(let finger in Finger.ALL_FINGERS) {
+			let fingerActionsForFinger = FingerActions.withFinger(
+				fingerActions,
+				finger
+			);
 			
-			//Every dead string must have no finger
-			if(
-				stringAction.fret === DEAD_STRING &&
-				stringAction.finger !== NO_FINGER
-			) {
-				return "Dead string has finger";
-			}
-			
-			//If this is a non-dead string with no fingers, then
-			//	a) Must be an open shape, and
-			//	b) Must be the root fret.
-			if(
-				stringAction.fret !== DEAD_STRING &&
-				stringAction.finger === NO_FINGER && ! (
-					isOpenShape &&
-					stringAction.fret === ROOT_FRET
-				)
-			) {
-				return "Finger missing";
+			//Is this finger used?
+			if(fingerActionsForFinger.length == 0) {
+				//No, check next.
+				continue;
 			}
 			
 			//A finger can be placed on at most one fret
-			if(stringAction.finger !== null && stringAction.fret !== null) {
-				fingerFrets[stringAction.finger][stringAction.fret] = true;
-				if(Object.keys(fingerFrets[stringAction.finger]).length > 1) {
-					return "Finger on multiple frets";
-				}
+			if(fingerActionsForFinger.length > 1) {
+				return "Finger on multiple frets";
 			}
 			
 			//Check if this string is at the root fret
-			if(stringAction.fret === ROOT_FRET) {
+			if(fingerActionsForFinger[0].fret === ROOT_FRET) {
 				containsRootFret = true;
 			}
 		}
 		
 		//There must be at least one string with the root fret
 		if(! containsRootFret) {
-			return "No root string";
+			return "No root fret";
 		}
 		
 		//min <= max
@@ -212,13 +214,7 @@ class ShapeService {
 		const rangeProperties = shapeProperties[1].split(";");
 		const strings = shapeProperties[0]
 			.split(";")
-			.map(stringActionProperties => {
-				const stringAction = stringActionProperties.split(",");
-				return StringAction.WithFretAndFinger(
-					stringAction[0] === "" ? null : parseInt(stringAction[0]),
-					stringAction[1] === "" ? null : parseInt(stringAction[1])
-				);
-			});
+			.map(StringAction.fromString);
 		const range = new Range(
 			rangeProperties[0] == "" ?
 				null :
@@ -240,13 +236,10 @@ class ShapeService {
 	 * Convert a shape to a string
 	 */
 	shapeToString(shape) {
-		return shape.strings.map(stringAction =>
-			(stringAction.fret === null ? "" : stringAction.fret) + "," +
-			(stringAction.finger === null ? "" : stringAction.finger)
-		).join(";") +
-		":" +
-		(shape.range.min === null ? "" : shape.range.min + ";") +
-		(shape.range.max === null ? "" : shape.range.max + ";");
+		return shape.strings.map(StringAction.toString).join(";") +
+			":" +
+			(shape.range.min === null ? "" : shape.range.min + ";") +
+			(shape.range.max === null ? "" : shape.range.max + ";");
 	}
 	
 	shapesToString(shapes) {
@@ -269,7 +262,7 @@ class ShapeService {
 	mergeShapeLists(a, b) {
 		const merged = a.slice();
 		for(let bShape of b) {
-			const unique = true;
+			let unique = true;
 			for(let aShape of merged) {
 				if(this.equals(bShape, aShape)) {
 					unique = false;

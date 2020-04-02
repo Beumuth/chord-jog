@@ -11,7 +11,7 @@ class ShapeChart extends HTMLCanvasElement {
 	connectedCallback() {
 		this.setAttribute("is", "shape-chart");
 		this.shape = this.initialOptions.shape;
-		this.fixedMin = this.initialOptions.fixedMin;
+		this.dataset.fixedMin = this.initialOptions.fixedMin;
 		
 		this.width = this.canvasWidth;
 		this.height = this.canvasHeight;
@@ -26,6 +26,7 @@ class ShapeChart extends HTMLCanvasElement {
 	
 	set fixedMin(fixedMin) {
 		this.dataset.fixedMin = fixedMin;
+		this.render();
 	}
 	
 	initializeConstants() {
@@ -115,108 +116,39 @@ class ShapeChart extends HTMLCanvasElement {
 	}
 	
 	drawFingerIndicators() {
-		//Digest the shape into greater digestibility
-		const model = this.getFingerIndicatorModel();
-		
 		//Draw dead strings
-		model.deadStrings.forEach(this.drawDeadString.bind(this));
+		Shape
+			.STRINGS
+			.filter(string =>
+				this.shape.strings[string] === StringAction.DEAD_STRING
+			).forEach(this.drawDeadString.bind(this));
 		//Draw open strings
-		model.openStrings.forEach(this.drawOpenString.bind(this));
-		//Draw single-fret fingers
-		for(let finger in model.singles) {
-			for(let fret in model.singles[finger]) {
-				this.drawFingerOnString(
-					finger,
-					model.singles[finger][fret],
-					fret
-				);
+		Shape
+			.STRINGS
+			.filter(string =>
+				this.shape.strings[string] === StringAction.OPEN_STRING
+			).forEach(this.drawOpenString.bind(this));
+		//Draw fingers on frets
+		this.shape.fingerActions().forEach(fingerAction => {
+			switch(FingerAction.type(fingerAction)) {
+				case FingerAction.TYPE_SINGE:
+					//A finger on a single string
+					this.drawFingerOnString(
+						fingerAction.finger,
+						fingerAction.string,
+						fingerAction.fret
+					);
+					break;
+				case FingerAction.TYPE_BAR:
+					//A finger bar
+					this.drawFingerBar(
+						fingerAction.finger,
+						fingerAction.bar.min,
+						fingerAction.bar.max,
+						fingerAction.fret
+					);
 			}
-		}
-		//Draw barred fingers
-		for(let finger in model.bars) {
-			for(let fret in model.bars[finger]) {
-				this.drawFingerBar(
-					finger,
-					model.bars[finger][fret][0],
-					model.bars[finger][fret][1],
-					fret
-				);
-			}
-		}
-	}
-	
-	getFingerIndicatorModel() {
-		//Map<String, Object> of finger-fret types and their values
-		const model = {
-			deadStrings: [],	//List<Int> of guitar string indices
-			openStrings: [],	//List<Int> of guitar string indices
-			singles: [],		//Map<Int, Map<Int, Int>> finger => fret => string
-			bars: []			//Map<Int, Map<Int, Pair<Int, Int>>> finger => fret => (minString, maxString)
-		};
-		
-		//Iterate through the shape's strings
-		for(let string = 0; string < this.shape.strings.length; ++string) {
-			const stringAction = this.shape.strings[string];
-			const finger = stringAction.finger;
-			const fret = stringAction.fret;
-			
-			if(fret === null) {
-				//relative fret == null ==> dead string
-				model.deadStrings.push(string);
-			} else if(this.fixedMin === OPEN_FRET && fret === ROOT_FRET) {
-				//(is root fret and is an open shape) ==> open string
-				model.openStrings.push(string);
-			} else if(finger in model.bars && fret in model.bars[finger]) {
-				//Finger already a part of a bar on this fret.
-				//Expand the range of the bar to include this string.
-				model.bars[finger][fret] = {
-					0: Math.min(model.bars[finger][fret][0], string),
-					1: Math.max(model.bars[finger][fret][1], string)
-				};
-			} else if(
-				finger in model.singles &&
-				fret in model.singles[finger]
-			) {
-				//Finger is used on this fret with on one other string.
-				//Convert the finger-fret from a single to a bar.
-				const minMax = {
-					0: Math.min(model.singles[finger][fret], string),
-					1: Math.max(model.singles[finger][fret], string)
-				};
-				if(! (finger in model.bars)) {
-					model.bars[finger] = {[fret]: minMax};
-				} else  {
-					model.bars[finger][fret] = minMax;
-				}
-				delete model.singles[finger][fret];
-				
-				if(Object.keys(model.singles[finger]).length === 0) {
-					//The finger is no longer used on any frets as a single.
-					//Remove it as a single.
-					delete model.singles[finger];
-				}
-			} else if(finger in model.singles) {
-				//Finger is used as a single, but not on this fret.
-				//Add it as a single on this fret.
-				model.singles[finger][fret] = string;
-			} else {
-				//Finger is completely unused.
-				//Add it as a single on this fret.
-				model.singles[finger] = {[fret]: string};
-			}
-		}
-		
-		return model;
-	}
-	
-	fingerToLabel(finger) {
-		if(finger === "null") {
-			return "?";
-		}
-		if(finger === "0") {
-			return "T";
-		}
-		return finger + "";
+		});
 	}
 	
 	drawOpenString(stringNumber) {
@@ -285,7 +217,7 @@ class ShapeChart extends HTMLCanvasElement {
 		this.context.fillStyle = "white";
 		this.context.font = "12px Arial";
 		this.context.fillText(
-			this.fingerToLabel(finger),
+			finger,
 			centerX,
 			centerY+4
 		);
@@ -338,7 +270,7 @@ class ShapeChart extends HTMLCanvasElement {
 		this.context.fillStyle = "white";
 		this.context.font = "12px Arial";
 		this.context.fillText(
-			this.fingerToLabel(finger),
+			finger,
 			centerX,
 			centerY+4
 		);
