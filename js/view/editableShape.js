@@ -1,4 +1,6 @@
 class EditableShape extends HTMLFieldSetElement {
+	static TAG_NAME = "editable-shape";
+	
 	constructor(options) {
 		super()
 		this.initialOptions = {
@@ -16,10 +18,51 @@ class EditableShape extends HTMLFieldSetElement {
 	}
 	
 	connectedCallback() {
-		this.setAttribute("is", "editable-shape");
+		this.setAttribute("is", EditableShape.TAG_NAME);
 		this.initializeHtml();
 		this.isOpen = shapeService.isOpenShape(this.initialOptions.shape);
 		this.validate();
+	}
+	
+	get shape() {
+		return new Shape(this.idShape, this.schema, this.range);
+	}
+	
+	set shape(shape) {
+		
+		this.shapeChart.shape = shape;
+	}
+	
+	get idShape() {
+		return this.dataset.idShape;
+	}
+	
+	get schema() {
+		return this.editableSchema.schema;
+	}
+	
+	get minFret() {
+		return parseInt(this.minFretInput.value);
+	}
+	
+	set minFret(minFret) {
+		this.minFretInput.value = minFret;
+		this.minFretChanged();
+	}
+	
+	get maxFret() {
+		return parseInt(
+			this.maxFretSelect.options[
+				this.maxFretSelect.selectedIndex
+			].value
+		);
+	}
+	
+	get range() {
+		return new Range(
+			this.minFret,
+			this.maxFret
+		);
 	}
 	
 	get shapeChart() {
@@ -38,23 +81,12 @@ class EditableShape extends HTMLFieldSetElement {
 		return this.querySelector(".rRangeLabel");
 	}
 	
-	get editableShapeStrings() {
-		return this.querySelector("[is='editable-shape-strings']");
+	get editableSchema() {
+		return this.querySelector("[is='editable-schema']");
 	}
 	
 	get saveButton() {
 		return this.querySelector(".editShapeEditButton");
-	}
-	
-	get isOpen() {
-		return this.dataset.isOpen;
-	}
-	
-	set isOpen(isOpen) {
-		this.dataset.isOpen = isOpen;
-		this.shapeChart.fixedMin = isOpen ? OPEN_FRET : null;
-		this.maxFretSelect.selectedIndex = isOpen ? 0 : 1;
-		this.updateRRangeLabel();
 	}
 	
 	initializeHtml(){
@@ -67,64 +99,47 @@ class EditableShape extends HTMLFieldSetElement {
 		const rangeContainer = document.createElement("div");
 		rangeContainer.className = "rangeContainer";
 		this.append(rangeContainer);
-		//	Max
-		//		Select
-		const maxFretSelect = document.createElement("select");
-		rangeContainer.append(maxFretSelect);
-		maxFretSelect.className = "shapeTypeSelect";
-		maxFretSelect.classList.add("enumSelect");
-		maxFretSelect.onchange = this.maxFretChanged.bind(this);
-		//		Open fret option
-		const openFretOption = document.createElement("option");
-		maxFretSelect.append(openFretOption);
-		openFretOption.className = "maxFretOpenOption";
-		openFretOption.value = 0;
-		openFretOption.textContent = "Open";
-		//		Max root fret option
-		const maxRootFretOption = document.createElement("option");
-		maxFretSelect.append(maxRootFretOption);
-		maxRootFretOption.className = "maxFretMaxRootOption";
-		maxRootFretOption.value = 11;
-		maxRootFretOption.textContent = "Movable";
 		//	Min
-		//		Container
-		const minFretContainer = document.createElement("div");
-		rangeContainer.append(minFretContainer);
-		minFretContainer.className = "minFretContainer";
-		minFretContainer.classList.add("rangeSubcontainer");
-		//		Input
 		const minFretInput = document.createElement("input");
-		minFretContainer.append(minFretInput);
+		rangeContainer.append(minFretInput);
 		minFretInput.type = "text";
 		minFretInput.className = "minFretInput";
-		minFretInput.maxLength = 2;
-		minFretInput.onclick = this.minFretClicked.bind(this);
+		minFretInput.maxLength = Integer.numDigits(Fret.MAX_ROOT);
+		minFretInput.onclick = (e) => TextInput.selectAllText(e.target);
 		minFretInput.onchange = this.minFretChanged.bind(this);
 		minFretInput.value = this.initialOptions.shape.range.min;
-		
 		//R range label
 		const rRangeLabel = document.createElement("span");
-		minFretContainer.append(rRangeLabel);
+		rangeContainer.append(rRangeLabel);
 		rRangeLabel.className = "rRangeLabel";
+		rRangeLabel.textContent = " <= r <= ";
+		//	Max
+		const maxFretInput = document.createElement("input");
+		rangeContainer.append(maxFretInput);
+		maxFretInput.type = "text";
+		maxFretInput.className = "maxFretInput";
+		maxFretInput.maxLength = Integer.numDigits(Fret.MAX_ROOT);
+		maxFretInput.onclick = (e) => TextInput.selectAllText(e.target);
+		maxFretInput.onchange = this.maxFretChanged.bind(this);
+		maxFretInput.value = this.initialOptions.shape.range.max;
 		
-		//Editable shape strings
-		const editableShapeStrings = new EditableShapeStrings(
-			{strings: this.initialOptions.shape.strings}
+		//Editable schema
+		const editableSchema = new EditableSchema(
+			{schema: this.initialOptions.shape.schema}
 		);
-		this.append(editableShapeStrings);
-		Integer
-			.range(0, NUM_STRINGS)
-			.forEach(string => {
-				const editableShapeString = editableShapeStrings.strings[string];
-				editableShapeString.addEventListener(
+		this.append(editableSchema);
+		editableSchema
+			.editableStringActions
+			.forEach((editableStringAction, index) => {
+				editableStringAction.addEventListener(
 					"change",
 					this.inputChanged.bind(this)
 				);
-				editableShapeString.addEventListener(
+				editableStringAction.addEventListener(
 					"change",
-					() =>this.fretChanged(string)
+					() => this.fretChanged(index)
 				);
-				editableShapeString
+				editableStringAction
 					.relativeFretSelect
 					.addEventListener("change", this.inputChanged.bind(this));
 			});
@@ -179,35 +194,6 @@ class EditableShape extends HTMLFieldSetElement {
 		}
 	}
 	
-	maxFretChanged() {
-		this.shapeChart.shape.range.max = parseInt(
-			this.maxFretSelect.options[
-				this.maxFretSelect.selectedIndex
-			].value
-		);
-		
-		if(this.shapeChart.shape.range.max === OPEN_FRET) {
-			//This is an open chord
-			this.isOpen = true;
-			
-		} else {
-			//This is a movable chord
-			this.isOpen = false;
-			//Set the min fret to the input value
-			this.shapeChart.shape.range.min = parseInt(this.minFretInput.value);
-		}
-		
-		this.updateRRangeLabel();
-		for(let i = 0; i < NUM_STRINGS; ++i) {
-			this.fretChanged(i);
-		}
-		this.inputChanged();
-	}
-	
-	minFretClicked() {
-		this.minFretInput.setSelectionRange(0, this.minFretInput.value.length);
-	}
-	
 	minFretChanged() {
 		const minFret = parseInt(this.minFretInput.value);
 		//Is the new min fret valid?
@@ -229,26 +215,37 @@ class EditableShape extends HTMLFieldSetElement {
 		this.minFretInput.value = minFret;
 	}
 	
-	updateRRangeLabel() {
-		this.rRangeLabel.textContent =
-			shapeService.isOpenShape(this.shapeChart.shape) ?
-				"r = 0" :
-				" <= r <= " + MAX_ROOT_FRET;
+	maxFretChanged() {
+		this.shapeChart.shape.range.max = this.maxFret;
+		
+		if(this.shapeChart.shape.range.max === OPEN_FRET) {
+			//This is an open chord
+			this.isOpen = true;
+			
+		} else {
+			//This is a movable chord
+			this.isOpen = false;
+			//Set the min fret to the input value
+			this.shapeChart.shape.range.min = parseInt(this.minFretInput.value);
+		}
+		
+		this.updateRRangeLabel();
+		for(let i = 0; i < NUM_STRINGS; ++i) {
+			this.fretChanged(i);
+		}
+		this.inputChanged();
 	}
 	
 	fretChanged(stringIndex) {
-		let editableShapeStrings = this.editableShapeStrings;
-		const fret = editableShapeStrings
-			.strings[stringIndex]
-			.relativeFretSelect
-			.fret;
-		const isFingerless =
-			fret === DEAD_STRING ||
-			fret === ROOT_FRET && this.isOpen;
-		editableShapeStrings
-			.strings[stringIndex]
+		const editableSchema = this.editableSchema;
+		editableSchema
+			.editableStringActions[stringIndex]
 			.fingerSelect
-			.disabled = isFingerless;
+			.disabled = StringAction.isFingerless(
+				editableSchema
+					.editableStringActions[stringIndex]
+					.fret
+			);
 	}
 	
 	inputChanged() {
@@ -269,36 +266,6 @@ class EditableShape extends HTMLFieldSetElement {
 	}
 	
 	updateShape() {
-		const maxFret = parseInt(
-			this.maxFretSelect.options[
-				this.maxFretSelect.selectedIndex
-			].value
-		);
-		this.shapeChart.shape = new Shape(
-			this.initialOptions.shape.id,
-			this
-				.editableShapeStrings
-				.strings
-				.map(editableString => {
-					const fret = editableString.relativeFretSelect.fret;
-					const finger = editableString.fingerSelect.finger;
-					//If open shape and open fret, force the finger to null
-					return StringAction.withFretAndFinger(
-						fret,
-						fret === DEAD_STRING ||
-						(this.isOpen && fret === ROOT_FRET) ?
-							Finger.NO_FINGER :
-							finger
-					);
-				}),
-			new Range(
-				maxFret === OPEN_FRET ?
-					OPEN_FRET :
-					parseInt(this.minFretInput.value),
-				maxFret
-			)
-		);
-		this.shapeChart.fixedMin = this.getFixedMin();
 	}
 	
 	getFixedMin() {
@@ -325,7 +292,7 @@ class EditableShape extends HTMLFieldSetElement {
 }
 
 customElements.define(
-	"editable-shape",
+	EditableShape.TAG_NAME,
 	EditableShape,
 	{extends: "fieldset"}
 );

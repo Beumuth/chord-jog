@@ -157,14 +157,14 @@ class ShapeService {
 		//Does the unknown finger have any finger actions?
 		if(
 			FingerActions
-				.withFinger(fingerActions, Finger.UNKNOWN_FINGER)
+				.withFinger(fingerActions, Finger.UNKNOWN)
 				.length !== 0
 		) {
 			//Yes. A finger is missing.
 			return "Finger missing";
 		}
 		
-		for(let finger in Finger.ALL_FINGERS) {
+		for(let finger in Fingers.FINGERFUL) {
 			let fingerActionsForFinger = FingerActions.withFinger(
 				fingerActions,
 				finger

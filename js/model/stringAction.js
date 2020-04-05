@@ -2,13 +2,17 @@ class StringAction {
 	static DEAD_STRING = "x";
 	static OPEN_STRING = "o";
 	
-	constructor(fret=DEAD_STRING, finger=Finger.NO_FINGER) {
+	constructor(fret=DEAD_STRING, finger=Finger.NONE) {
 		this.fret = fret;
 		this.finger = finger;
 	}
 	
 	static withFretAndFinger(fret, finger) {
-		return new StringAction(fret, finger);
+		return fret === DEAD_STRING ?
+			StringAction.DEAD_STRING :
+			fret === OPEN_STRING :
+				StringAction.OPEN_STRING :
+				new StringAction(fret, finger);
 	}
 	
 	static fret(stringAction) {
@@ -19,7 +23,7 @@ class StringAction {
 	
 	static finger(stringAction) {
 		return StringAction.isFingerless(stringAction) ?
-			Finger.NO_FINGER :
+			Finger.NONE :
 			stringAction.finger;
 	}
 	

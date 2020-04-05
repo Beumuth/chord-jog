@@ -131,7 +131,7 @@ class ShapeChart extends HTMLCanvasElement {
 		//Draw fingers on frets
 		this.shape.fingerActions().forEach(fingerAction => {
 			switch(FingerAction.type(fingerAction)) {
-				case FingerAction.TYPE_SINGE:
+				case FingerActionType.SINGLE:
 					//A finger on a single string
 					this.drawFingerOnString(
 						fingerAction.finger,
@@ -139,7 +139,7 @@ class ShapeChart extends HTMLCanvasElement {
 						fingerAction.fret
 					);
 					break;
-				case FingerAction.TYPE_BAR:
+				case FingerActionType.BAR:
 					//A finger bar
 					this.drawFingerBar(
 						fingerAction.finger,

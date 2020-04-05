@@ -1,55 +1,48 @@
 class FingerSelect extends HTMLSelectElement {
-	static FINGER_SELECT_CHANGED = "fingerSelectChanged";
+	static TAG_NAME = "finger-select";
 	
 	constructor(options) {
 		super();
 		this.initialOptions = {
-			string: options.string,
 			finger: options.finger !== undefined ?
 				options.finger :
-				null
+				Finger.UNKNOWN
 		};
 	}
 	
 	connectedCallback() {
-		this.setAttribute("is", "finger-select");
-		
-		//Create select
+		this.setAttribute("is", FingerSelect.TAG_NAME);
 		this.classList.add("enumSelect");
 		
 		//Create finger options
-		[Finger.UNKNOWN_FINGER].concat(Finger.ALL_FINGERS).forEach(finger =>
-			this.createFingerOption(finger)
-		);
-		
-		//Optionally select an option
-		if(this.initialOptions.finger !== null) {
-			this.finger = this.initialOptions.finger;
-		}
+		[Finger.UNKNOWN]
+			.concat(Fingers.FINGERFUL)
+			.forEach(finger =>
+				this.append(new Option(
+					finger,	//text
+					finger,	//value
+					false,	//defaultSelected
+					finger === this.initialOptions.finger	//selected
+				));
+			);
 	}
 	
 	get finger() {
-		const selectedOption = this.options[this.selectedIndex].value;
-		return isNaN(selectedOption) ? selectedOption : parseInt(selectedOption);
+		return Finger.fromString(
+			this.options[this.selectedIndex].value
+		);
 	}
 	
 	set finger(finger) {
+		const fingerAsString = Finger.toString(finger);
 		this.selectedIndex = Integer
 			.range(0, this.options.length)
-			.find(i => this.options[i].value === finger + "");
-	}
-	
-	createFingerOption(finger) {
-		const option = document.createElement("option");
-		this.append(option);
-		option.className = "fingerOption";
-		option.value = finger;
-		option.textContent = finger;
+			.find(i => this.options[i].value === fingerAsString);
 	}
 }
 
 customElements.define(
-	"finger-select",
+	FingerSelect.TAG_NAME,
 	FingerSelect,
 	{extends: "select"}
 );

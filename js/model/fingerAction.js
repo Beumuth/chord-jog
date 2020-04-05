@@ -1,6 +1,4 @@
 class FingerAction {
-	static TYPE_SINGLE = "single";
-	static TYPE_BAR = "bar";
 	
 	static single(finger, fret, string) {
 		return {
@@ -12,8 +10,8 @@ class FingerAction {
 	
 	static bar(finger, fret, minString, maxString) {
 		return {
-			finger: finger,
 			fret: fret,
+			finger: finger,
 			bar: {
 				min: minString,
 				max: maxString
@@ -23,15 +21,20 @@ class FingerAction {
 	
 	static type(fingerAction) {
 		return fingerAction.string !== undefined ?
-			FingerAction.TYPE_SINGLE :
-			FingerActions.TYPE_BAR;
+			FingerActionType.SINGLE :
+			FingerActionType.BAR;
 	}
+}
+
+class FingerActionType {
+	static SINGLE = "fingerActionTypeSingle";
+	static BAR = "fingerActionTypeBar";
 }
 
 class FingerActions {	
 	static getSingleFingerOnFret(fingerActions, finger, fret) {
 		return fingerActions.find(fingerAction =>
-			FingerAction.type(fingerAction) === FingerAction.TYPE_SINGLE &&
+			FingerAction.type(fingerAction) === FingerActionType.SINGLE &&
 			fingerAction.finger === finger &&
 			fingerAction.fret === fret
 		);
@@ -39,7 +42,7 @@ class FingerActions {
 	
 	static getFingerBarOnFret(fingerActions, finger, fret) {
 		return fingerActions.find(fingerAction =>
-			FingerAction.type(fingerAction) === FingerAction.TYPE_BAR &&
+			FingerAction.type(fingerAction) === FingerActionType.BAR &&
 			fingerAction.finger === finger &&
 			fingerAction.fret === fret
 		);

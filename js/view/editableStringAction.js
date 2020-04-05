@@ -1,8 +1,6 @@
-class EditableShapeString extends HTMLLIElement {
-	static TYPE_OPEN_STRING = "open";
-	static TYPE_DEAD_STRING = "dead";
-	static TYPE_FINGER_ON_FRET = "fingerOnFret";
-	
+class EditableStringAction extends HTMLSpanElement {	
+	static TAG_NAME = "editable-string-action";
+
 	constructor(options) {
 		super();
 		this.initialOptions = {
@@ -15,7 +13,7 @@ class EditableShapeString extends HTMLLIElement {
 	}
 	
 	connectedCallback() {
-		this.setAttribute("is", "editable-shape-string");
+		this.setAttribute("is", EditableStringAction.TAG_NAME);
 		this.style.display = "inline-block";
 		const label = document.createElement("label");
 		this.append(label);
@@ -26,10 +24,9 @@ class EditableShapeString extends HTMLLIElement {
 		label.style.textAlign = "center";
 		label.style.width = 23;
 		
-		const relativeFretSelect = new RelativeFretSelect({
-			string: this.initialOptions.string,
-			fret: StringAction.fret(this.initialOptions.stringAction)
-		});
+		const relativeFretSelect = new RelativeFretSelect(
+			StringAction.fret(this.initialOptions.stringAction)
+		);
 		this.append(relativeFretSelect);
 		relativeFretSelect.style.float = "right";
 		relativeFretSelect.style.clear = "right";
@@ -47,30 +44,16 @@ class EditableShapeString extends HTMLLIElement {
 		);
 	}
 	
-	get type() {
-		return this.dataset.type;
+	get stringAction() {
+		return StringAction.withFretAndFinger(
+			this.fret,
+			this.finger
+		);
 	}
 	
-	set type(type) {
-		switch(type) {
-			case EditableShapeString.TYPE_OPEN_STRING:
-				this.fret = OPEN_FRET;
-				this.finger = NO_FINGER;
-				break;
-			case EditableShapeString.TYPE_DEAD_STRING:
-				this.fret = DEAD_STRING;
-				this.finger = NO_FINGER;
-				break;
-		}
-		this.dataset.type = type;
-	}
-	
-	get fingerSelect() {
-		return this.querySelector("[is='finger-select']");
-	}
-	
-	get relativeFretSelect() {
-		return this.querySelector("[is='relative-fret-select']");
+	set stringAction(stringAction) {
+		this.finger = StringAction.finger(stringAction);
+		this.fret = StringAction.fret(stringAction);
 	}
 	
 	get fret() {
@@ -82,16 +65,32 @@ class EditableShapeString extends HTMLLIElement {
 	}
 	
 	get finger() {
-		return this.fingerSelect.finger;
+		return Fret.isFingerless(this.fret) ?
+			Finger.NONE :
+			this.fingerSelect.finger;
 	}
 	
 	set finger(finger) {
 		this.fingerSelect.finger = finger;
 	}
+	
+	get fingerSelect() {
+		return this.querySelector("[is='finger-select']");
+	}
+	
+	get relativeFretSelect() {
+		return this.querySelector("[is='relative-fret-select']");
+	}
+	
+	fretChanged() {
+		if(Fret.isFingerless(this.fret)) {
+			
+		}
+	}
 }
 
 customElements.define(
-	"editable-shape-string",
-	EditableShapeString,
-	{extends: "li"}
+	EditableStringAction.TAG_NAME,
+	EditableStringAction,
+	{extends: "span"}
 );
