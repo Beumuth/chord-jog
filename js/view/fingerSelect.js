@@ -34,13 +34,6 @@ class FingerSelect extends HTMLElement {
 		svg.setAttribute("width", "233");
 		svg.setAttribute("height", "291");
 		svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		svg.setAttribute("fill", "none");
-		svg.setAttribute("stroke", "#000");
-		svg.setAttribute("stroke-width", "1.85815561px");
-		svg.setAttribute("stroke-linecap", "butt");
-		svg.setAttribute("stroke-linejoin", "miter");
-		svg.setAttribute("font-family", "Helvetica");
-		svg.setAttribute("font-size", 37.16311264);
 		this.append(svg);
 		
 		//Create group
@@ -51,6 +44,8 @@ class FingerSelect extends HTMLElement {
 		
 		//Create outline
 		const outline = createSVGElement("path");
+		outline.setAttribute("fill", "none");
+		outline.setAttribute("stroke", "#000");
 		outline.setAttribute(	//Drawn with Inkscape
 			"d",
 			`M
@@ -305,12 +300,19 @@ class FingerSelect extends HTMLElement {
 		const lineSegmentDistance2Mapper = (line) => (p) =>
 			distance2(p, closestPointOnLineSegmentToPoint(line, p));
 		const fingerSelectLabel = (text, textX, textY) => {
+			const fingerLabel = createSVGElement("g");
+			fingerLabel.className = "fingerLabel";
+			group.append(fingerLabel);
+			
 			const label = createSVGElement("text");
 			label.textContent = text;
 			label.setAttribute("x", textX);
 			label.setAttribute("y", textY);
-			group.append(label);
-			return label;
+			label.setAttribute("fill", "black");
+			label.setAttribute("font-family", "Courier New");
+			label.setAttribute("font-size", 37);
+			fingerLabel.append(label);
+			return fingerLabel;
 		};
 		
 		//Create finger labels and regions
@@ -322,7 +324,7 @@ class FingerSelect extends HTMLElement {
 			}),
 			new FingerSelectRegion({
 				finger: Finger.THUMB,
-				label: fingerSelectLabel(Finger.THUMB, 21, 200),
+				label: fingerSelectLabel(Finger.THUMB, 25, 200),
 				distance2Mapper: lineSegmentDistance2Mapper([[11, 137], [47, 211]])
 			}),
 			new FingerSelectRegion({
@@ -332,7 +334,7 @@ class FingerSelect extends HTMLElement {
 			}),
 			new FingerSelectRegion({
 				finger: Finger.MIDDLE,
-				label: fingerSelectLabel(Finger.MIDDLE, 123, 94),
+				label: fingerSelectLabel(Finger.MIDDLE, 124, 94),
 				distance2Mapper: lineSegmentDistance2Mapper([[131, 7], [139, 133]])
 			}),
 			new FingerSelectRegion({
@@ -342,7 +344,7 @@ class FingerSelect extends HTMLElement {
 			}),
 			new FingerSelectRegion({
 				finger: Finger.PINKY,
-				label: fingerSelectLabel(Finger.PINKY, 208, 128),
+				label: fingerSelectLabel(Finger.PINKY, 207, 128),
 				distance2Mapper: lineSegmentDistance2Mapper([[219, 61], [219, 158]])
 			}),
 		];
@@ -503,19 +505,19 @@ class FingerSelectRegion extends HTMLElement {
 		if(name === "state") {
 			switch(newValue) {
 				case "unselectable":
-					this.label.setAttribute("fill", "#AEAEAE");
+					this.label.setAttribute("text-decoration", "line-through solid");
 					break;
 				case "unselected":
-					this.label.setAttribute("fill", "none");
+					this.label.setAttribute("text-decoration", "none");
 					break;
 				case "preview":
-					this.label.setAttribute("fill", "#FCEC7F");
+					this.label.setAttribute("text-decoration", "underline dotted");
 					break;
 				case "selected":
-					this.label.setAttribute("fill", "#5C9FFF");
+					this.label.setAttribute("text-decoration", "underline solid");
 					break;
 				default:
-					this.label.setAttribute("fill", "#E64421");
+					this.label.setAttribute("text-decoration", "spelling-error");
 			}
 		}
 	}
