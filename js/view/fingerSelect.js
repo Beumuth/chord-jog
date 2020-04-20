@@ -1,7 +1,5 @@
-class FingerSelect extends HTMLElement {
-	static TAG_NAME = "finger-select";
-	
-	static distance2 = (a, b) =>
+class FingerSelect {
+	static TAG_NAME = "finger-select";static distance2 = (a, b) =>
 		Math.pow(a[0] - b[0], 2) +
 		Math.pow(a[1] - b[1], 2);
 		
@@ -28,8 +26,8 @@ class FingerSelect extends HTMLElement {
 		any: {
 			finger: Finger.ANY,
 			text: Finger.ANY,
-			x: 142,
-			y: 262,
+			x: 149,
+			y: 250,
 			offsetX: -.25,
 			offsetY: 3.5,
 			distance2Mapper: FingerSelect.distance2MapperGenerators.point([149, 241])
@@ -103,10 +101,6 @@ class FingerSelect extends HTMLElement {
 		"selected",
 		"unselectable"
 	];
-	
-	static get observedAttributes() {
-		return _.keys(FingerSelect.regions);
-	};
 	
 	static regionWithFinger(finger) {
 		return _.toPairs(FingerSelect.regions) //Convert the region info to pairs.
@@ -436,286 +430,304 @@ class FingerSelect extends HTMLElement {
 		distance2Mapper: distance2Mapper
 	});
 	
-	constructor(options={}) {
-		super();
-	}
-	
-	get thumb() {
-		return this.getAttribute("thumb");
-	}
-	
-	set thumb(state) {
-		this.setAttribute("thumb", state);
-	}
-	
-	get index() {
-		return this.getAttribute("index");
-	}
-	
-	set index(state) {
-		this.setAttribute("index", state);
-	}
-	
-	get middle() {
-		return this.getAttribute("middle");
-	}
-	
-	set middle(state) {
-		this.setAttribute("middle", state);
-	}
-	
-	get ring() {
-		return this.getAttribute("ring");
-	}
-	
-	set ring(state) {
-		this.setAttribute("ring", state);
-	}
-	
-	get pinky() {
-		return this.getAttribute("pinky");
-	}
-	
-	set pinky(state) {
-		this.setAttribute("pinky", state);
-	}
-	
-	get any() {
-		return this.getAttribute("any");
-	}
-	
-	set any(state) {
-		this.setAttribute("any", state);
-	}
-	
-	get all() {
-		return _.toPairs(FingerSelect.regions).map(keyedRegions => ({
-			finger: keyedRegions[1].finger,
-			state: this.getAttribute(keyedRegions[0])
-		}));
-	}
-	
-	get selected() {
-		return this.getFingerWithExclusiveState("selected");
-	}
-	
-	set selected(finger) {
-		//Unselect if null or undefined
-		if(_.isNil(finger)) {
-			return this.unselect();
+	static Standalone = class extends HTMLElement {
+		static get observedAttributes() {
+			return _.keys(FingerSelect.regions);
+		};
+		
+		constructor(options={}) {
+			super();
 		}
 		
-		//Get the newly selected region state
-		const selectedFingerCurState = this.getFingerState(finger);
-		//Is it unselectable or already selected?
-		if(["unselectable", "selected"].includes(selectedFingerCurState)) {
-			//Yes. Do nothing.
-			return;
+		get thumb() {
+			return this.getAttribute("thumb");
 		}
 		
-		//Get the previously selected region
-		const previouslySelectedFinger = this.selected;
-		//Does one exist?
-		if(previouslySelectedFinger !== null) {
-			//Yes. Unselect it.
-			this.setFingerState(previouslySelectedFinger, "unselected");
+		set thumb(state) {
+			this.setAttribute("thumb", state);
 		}
 		
-		//Select the new finger
-		this.setFingerState(finger, "selected")
-	}
-	
-	get preview() {
-		return this.getFingerWithExclusiveState("preview");
-	}
-	
-	set preview(finger) {
-		//Unpreview if null or undefined
-		if(_.isNil(finger)) {
-			return this.unpreview();
+		get index() {
+			return this.getAttribute("index");
 		}
 		
-		//Get the current preview region (possibly undefined)
-		const existingPreviewFinger = this.preview;
-		//Does one exist, and if so does it differ from the current preview finger?
-		if(! [null, finger].includes(existingPreviewFinger)){
-			//Yes. Unselect it.
-			this.setFingerState(existingPreviewFinger, "unselected");
-		}
-		//Is the new region unselected?
-		if(this.getFingerState(finger) === "unselected") {
-			//Yes. Preview it (only unselected regions can be previewed)
-			this.setFingerState(finger, "preview");
-		}
-	}
-	
-	connectedCallback() {
-		this.connectStyle();
-		this.connectSVG();
-		this.connectAttributes();
-	}
-	
-	attributeChangedCallback(name, oldValue, newValue) {
-		//Is the finger-selected not yet connected?
-		if(! this.isConnected) {
-			//No, ignore.
-			return;
+		set index(state) {
+			this.setAttribute("index", state);
 		}
 		
-		//Is the attribute a region?
-		if(_.keys(FingerSelect.regions).includes(name)) {
-			//Yes - is it valid?
-			if(! FingerSelect.states.includes(newValue)) {
-				//No - reset to the old value and return
-				return this.setAttribute(name, oldValue);
+		get middle() {
+			return this.getAttribute("middle");
+		}
+		
+		set middle(state) {
+			this.setAttribute("middle", state);
+		}
+		
+		get ring() {
+			return this.getAttribute("ring");
+		}
+		
+		set ring(state) {
+			this.setAttribute("ring", state);
+		}
+		
+		get pinky() {
+			return this.getAttribute("pinky");
+		}
+		
+		set pinky(state) {
+			this.setAttribute("pinky", state);
+		}
+		
+		get any() {
+			return this.getAttribute("any");
+		}
+		
+		set any(state) {
+			this.setAttribute("any", state);
+		}
+		
+		get all() {
+			return _.toPairs(FingerSelect.regions).map(keyedRegions => ({
+				finger: keyedRegions[1].finger,
+				state: this.getAttribute(keyedRegions[0])
+			}));
+		}
+		
+		get selected() {
+			return this.getFingerWithExclusiveState("selected");
+		}
+		
+		set selected(finger) {
+			//Unselect if null or undefined
+			if(_.isNil(finger)) {
+				return this.unselect();
 			}
 			
-			//Valid. Is this an exclusive state?
-			if(["preview", "selected"].includes(newValue)) {
-				//Yes. If there's another region with the exclusive state,
-				//switch it to 'unselected'.
-				_.keys(FingerSelect.regions)
-					.map(region => ({
-						region: region,
-						state: this.getAttribute(region)}))
-					.filter(regionState =>
-						name !== regionState.region &&
-						regionState.state === newValue)
-					.forEach(regionState =>
-						this.setAttribute(regionState.region, "unselected"));
+			//Get the newly selected region state
+			const selectedFingerCurState = this.getFingerState(finger);
+			//Is it unselectable or already selected?
+			if(["unselectable", "selected"].includes(selectedFingerCurState)) {
+				//Yes. Do nothing.
+				return;
 			}
 			
-			//Style the region according to the new state.
-			const fingerLabel = this.getRegionFingerLabel(name);
-			const fingerLabelOutline = fingerLabel.querySelector("circle");
-			fingerLabel.setAttribute("display",	//Is the label hidden?
-				"unselectable" === newValue ?
-					"none" : "inline");	//Only if 'unselectable'
-			fingerLabelOutline.setAttribute("stroke",	//Is stroke visible?
-				["preview", "selected"].includes(newValue) ?
-					"black" : "none");	//Only if 'preview' or 'selected'
-			fingerLabelOutline.setAttribute("stroke-dasharray",	//Is stroke dashed?
-				"preview" === newValue ?
-					"4 5" : null);	//Only if 'preview'
+			//Get the previously selected region
+			const previouslySelectedFinger = this.selected;
+			//Does one exist?
+			if(previouslySelectedFinger !== null) {
+				//Yes. Unselect it.
+				this.setFingerState(previouslySelectedFinger, "unselected");
+			}
+			
+			//Select the new finger
+			this.setFingerState(finger, "selected")
 		}
-	}
-	
-	connectAttributes() {
-		_.keys(FingerSelect.regions).forEach(region => {
-			let initialAttribute = this.getAttribute(region);
-			this.setAttribute(region, 
-				FingerSelect.states.includes(initialAttribute) ?
-					initialAttribute :
-					"unselected");
-		});
-	}
-	
-	connectStyle() {
-		const style = document.createElement("style");
-		style.textContent = `
-			text {
-				-webkit-user-select: none;
-				-moz-user-select: none;
-				-ms-user-select: none;
-				user-select: none;
-			}`;
-		this.append(style);
-	}
-	
-	connectSVG() {
-		const svg = FingerSelect.createSVGElement("svg");
-		svg.setAttribute("viewBox", "0 0 235 291");
-		svg.setAttribute("width", "235");
-		svg.setAttribute("height", "291");
-		svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-		svg.append(this.createHandGroup());
-		this.append(svg);
-	}
-	
-	createHandGroup() {
-		const group = FingerSelect.createSVGElement("g");
-		group.setAttribute("cursor", "pointer");
-		group.setAttribute("pointer-events", "fill");
-		group.setAttribute("class", "hand");
-		group.append(FingerSelect.createHandOutline());
 		
-		//Create finger labels for each region
-		_.values(FingerSelect.regions).map(region =>
-			FingerSelect.createFingerLabelGroup(
-				region.finger,
-				region.text,
-				region.x,
-				region.y,
-				region.offsetX,
-				region.offsetY
-			)
-		).forEach(fingerLabelGroup => group.append(fingerLabelGroup));
+		get preview() {
+			return this.getFingerWithExclusiveState("preview");
+		}
 		
-		//Mouse move handler
-		group.addEventListener("mousemove", (e) => {
-			//Get the preview region based on closest point to mouse
-			const previewFinger = FingerSelect.closestFingerToPoint(
-				[e.offsetX, e.offsetY]);
+		set preview(finger) {
+			//Unpreview if null or undefined
+			if(_.isNil(finger)) {
+				return this.unpreview();
+			}
+			
+			//Get the current preview region (possibly undefined)
+			const existingPreviewFinger = this.preview;
+			//Does one exist, and if so does it differ from the current preview finger?
+			if(! [null, finger].includes(existingPreviewFinger)){
+				//Yes. Unselect it.
+				this.setFingerState(existingPreviewFinger, "unselected");
+			}
+			//Is the new region unselected?
+			if(this.getFingerState(finger) === "unselected") {
+				//Yes. Preview it (only unselected regions can be previewed)
+				this.setFingerState(finger, "preview");
+			}
+		}
+		
+		connectedCallback() {
+			this.connectStyle();
+			this.connectSVG();
+			this.connectAttributes();
+		}
+		
+		attributeChangedCallback(name, oldValue, newValue) {
+			//Is the finger-selected not yet connected?
+			if(! this.isConnected) {
+				//No, ignore.
+				return;
+			}
+			
+			//Is the attribute a region?
+			if(_.keys(FingerSelect.regions).includes(name)) {
+				//Yes - is it valid?
+				if(! FingerSelect.states.includes(newValue)) {
+					//No - reset to the old value and return
+					return this.setAttribute(name, oldValue);
+				}
 				
-			//Set the cursor to 'auto' if the preview region is 'unselectable',
-			//otherwise 'pointer'.
-			this.querySelector(".hand").setAttribute("cursor",
-				"unselectable" === this.getFingerState(previewFinger) ?
-					"auto" : "pointer");
-			//Set the preview
+				//Valid. Is this an exclusive state?
+				if(["preview", "selected"].includes(newValue)) {
+					//Yes. If there's another region with the exclusive state,
+					//switch it to 'unselected'.
+					_.keys(FingerSelect.regions)
+						.map(region => ({
+							region: region,
+							state: this.getAttribute(region)}))
+						.filter(regionState =>
+							name !== regionState.region &&
+							regionState.state === newValue)
+						.forEach(regionState =>
+							this.setAttribute(regionState.region, "unselected"));
+				}
+				
+				//Style the region according to the new state.
+				const fingerLabel = this.getRegionFingerLabel(name);
+				const fingerLabelOutline = fingerLabel.querySelector("circle");
+				//Hide the label if 'unselectable'
+				fingerLabel.setAttribute("display",
+					"unselectable" === newValue ?
+						"none" : "inline");	
+				//Show the stroke if 'preview' or 'selected'
+				fingerLabelOutline.setAttribute("stroke",
+					["preview", "selected"].includes(newValue) ?
+						"black" : "none");
+				//Dash the stroke if 'preview'
+				fingerLabelOutline.setAttribute("stroke-dasharray",
+					"preview" === newValue ?
+						"4 5" : null);
+			}
+		}
+		
+		connectAttributes() {
+			_.keys(FingerSelect.regions).forEach(region => {
+				let initialAttribute = this.getAttribute(region);
+				this.setAttribute(region, 
+					FingerSelect.states.includes(initialAttribute) ?
+						initialAttribute :
+						"unselected");
+			});
+		}
+		
+		connectStyle() {
+			const style = document.createElement("style");
+			style.textContent = `
+				text {
+					-webkit-user-select: none;
+					-moz-user-select: none;
+					-ms-user-select: none;
+					user-select: none;
+				}`;
+			this.append(style);
+		}
+		
+		connectSVG() {
+			const svg = FingerSelect.createSVGElement("svg");
+			svg.setAttribute("viewBox", "0 0 235 291");
+			svg.setAttribute("width", "235");
+			svg.setAttribute("height", "291");
+			svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+			svg.append(this.createHandGroup());
+			this.append(svg);
+		}
+		
+		createHandGroup() {
+			const group = FingerSelect.createSVGElement("g");
+			group.setAttribute("cursor", "pointer");
+			group.setAttribute("pointer-events", "fill");
+			group.setAttribute("class", "hand");
+			group.append(FingerSelect.createHandOutline());
 			
-			this.preview = previewFinger;
-		});
+			//Create finger labels for each region
+			_.values(FingerSelect.regions).map(region =>
+				FingerSelect.createFingerLabelGroup(
+					region.finger,
+					region.text,
+					region.x,
+					region.y,
+					region.offsetX,
+					region.offsetY
+				)
+			).forEach(fingerLabelGroup => group.append(fingerLabelGroup));
+			
+			//Mouse move handler
+			group.addEventListener("mousemove", (e) => {
+				//Get the preview region based on closest point to mouse
+				const previewFinger = FingerSelect.closestFingerToPoint(
+					[e.offsetX, e.offsetY]);
+					
+				//Set the cursor to 'auto' if the preview region is 'unselectable',
+				//otherwise 'pointer'.
+				this.querySelector(".hand").setAttribute("cursor",
+					"unselectable" === this.getFingerState(previewFinger) ?
+						"auto" : "pointer");
+				//Set the preview
+				
+				this.preview = previewFinger;
+			});
+			
+			//Mouse down handler
+			group.addEventListener("mousedown", (e) =>{
+				if(e.button === 0)	//If left click,
+					this.selected =	//then select
+						FingerSelect.closestFingerToPoint(	//the closest point
+							[e.offsetX, e.offsetY])	//to the cursor
+			});
+			
+			//Mouse leave handler - unselect the preview region if one exists
+			group.addEventListener("mouseleave", this.unpreview.bind(this));
+			return group;
+		}
 		
-		//Mouse down handler
-		group.addEventListener("mousedown", (e) =>{
-			if(e.button === 0)	//If left click,
-				this.selected =	//then select
-					FingerSelect.closestFingerToPoint(	//the closest point
-						[e.offsetX, e.offsetY])	//to the cursor
-		});
+		unpreview() {
+			const previewFinger = this.preview;
+			if(! _.isNil(previewFinger)) {
+				this.setFingerState(previewFinger, "unselected");
+			}	
+		}
 		
-		//Mouse leave handler - unselect the preview region if one exists
-		group.addEventListener("mouseleave", this.unpreview.bind(this));
-		return group;
-	}
-	
-	unpreview() {
-		const previewFinger = this.preview;
-		if(! _.isNil(previewFinger)) {
-			this.setFingerState(previewFinger, "unselected");
-		}	
-	}
-	
-	unselect() {
-		const selectedFinger = this.selected;
-		if(! _.isNil(selectedFinger)) {
-			this.setFingerState(selectedFinger, "unselected");
+		unselect() {
+			const selectedFinger = this.selected;
+			if(! _.isNil(selectedFinger)) {
+				this.setFingerState(selectedFinger, "unselected");
+			}
+		}
+		
+		getFingerState(finger) {
+			return this.getAttribute(FingerSelect.regionWithFinger(finger));
+		}
+		
+		setFingerState(finger, state) {
+			this.setAttribute(FingerSelect.regionWithFinger(finger), state);
+		}
+		
+		getFingerWithExclusiveState(state) {
+			return _.defaultTo(
+				this.all.find(regionState => regionState.state === state),
+				{finger: null}
+			).finger;
+		}
+		
+		getRegionFingerLabel(region) {
+			return this.querySelector(
+				`.fingerLabel[data-finger='${FingerSelect.regions[region].finger}']`
+			);
 		}
 	}
 	
-	getFingerState(finger) {
-		return this.getAttribute(FingerSelect.regionWithFinger(finger));
+	static newStandalone(options={}) {
+		return new FingerSelect.Standalone(options);
 	}
 	
-	setFingerState(finger, state) {
-		this.setAttribute(FingerSelect.regionWithFinger(finger), state);
-	}
-	
-	getFingerWithExclusiveState(state) {
-		return _.defaultTo(
-			this.all.find(regionState => regionState.state === state),
-			{finger: null}
-		).finger;
-	}
-	
-	getRegionFingerLabel(region) {
-		return this.querySelector(
-			`.fingerLabel[data-finger='${FingerSelect.regions[region].finger}']`
-		);
+	static newSVGGroup(options={}) {
+		//TODO
+		return FingerSelect.createHandOutline();
 	}
 }
 customElements.define(
 	FingerSelect.TAG_NAME,
-	FingerSelect
+	FingerSelect.Standalone
 );
