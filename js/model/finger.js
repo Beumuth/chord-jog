@@ -3,10 +3,10 @@ class Finger {
 	static ANY = "*";
 	static NONE = "x";
 	static THUMB = 'T';
-	static INDEX = 1;
-	static MIDDLE = 2;
-	static RING = 3;
-	static PINKY = 4;
+	static INDEX = "1";
+	static MIDDLE = "2";
+	static RING = "3";
+	static PINKY = "4";
 	
 	static fromString(finger) {
 		return isNaN(finger) ? finger : parseInt(finger);
