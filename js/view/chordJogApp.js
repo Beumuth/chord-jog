@@ -1,15 +1,5 @@
+//Chord jog app view module
 const ChordJogApp = (function()  {
-    //Model
-    const anyFinger = "*";
-    const Finger = {
-        none: "x",
-        thumb: 'T',
-        index: "1",
-        middle: "2",
-        ring: "3",
-        pinky: "4"
-    };
-
     //Methods
     const distance2 = (a, b) =>
         Math.pow(a[0] - b[0], 2) +
@@ -19,8 +9,94 @@ const ChordJogApp = (function()  {
             "http://www.w3.org/2000/svg",
             tagName
         );
+    const createLine = (x1, y1, x2, y2) => {
+        const line = createSVGElement("line");
+        line.setAttribute("x1", x1);
+        line.setAttribute("y1", y1);
+        line.setAttribute("x2", x2);
+        line.setAttribute("y2", y2);
+        return line;
+    }
+    const createCircle = (r, cx, cy) => {
+        const circle = createSVGElement("circle");
+        circle.setAttribute("cx", cx);
+        circle.setAttribute("cy", cy);
+        circle.setAttribute("r", r);
+        return circle;
+    }
+    const range = (from, to) => {
+        const integers = [];
+        for(let i = from; i < to; ++i) {
+            integers.push(i);
+        }
+        return integers;
+    };
+    const numDigits = (integer) =>
+        //Credit: https://stackoverflow.com/a/14879700/13172428
+        Math.log(integer) * Math.LOG10E + 1 | 0;
 
-    //Views
+    //Models
+    const Style = {
+        stroke: {
+            width: 1
+        }
+    };
+    Style.stroke.halfWidth = Style.stroke.width * .5;
+    const GuitarString = {
+        dead: "x",
+        count: 6
+    };
+    const Finger = {
+        any: "*",
+        none: "x",
+        thumb: 'T',
+        index: "1",
+        middle: "2",
+        ring: "3",
+        pinky: "4"
+    };
+    const Fret = {
+        open: "o",
+        first: 1,
+        last: 15,
+        maxRoot: 11,
+    };
+    const Frets = {
+        fingerless: [Fret.dead, Fret.open],
+        fingerful: _.range(Fret.first, Fret.last)
+    }
+    Frets.roots = Frets.fingerful.slice(0, Fret.maxRoot)
+    Frets.all = Frets.fingerless.concat(Frets.fingerful);
+    Fret.isFingerless = Frets.fingerless.includes;
+    Fret.isFingerful = Frets.fingerful.includes;
+    const RelativeFret = {
+        any: "*",
+        root: 0,
+        max: 4
+    }
+    const RelativeFrets = {
+        fingerless: [Fret.dead, Fret.open],
+        fingerful: range(RelativeFret.root, RelativeFret.max + 1)
+    };
+    RelativeFrets.count = RelativeFrets.fingerful.length;
+    RelativeFrets.all = [RelativeFret.any].concat(
+        RelativeFrets.fingerless.concat(
+            RelativeFrets.fingerful
+        )
+    );
+    const Range = {
+        create: (min, max) => {
+            const createRange = (min, max) => ({
+                min: min,
+                max: max,
+            });
+            const range = createRange(min, max);
+            range.copy = () => createRange(min, max);
+            return range;
+        }
+    }
+
+    //View modules
     const FingerSelect = (function () {
         //Model
         //  (this method is used for model creation)
@@ -32,9 +108,9 @@ const ChordJogApp = (function()  {
         const regions = [
             {
                 ///*
-                finger: anyFinger,
+                finger: Finger.any,
                 attribute: "palm",
-                text: anyFinger,
+                text: Finger.any,
                 x: 149,
                 y: 250,
                 offsetX: -.25,
@@ -130,9 +206,7 @@ const ChordJogApp = (function()  {
         //  View creation
         const createHandOutline = () => {
             const outline = createSVGElement("path");
-            outline.setAttribute("fill", "none");
             outline.setAttribute("class", "outline");
-            outline.setAttribute("stroke", "#000");
             outline.setAttribute(	//Drawn with Inkscape
                 "d",
                 `M
@@ -392,15 +466,7 @@ const ChordJogApp = (function()  {
         };
 
         //	creating <circle> outline for the finger label
-        const createFingerLabelOutline = (x, y) => {
-            const outline = createSVGElement("circle");
-            outline.setAttribute("r", 16);
-            outline.setAttribute("cx", x);
-            outline.setAttribute("cy", y);
-            outline.setAttribute("fill", "none");
-            outline.setAttribute("stroke", "none");
-            return outline;
-        };
+        const createFingerLabelOutline = (x, y) => createCircle(16, x, y);
 
         const createFingerLabelGroup = (
             region,
@@ -669,15 +735,125 @@ const ChordJogApp = (function()  {
             }
         }
     })();
+    const ShapeChart = (function () {
+        return {
+            create: {
+                displayOnly: () => {
+                    //Initialize some constants
+                    const halfRoot2 = .5 * Math.SQRT2;
+                    const fingerlessIndicator = {
+                        radius: 5,
+                        marginBottom: 2,
+                    };
+                    const padding =  Style.stroke.halfWidth + fingerlessIndicator.radius;
+                    fingerlessIndicator.startX = padding;
+                    fingerlessIndicator.startY = padding;
+                    fingerlessIndicator.diameter = 2 * fingerlessIndicator.radius;
+                    const fretboard = {
+                        stringSpacing: 25,
+                        fretHeight: 30,
+                        startX: padding,
+                        startY: fingerlessIndicator.startY +
+                            fingerlessIndicator.diameter +
+                            fingerlessIndicator.marginBottom
+                    };
+                    fretboard.width = fretboard.stringSpacing * (GuitarString.count - 1);
+                    fretboard.height = fretboard.fretHeight * RelativeFrets.count;
+
+                    //shape-chart
+                    const shapeChart = createSVGElement("g");
+                    shapeChart.setAttribute("class", "shape-chart");
+
+                    //fingerless-indicator-zone
+                    const fingerlessIndicators = createSVGElement("g");
+                    //  fingerless-indicator-zone
+                    fingerlessIndicators.setAttribute("class", "fingerless-indicators");
+                    shapeChart.append(fingerlessIndicators);
+
+                    range(0, GuitarString.count).forEach(stringIndex => {
+                        const centerX = padding + (stringIndex * fretboard.stringSpacing);
+                        const centerY = padding + fingerlessIndicator.radius;
+                        //  string-fingerless-indicator
+                        const stringFingerlessIndicator = createSVGElement("g");
+                        stringFingerlessIndicator.setAttribute("class", "string-fingerless-indicator");
+                        stringFingerlessIndicator.dataset.stringIndex = stringIndex;
+                        fingerlessIndicators.append(stringFingerlessIndicator);
+
+                        //open-string-indicator
+                        const openStringIndicator = createCircle(fingerlessIndicator.radius, centerX, centerY);
+                        openStringIndicator.setAttribute("class", "open-string-indicator");
+                        stringFingerlessIndicator.append(openStringIndicator);
+
+                        //dead-string-indicator
+                        const deadStringIndicator = createSVGElement("path");
+                        deadStringIndicator.setAttribute("class", "dead-string-indicator");
+                        deadStringIndicator.setAttribute("d",
+                            `M 
+                                ${centerX - fingerlessIndicator.radius * halfRoot2},
+                                ${centerY - fingerlessIndicator.radius * halfRoot2}
+                            l 
+                                ${fingerlessIndicator.diameter * halfRoot2},
+                                ${fingerlessIndicator.diameter * halfRoot2}
+                            m 0, ${- fingerlessIndicator.diameter * halfRoot2}
+                            l 
+                                ${- fingerlessIndicator.diameter * halfRoot2},
+                                ${fingerlessIndicator.diameter * halfRoot2}`);
+                        stringFingerlessIndicator.append(deadStringIndicator);
+                    });
+
+                    //  Create strings
+                    const strings = createSVGElement("g");
+                    strings.setAttribute("class", "strings");
+                    shapeChart.append(strings);
+                    range(0, GuitarString.count)    //Create and add string lines
+                        .forEach(stringIndex => {
+                            const x = fretboard.startX + stringIndex * fretboard.stringSpacing;
+                            const stringLine = createLine(
+                                x, fretboard.startY,
+                                x, fretboard.startY + fretboard.height);
+                            stringLine.setAttribute("class", "string");
+                            stringLine.dataset.index = stringIndex;
+                            strings.append(stringLine);
+                        });
+                    //  Create frets
+                    const frets = createSVGElement("g");
+                    frets.setAttribute("class", "frets");
+                    shapeChart.append(frets);
+                    range(0, RelativeFrets.count + 1)   //Create and add relative fret lines
+                        .forEach(relativeFretIndex => {
+                            const y = fretboard.startY + (relativeFretIndex * fretboard.fretHeight);
+                            const fretSeparator = createLine(
+                                fretboard.startX, y,
+                                fretboard.startX + fretboard.width, y);
+                            fretSeparator.setAttribute("class", "fretSeparator");
+                            if (relativeFretIndex > 0) {
+                                fretSeparator.dataset.above = `${relativeFretIndex - 1}`;
+                            }
+                            if (relativeFretIndex < RelativeFrets.count) {
+                                fretSeparator.dataset.below = `${relativeFretIndex}`;
+                            }
+                            frets.append(fretSeparator);
+                        });
+                    return shapeChart;
+                }
+            }
+        }
+    })();
     return {
         create: () => {
-            let container = createSVGElement("svg");
-            container.setAttribute("viewBox", "0 0 250 300");
-            container.setAttribute("xmlns", 'xmlns="http://www.w3.org/2000/svg"');
-            container.setAttribute("width", '250');
-            container.setAttribute("height", '300');
-            container.append(FingerSelect.create());
-            return container;
+            let chordJogApp = createSVGElement("svg");
+            chordJogApp.setAttribute("viewBox", "0 0 250 300");
+            chordJogApp.setAttribute("xmlns", 'xmlns="http://www.w3.org/2000/svg"');
+            chordJogApp.setAttribute("width", '250');
+            chordJogApp.setAttribute("height", '300');
+            chordJogApp.setAttribute("fill", "none");
+            chordJogApp.setAttribute("stroke", "black");
+            chordJogApp.setAttribute("stroke-width", Style.stroke.width);
+            chordJogApp.setAttribute("stroke-linecap", "round");
+            // chordJogApp.append(FingerSelect.create());
+            const shapeChart = ShapeChart.create.displayOnly();
+            chordJogApp.append(shapeChart);
+            return chordJogApp;
         }
     }
 })();
