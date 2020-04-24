@@ -1,4 +1,4 @@
-class StringAction {
+class StringActions {
 	static DEAD_STRING = "x";
 	static OPEN_STRING = "o";
 	
@@ -9,54 +9,54 @@ class StringAction {
 	
 	static withFretAndFinger(fret, finger) {
 		return fret === DEAD_STRING ?
-			StringAction.DEAD_STRING :
+			StringActions.DEAD_STRING :
 			fret === OPEN_STRING :
-				StringAction.OPEN_STRING :
-				new StringAction(fret, finger);
+				StringActions.OPEN_STRING :
+				new StringActions(fret, finger);
 	}
 	
 	static fret(stringAction) {
-		return StringAction.isFingerless(stringAction) ?
+		return StringActions.isFingerless(stringAction) ?
 			DEAD_STRING :
 			stringAction.fret;
 	}
 	
 	static finger(stringAction) {
-		return StringAction.isFingerless(stringAction) ?
+		return StringActions.isFingerless(stringAction) ?
 			Finger.NONE :
 			stringAction.finger;
 	}
 	
 	static equals(a, b) {
-		return StringAction.isFingerless(a) && StringAction.isFingerless(b) ?
+		return StringActions.isFingerless(a) && StringActions.isFingerless(b) ?
 			a === b :
 			a.fret === b.fret && a.finger === b.finger;
 	}
 	
 	static copy(stringAction) {
-		return StringAction.isFingerless(stringAction) ?
+		return StringActions.isFingerless(stringAction) ?
 			stringAction :
-			new StringAction(stringAction.fret, stringAction.finger);
+			new StringActions(stringAction.fret, stringAction.finger);
 	}
 	
 	static isFingerless(stringAction) {
-		return [StringAction.DEAD_STRING, StringAction.OPEN_STRING].includes(
+		return [StringActions.DEAD_STRING, StringActions.OPEN_STRING].includes(
 			stringAction
 		);
 	}
 	
 	static toString(stringAction) {
-		return StringAction.isFingerless(stringAction) ?
+		return StringActions.isFingerless(stringAction) ?
 			stringAction :
 			stringAction.fret + "," + stringAction.finger;
 	}
 	
 	static fromString(string) {
-		if(StringAction.isFingerless(string)) {
+		if(StringActions.isFingerless(string)) {
 			return string;
 		}
 		let stringParts = string.split(",");
-		return new StringAction(
+		return new StringActions(
 			parseInt(stringParts[0]),
 			parseInt(stringParts[1])
 		);
