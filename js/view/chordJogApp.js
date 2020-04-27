@@ -182,7 +182,7 @@ const ChordJogApp = ( () =>  {
     Frets.all = Frets.fingerless.concat(Frets.fingerful);
     Frets.isFingerless = Frets.fingerless.includes;
     Frets.isFingerful = Frets.fingerful.includes;
-    Frets.Relative.all = _.range(Frets.Relative.root, Frets.Relative.max);
+    Frets.Relative.all = _.range(Frets.Relative.root, Frets.Relative.max+1);
     Frets.Relative.count = Frets.Relative.all.length;
 
     const StringActions = {
@@ -737,11 +737,10 @@ const ChordJogApp = ( () =>  {
                     .withChild(SVG.Builder
                         .g()
                         .withClass("fingerless-indicators")
-                        .withChildren(_.range(0, Strings.count).map(stringIndex => {
+                        .withChildren(Strings.all.map(stringIndex => {
                             const center = [
-                                padding + (stringIndex * Fretboard.stringSpacing),
+                                padding + ((stringIndex - 1) * Fretboard.stringSpacing),
                                 padding + FingerlessIndicator.radius];
-                            //  string-fingerless-indicator
                             return SVG.Builder
                                 .g()
                                 .withClass("string-fingerless-indicator")
@@ -765,12 +764,13 @@ const ChordJogApp = ( () =>  {
                                             ${FingerlessIndicator.diameter * halfRoot2}`)
                                     .withClass("dead-string-indicator")
                                     .build())
-                                .build() })))
+                                .build() }))
+                        .build())
                     .withChild(SVG.Builder
                         .g()
                         .withClass("strings")
-                        .withChildren(_.range(0, String.count).map(stringIndex => {
-                            const x = Fretboard.startX + stringIndex * Fretboard.stringSpacing;
+                        .withChildren(Strings.all.map(stringIndex => {
+                            const x = Fretboard.startX + (stringIndex - 1) * Fretboard.stringSpacing;
                             return SVG.Builder.Line
                                 .withEndpoints(
                                     [x, Fretboard.startY],
@@ -795,7 +795,7 @@ const ChordJogApp = ( () =>  {
                                 .withDataAttribute("below", fretSeparatorIndex < Frets.Relative.count ?
                                     `${fretSeparatorIndex}` : null)
                                 .build(); }))
-                        .build() ) } } };
+                        .build()) } } };
     ShapeChart.Builder.forShape = (shape) => {
         const shapeChart = ShapeChart.Builder.blank();
         //TODO
@@ -811,6 +811,6 @@ const ChordJogApp = ( () =>  {
                 stroke: "black",
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
-            .withChild(FingerSelect.Builder.build())
-            // .withChild(ShapeChart.Builder.Blank.build())
+            // .withChild(FingerSelect.Builder.build())
+            .withChild(ShapeChart.Builder.blank().build())
     }; })();
