@@ -26,6 +26,8 @@ const ChordJogApp = (() => {
 
     const Strings = {count: 6};
     Strings.all = _.range(1, Strings.count+1);
+    Strings.first = Strings.all[0];
+    Strings.last = Strings.all[Strings.count - 1];
 
     const Fingers = {
         thumb: {
@@ -74,6 +76,8 @@ const ChordJogApp = (() => {
         Frets.Relative.root,
         Frets.Relative.max+1);
     Frets.Relative.count = Frets.Relative.all.length;
+    Frets.Relative.first = Frets.Relative.all[0];
+    Frets.Relative.last = Frets.Relative.all[Frets.Relative.count - 1];
 
     const StringActions = {
         unsounded: " ",
@@ -748,45 +752,54 @@ const ChordJogApp = (() => {
             OpenString: {}};
         FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
         FingerIndicator.Builder = {
-            withStrokeColor: (strokeColor) => ({
-                withCenter: (center) => ({
-                    deadString: () => SVGBuilder.Path
-                        .withD(
-                            `M
-                                ${center[0] - FingerIndicator.Style.radius * halfRoot2},
-                                ${center[1] - FingerIndicator.Style.radius * halfRoot2}
-                            l
-                                ${FingerIndicator.Style.diameter * halfRoot2},
-                                ${FingerIndicator.Style.diameter * halfRoot2}
-                            m 0, ${-FingerIndicator.Style.diameter * halfRoot2}
-                            l
-                                ${-FingerIndicator.Style.diameter * halfRoot2},
-                                ${FingerIndicator.Style.diameter * halfRoot2}`)
-                        .withClass("dead-string-indicator")
-                        .withAttribute("stroke", strokeColor),
-                    openString: () => SVGBuilder.Circle
-                        .withCenter(center)
-                        .withRadius(FingerIndicator.Style.radius)
-                        .withClass("open-string-indicator")
-                        .withAttribute("stroke", strokeColor)})})};
+            withCenter: (center) => ({
+                deadString: () => SVGBuilder.Path
+                    .withD(
+                        `M
+                            ${center[0] - FingerIndicator.Style.radius * halfRoot2},
+                            ${center[1] - FingerIndicator.Style.radius * halfRoot2}
+                        l
+                            ${FingerIndicator.Style.diameter * halfRoot2},
+                            ${FingerIndicator.Style.diameter * halfRoot2}
+                        m 0, ${-FingerIndicator.Style.diameter * halfRoot2}
+                        l
+                            ${-FingerIndicator.Style.diameter * halfRoot2},
+                            ${FingerIndicator.Style.diameter * halfRoot2}`)
+                    .withClass("dead-string-indicator"),
+                openString: () => SVGBuilder.Circle
+                    .withCenter(center)
+                    .withRadius(FingerIndicator.Style.radius)
+                    .withClass("open-string-indicator")})};
         ShapeChart.Style.padding = Style.stroke.halfWidth + FingerIndicator.Style.radius;
         const Fretboard = {
-            stringSpacing: 25,
-            fretHeight: 30,
-            startX: ShapeChart.Style.padding,
-            startY: ShapeChart.Style.padding };
+            Style: {
+                stringSpacing: 25,
+                fretHeight: 30,
+                startX: ShapeChart.Style.padding,
+                startY: ShapeChart.Style.padding },
+            stringFretToXY: (stringIndex, fretIndex) => [
+                Fretboard.Style.startX + (stringIndex - 1) * Fretboard.Style.stringSpacing,
+                Fretboard.Style.startY + (fretIndex - .5) * Fretboard.Style.fretHeight],
+            LineSegmentBuilder: {
+                fromStringFret: (fromStringIndex, fromFretIndex) => ({
+                    toStringFret: (toStringIndex, toFretIndex) => SVGBuilder.Line
+                        .withEndpoints(
+                            Fretboard.stringFretToXY(fromStringIndex, fromFretIndex),
+                            Fretboard.stringFretToXY(toStringIndex, toFretIndex))})}};
 
         const Skeleton = {
-            Builder: SVGBuilder
+            builder: () => SVGBuilder
                 .g()
                 .withClass("shape-filter-skeleton")
+                .withAttribute("stroke", Style.colors.light)
                 .withChild(SVGBuilder
                     .g()
                     .withClass("fingerless-indicators")
-                    .withChildren(_.range(0, Strings.count).map(stringIndex => [
-                            Skeleton.Style.startX + ((stringIndex - 1) * Fretboard.Style.stringSpacing),
-                            Skeleton.Style.startY + FingerIndicator.Style.radius])
-                        .map(FingerIndicator.Builder.withStrokeColor(Style.colors.light).withCenter)
+                    .withChildren(Strings.all
+                        .map(stringIndex => [
+                            Fretboard.Style.startX + ((stringIndex - 1) * Fretboard.Style.stringSpacing),
+                            Fretboard.Style.startY + FingerIndicator.Style.radius])
+                        .map(FingerIndicator.Builder.withCenter)
                         .map(fingerIndicatorBuilder => [
                             fingerIndicatorBuilder.openString(),
                             fingerIndicatorBuilder.deadString()])
@@ -794,108 +807,22 @@ const ChordJogApp = (() => {
                 .withChild(SVGBuilder
                     .g()
                     .withClass("fretboard")
-                    .withChildren(
-
-                    )
-                )};
-
-        const Container = {
-            Style: {
-                startX: ShapeChart.Style.padding,
-                startY: ShapeChart.Style.padding }};
-        FingerIndicators.Style.diameter = 2 * FingerIndicators.radius;
-        FingerIndicators.Container = {
-            Style: {
-                startX: ShapeChart.Style.padding,
-                startY: ShapeChart.Style.padding },
-            builder: () => SVGBuilder
-                .g()
-                .withClass("fingerless-indicators")};
-        const Fretboard = {
-            Style: {
-                stringSpacing: 25,
-                fretHeight: 30,
-                startX: padding,
-                startY: FingerIndicators.Style.startY +
-                    FingerIndicators.Style.diameter +
-                    FingerIndicators.Style.marginBottom } };
-        Fretboard.Style.width = Fretboard.Style.stringSpacing * (Strings.count - 1);
-        Fretboard.Style.height = Fretboard.Style.fretHeight * Frets.Relative.count;
-        Container.builder = () => SVGBuilder.g().withClass("shape-chart");
-        FingerIndicators.Builder = {
-            forString: (stringIndex) => {
-                const center = [
-                    padding + ((stringIndex - 1) * Fretboard.stringSpacing),
-                    padding + FingerIndicator.radius];
-                const buildStep = (strokeColor) => SVGBuilder
-                    .g()
-                    .withClass("string-fingerless-indicator")
-                    .withDataAttribute("stringIndex", stringIndex)
-                    .withAttribute({
-                        stroke: strokeColor })
-                    .withChild()
-                    .withChild();
-                return {
-                    withLightStroke: buildStep(Style.colors.light),
-                    withMediumStroke: buildStep(Style.colors.medium),
-                    withHeavyStroke: buildStep(Style.colors.heavy) }; } }
+                    .withChildren(Strings.all.map(stringIndex => Fretboard.LineSegmentBuilder
+                        .fromStringFret(stringIndex, Frets.Relative.first - .5)
+                        .toStringFret(stringIndex, Frets.Relative.last + .5)
+                        .withDataAttribute("stringIndex", stringIndex))
+                    ).withChildren(Frets.Relative.all.map(fretIndex => Fretboard.LineSegmentBuilder
+                        .fromStringFret(Strings.first, fretIndex - .5)
+                        .toStringFret(Strings.last, fretIndex - .5)
+                        .withDataAttribute("above", fretIndex > Frets.Relative.first ?
+                            fretIndex - 1 : null)
+                        .withDataAttribute("below", fretIndex < Frets.Relative.last ?
+                            `${fretIndex}` : null))))};
         return {
-            Style: ShapeChart.Style,
             Builder: {
-                blank: () => {
-
-                }
-            }
-        }
-
-        Builder: {
-            blank: () => {
-
-                //shape-chart
-                return SVGBuilder
-                    .g()
-                    .withClass("shape-chart")
-                    .withAttributes({
-                        stroke: ShapeChart.Style.colors.light })
-                    .withChild(SVGBuilder
-                        .g()
-                        .withClass("fingerless-indicators")
-                        .withChildren(Strings.all.map()))
-                    .withChild(SVGBuilder
-                        .g()
-                        .withClass("strings")
-                        .withChildren(Strings.all.map(stringIndex => {
-                            const x = Fretboard.startX + (stringIndex - 1) * Fretboard.stringSpacing;
-                            return SVGBuilder.Line
-                                .withEndpoints(
-                                    [x, Fretboard.startY],
-                                    [x, Fretboard.startY + Fretboard.height])
-                                .withClass("string")
-                                .withDataAttribute("index", stringIndex);})))
-                    .withChild(SVGBuilder
-                        .g()
-                        .withClass("fretsSeparators")
-                        .withChildren(_.range(0, Frets.Relative.count + 1).map(fretSeparatorIndex => {
-                            const y = Fretboard.startY + (fretSeparatorIndex * Fretboard.fretHeight);
-                            return SVGBuilder.Line
-                                .withEndpoints(
-                                    [Fretboard.startX, y],
-                                    [Fretboard.startX + Fretboard.width, y])
-                                .withClass("fretSeparator")
-                                .withDataAttribute("above", fretSeparatorIndex > 0 ?
-                                    fretSeparatorIndex - 1 :
-                                    null)
-                                .withDataAttribute("below", fretSeparatorIndex < Frets.Relative.count ?
-                                    `${fretSeparatorIndex}` : null)})))},
-            forShapeFilter: (shapeFilter) =>
-                ShapeChart
-                    .Builder
-                    .blank()
-                    .withChildren(  //Draw sounded strings
-                        _.range(0, Strings.count)
-                            .filter(i => stringActions[i] !== StringActions.unsounded)
-                            .forEach(i => stringAction !== Str)
-        }};
+                blank: () => Skeleton.builder()}
+        };
+    })();
     
     return {
         create: () => SVGBuilder.SVG
