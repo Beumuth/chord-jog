@@ -109,7 +109,7 @@ const ChordJogApp = (() => {
             stringAction === StringActions.open ?
                 StringActions.open :
                 `${stringAction.fret}` + `${stringAction.finger}`
-    StringActions.isFingerless = [StringActions.unsounded, StringActions.open].includes;
+    StringActions.isFingerless = (stringAction) => [StringActions.unsounded, StringActions.open].includes(stringAction);
     StringActions.isFingered = (stringAction) => ! StringActions.isFingerless(stringAction);
 
     const ObjectBuilder = (() => {
@@ -806,8 +806,8 @@ const ChordJogApp = (() => {
                                 Fretboard.stringFretToXY(fromString, belowFret - .5),
                                 Fretboard.stringFretToXY(toString, belowFret - .5))
                             .withClass("fret-separator")
-                            .withDataAttribute("above-fret", belowFret - 1)
-                            .withDataAttribute("below-fret", belowFret)})})}};
+                            .withDataAttribute("aboveFret", belowFret - 1)
+                            .withDataAttribute("belowFret", belowFret)})})}};
 
         //The 'skeleton' consists of the passive portion of the ShapeFilterView -
         //fretboard and finger indicator placeholders.
@@ -832,12 +832,12 @@ const ChordJogApp = (() => {
                 .withClass("fretboard")
                 .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                     .forString(string)
-                    .toFret(Frets.Relative.last))
+                    .toFret(Frets.Relative.last)))
                 .withChildren(_.range(Frets.Relative.first, Frets.Relative.last + 2)
                     .map(belowFret => Fretboard.FretDividerBuilder
                         .belowFret(belowFret)
                         .fromString(Strings.first)
-                        .toString(Strings.last)));
+                        .toString(Strings.last))));
 
         //The 'meat' consists of the active portion of the ShapeFilterView -
         // darkened fretboard strings and finger indicators.
@@ -847,7 +847,9 @@ const ChordJogApp = (() => {
                 const maxFret = fingeredStringActions.length === 0 ? undefined : fingeredStringActions
                     .map(stringAction => stringAction.fret)
                     .reduce((a, b) => a >= b ? a : b);
-                const activeStrings = shape.filter(stringAction => stringAction !== StringActions.unsounded);
+                const activeStrings = _.range(0, Strings.count)
+                    .filter(stringIndex => shape[stringIndex] !== StringActions.unsounded)
+                    .map(stringIndex => stringIndex + 1);
                 const activeStringRange = activeStrings.length === 0 ? undefined : Strings.Range(
                     activeStrings[0], activeStrings[activeStrings.length - 1]);
                 const meatBuilder = SVGBuilder
@@ -855,29 +857,33 @@ const ChordJogApp = (() => {
                     .withClass("shape-filter-meat")
                     .withAttribute("stroke", Style.colors.heavy);
                 if(activeStringRange) { meatBuilder
-                    .withChildren(_.range(activeStringRange.min, activeStringRange.max)
+                    .withChildren(_.range(activeStringRange.min, activeStringRange.max+1)
                         .map(string => Fretboard.StringLineBuilder
                             .forString(string)
                             .toFret(maxFret)))
-                    .withChildren(_.range(Frets.relative.first, maxFret + 1).map(belowFret =>
+                    .withChildren(_.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
                         Fretboard.FretDividerBuilder
                             .belowFret(belowFret)
                             .fromString(activeStringRange.min)
                             .toString(activeStringRange.max)));}
                 return meatBuilder; }};
+        const containerBuilder = () => SVGBuilder
+            .g()
+            .withClass("shape-chart")
+            .withChild(skeletonBuilder());
 
         return {
             Builder: {
-                blank: skeletonBuilder,
-                forShapeFilter: (shapeFilter) => ({
-                    fixed: (fret) => null,
-                    unfixed: ({
-                        displayOnly: skeletonBuilder
-                    })
-                })
-            }
-        }})();
-    
+                blank: containerBuilder,
+                forShapeFilter: (shapeFilter) => {
+                    const container = containerBuilder()
+                        .withChild(MeatBuilder.forShape(shapeFilter.shape))
+                    const displayTypeStep = {
+                        displayOnly: () => container };
+                    return {
+                        fixed: (fret) => displayTypeStep,
+                        unfixed: displayTypeStep };}}}})();
+
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
