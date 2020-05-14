@@ -4,12 +4,16 @@ const ChordJogApp = (() => {
             width: 1
         },
         colors: {
-            heavy: "#000000",
+            superHeavy: "#202020",
+            heavy: "#464646",
             medium: "#909090",
-            light: "#B0B0B0"
+            light: "#A0A0A0",
+            superLight: "#F6F6F6"
         }
     };
     Style.stroke.halfWidth = Style.stroke.width * .5;
+    Style.textColor = Style.colors.heavy;
+    Style.font = "Helvetica";
 
     const Geometry = {
         distance2: (a, b) =>
@@ -208,9 +212,7 @@ const ChordJogApp = (() => {
                         return this; },
                     disableTextSelection: function() {
                         ["webkitUserSelect", "mozUserSelect", "msUserSelect", "userSelect"]
-                            .forEach(selectAttribute => {
-                                if(_.has(this.style, selectAttribute)) {
-                                    this.style[selectAttribute] = "none"; } });
+                            .forEach(selectAttribute => this.style[selectAttribute] = "none");
                         return this; }})};
         return {
             element: createElement,
@@ -270,7 +272,10 @@ const ChordJogApp = (() => {
             Text: ({
                 withTextContent: (textContent) => createElement("text")
                     .withMutation((element) =>
-                        element.textContent = textContent) }) }; })();
+                        element.textContent = textContent)
+                    .withAttributes({
+                        fill: Style.textColor,
+                        fontFamily: Style.font,})}) }; })();
     //A Schema is an array of 6 StringActions
     const Shape = {
         fromString: (string) => string.split(";").map(StringActions.fromString),
@@ -318,7 +323,6 @@ const ChordJogApp = (() => {
                         .withAttributes({
                             x: region.position[0],
                             y: region.position[1],
-                            fill: "black",
                             fontFamily: "Courier New",
                             fontSize: 37,
                             dx: -10.5 + region.offset[0],
@@ -807,10 +811,20 @@ const ChordJogApp = (() => {
                         .withRadius(FingerlessIndicator.Style.radius)
                         .withClass("open-string-indicator")};}};
         ShapeChart.Style.padding = Style.stroke.halfWidth + FingerlessIndicator.Style.radius;
+        const FingerActions = {
+            Builder: {
+                withFinger: (finger) => ({
+                    atFret: (fret) => ({
+                        fromString: (fromString) => ({
+                            toString: (toString) => ({
+                                finger: finger,
+                                fret: fret,
+                                range: Strings.range(fromString, toString)})})})})},
+            sameFingerAndFret: (a, b) => a.finger === b.finger && a.fret === b.fret};
         FingerlessIndicator.Style.startX = ShapeChart.Style.padding;
         FingerlessIndicator.Style.startY = ShapeChart.Style.padding;
         const FingerIndicator = {
-            Style: { radius: 5 } };
+            Style: { radius: 11 } };
         FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
         const Fretboard = {
             Style: {
@@ -820,8 +834,8 @@ const ChordJogApp = (() => {
                 startY: FingerlessIndicator.Style.startY +
                     FingerlessIndicator.Style.diameter +
                     FingerlessIndicator.Style.marginBottom },
-            stringToXCoordinate: (string) => Fretboard.Style.startX + (stringIndex - 1) * Fretboard.Style.stringSpacing,
-            fretToYCoordinate: (fret) => Fretboard.Style.startY + (fretIndex + .5) * Fretboard.Style.fretHeight};
+            stringToXCoordinate: (string) => Fretboard.Style.startX + (string - 1) * Fretboard.Style.stringSpacing,
+            fretToYCoordinate: (fret) => Fretboard.Style.startY + (fret + .5) * Fretboard.Style.fretHeight};
         Fretboard.stringFretToXY = (string, fret) => [
             Fretboard.stringToXCoordinate(string),
             Fretboard.fretToYCoordinate(fret)];
@@ -843,7 +857,6 @@ const ChordJogApp = (() => {
                         .withClass("fret-separator")
                         .withDataAttribute("aboveFret", belowFret - 1)
                         .withDataAttribute("belowFret", belowFret)})})};
-
         FingerIndicator.Builder = {
             forFingerAction: (fingerAction) => SVGBuilder
                 .g()
@@ -853,14 +866,16 @@ const ChordJogApp = (() => {
                     fret: fingerAction.fret,
                     minString: fingerAction.range.min,
                     maxString: fingerAction.range.max})
+                .withAttribute("stroke", Style.colors.superHeavy)
                 .withChild(SVGBuilder.Rect
-                    .withX(Fretboard.stringToXCoordinate(fingerAction.range.min) - FingerIndicator.Style.radius )
-                    .withY(Fretboard.fretToYCoordinate(fingerAction.fret))
+                    .withX(Fretboard.stringToXCoordinate(fingerAction.range.min) - FingerIndicator.Style.radius)
+                    .withY(Fretboard.fretToYCoordinate(fingerAction.fret) - FingerIndicator.Style.radius)
                     .withWidth(FingerIndicator.Style.diameter +
                         Fretboard.Style.stringSpacing * (fingerAction.range.max - fingerAction.range.min))
                     .withHeight(FingerIndicator.Style.diameter)
                     .withRadius(FingerIndicator.Style.radius)
-                    .withClass("finger-indicator-outline"))
+                    .withClass("finger-indicator-outline")
+                    .withAttribute("fill", Style.colors.superLight))
                 .withChild(SVGBuilder.Text
                     .withTextContent(fingerAction.finger)
                     .withAttributes({
@@ -868,8 +883,13 @@ const ChordJogApp = (() => {
                             const min = Fretboard.stringToXCoordinate(fingerAction.range.min);
                             return min + .5 * (Fretboard.stringToXCoordinate(fingerAction.range.max) - min);
                         })(),
-                        y: Fretboard.fretToYCoordinate(fingerAction.fret)
-                    }))};
+                        y: Fretboard.fretToYCoordinate(fingerAction.fret) - Style.stroke.width,
+                        dominantBaseline: "central",
+                        textAnchor: "middle",
+                        stroke: "none",
+                        fill: Style.colors.superHeavy,
+                        fontSize: 16,
+                        fontWeight: "bold"}))};
 
         //The 'skeleton' consists of the passive portion of the ShapeFilterView -
         //fretboard and finger indicator placeholders.
@@ -929,30 +949,47 @@ const ChordJogApp = (() => {
                     //Open strings indicators
                     .withChildren(activeStringActions
                         .filter(stringAction => stringAction.action === StringActions.open)
-                        .map(stringAction => FingerlessIndicator.Builder.forString(stringAction.string).open()))
+                        .map(stringAction => FingerlessIndicator.Builder
+                            .forString(stringAction.string)
+                            .open()
+                            .withAttribute("stroke", Style.colors.superHeavy)))
                     //Dead strings indicators
                     .withChildren(activeStringActions
                         .filter(stringAction => StringActions.isDeadened(stringAction.action))
                         .map(stringAction => stringAction.string)
-                        .map(deadString => FingerlessIndicator.Builder.forString(deadString).dead()))
+                        .map(deadString => FingerlessIndicator.Builder
+                            .forString(deadString)
+                            .dead()
+                            .withAttribute("stroke", Style.colors.superHeavy)))
                     //Finger indicators
-                    .withChildren(
-                        _.toPairs(
-                            _.groupBy(
-                                activeStringActions.filter(stringAction => StringActions.isFingered(stringAction.action)),
-                                (stringAction) => stringAction.action.finger))
-                        .map(stringActionsByFinger => ({
-                            finger: stringActionsByFinger[0],
-                            range: Strings.range(
-                                stringActionsByFinger[1].fret,
-                                stringActionsByFinger[stringActionsByFinger.length - 1].fret)}))
-                        .map(fingerAction => SVGBuilder.Ellipse
-                            .withCenter((() )))}};
+                    .withChildren(activeStringActions
+                        //Filter out open strings
+                        .filter(stringAction => stringAction.action !== StringActions.open)
+                        //Map to {finger, fret, string} objects
+                        .map(stringAction => ({
+                            finger: stringAction.action.finger,
+                            fret: stringAction.action.fret,
+                            string: stringAction.string }))
+                        //Merge objects with same finger and fret into a FingerAction object
+                        .reduce((fingerActions, current, i, source) => fingerActions.some((existing) =>
+                            FingerActions.sameFingerAndFret(existing, current)) ?
+                                fingerActions :
+                                fingerActions.concat([
+                                    FingerActions.Builder
+                                        .withFinger(current.finger)
+                                        .atFret(current.fret)
+                                        .fromString(current.string)
+                                        .toString(_.findLast(
+                                            source,
+                                            (existing) => FingerActions.sameFingerAndFret(existing, current)
+                                        ).string)]),
+                            [])
+                        .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)))}};
         const containerBuilder = () => SVGBuilder
             .g()
             .withClass("shape-chart")
+            .disableTextSelection()
             .withChild(skeletonBuilder());
-
         return {
             Builder: {
                 blank: containerBuilder,
@@ -978,7 +1015,7 @@ const ChordJogApp = (() => {
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
                 .forShapeFilter(ShapeFilter.create(
-                    Shape.fromString(";o;21;22;23;o"),
+                    Shape.fromString(";01;23;23;23;34"),
                     Frets.Range.full))
                 .unfixed
                 .displayOnly())
