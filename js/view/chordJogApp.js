@@ -4,11 +4,13 @@ const ChordJogApp = (() => {
             width: 1
         },
         colors: {
+            black: "#000000",
             superHeavy: "#202020",
             heavy: "#464646",
             medium: "#909090",
             light: "#A0A0A0",
-            superLight: "#F6F6F6"
+            superLight: "#F6F6F6",
+            white: "#FFFFFF"
         }
     };
     Style.stroke.halfWidth = Style.stroke.width * .5;
@@ -875,7 +877,7 @@ const ChordJogApp = (() => {
                     .withHeight(FingerIndicator.Style.diameter)
                     .withRadius(FingerIndicator.Style.radius)
                     .withClass("finger-indicator-outline")
-                    .withAttribute("fill", Style.colors.superLight))
+                    .withAttribute("fill", Style.colors.superHeavy))
                 .withChild(SVGBuilder.Text
                     .withTextContent(fingerAction.finger)
                     .withAttributes({
@@ -883,13 +885,12 @@ const ChordJogApp = (() => {
                             const min = Fretboard.stringToXCoordinate(fingerAction.range.min);
                             return min + .5 * (Fretboard.stringToXCoordinate(fingerAction.range.max) - min);
                         })(),
-                        y: Fretboard.fretToYCoordinate(fingerAction.fret) - Style.stroke.width,
+                        y: Fretboard.fretToYCoordinate(fingerAction.fret),
                         dominantBaseline: "central",
                         textAnchor: "middle",
                         stroke: "none",
-                        fill: Style.colors.superHeavy,
-                        fontSize: 16,
-                        fontWeight: "bold"}))};
+                        fill: Style.colors.superLight,
+                        fontSize: 17}))};
 
         //The 'skeleton' consists of the passive portion of the ShapeFilterView -
         //fretboard and finger indicator placeholders.
@@ -939,13 +940,15 @@ const ChordJogApp = (() => {
                     .withChildren(activeStringActions
                         .map(stringAction => Fretboard.StringLineBuilder
                             .forString(stringAction.string)
-                            .toFret(maxFret)))
+                            .toFret(maxFret)
+                            .withAttribute("strokeWidth", 1.5)))
                     //Active frets dividers
                     .withChildren(_.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
                         Fretboard.FretDividerBuilder
                             .belowFret(belowFret)
                             .fromString(activeStringActions[0].string)
-                            .toString(activeStringActions[activeStringActions.length-1].string)))
+                            .toString(activeStringActions[activeStringActions.length-1].string)
+                            .withAttribute("strokeWidth", 1.5)))
                     //Open strings indicators
                     .withChildren(activeStringActions
                         .filter(stringAction => stringAction.action === StringActions.open)
