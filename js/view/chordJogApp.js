@@ -789,29 +789,53 @@ const ChordJogApp = (() => {
             DeadString: {},
             OpenString: {}};
         FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
-        FingerlessIndicator.Builder = {
-            forString: (string) => {
-                const center = [
-                    FingerlessIndicator.Style.startX + ((string - 1) * Fretboard.Style.stringSpacing),
-                    FingerlessIndicator.Style.startY + FingerlessIndicator.Style.radius];
-                return {
-                    dead: () => SVGBuilder.Path
-                        .withD(
-                            `M
+        FingerlessIndicator.Builder = (() => {
+            const DeadStringBuilder = {
+                withCenter: (center) => SVGBuilder.Path
+                    .withD(
+                        `M
                                 ${center[0] - FingerlessIndicator.Style.radius * halfRoot2},
                                 ${center[1] - FingerlessIndicator.Style.radius * halfRoot2}
                             l
                                 ${FingerlessIndicator.Style.diameter * halfRoot2},
                                 ${FingerlessIndicator.Style.diameter * halfRoot2}
-                            m 0, ${-FingerlessIndicator.Style.diameter * halfRoot2}
+                            m
+                                0,
+                                ${-FingerlessIndicator.Style.diameter * halfRoot2}
                             l
                                 ${-FingerlessIndicator.Style.diameter * halfRoot2},
                                 ${FingerlessIndicator.Style.diameter * halfRoot2}`)
-                        .withClass("dead-string-indicator"),
-                    open: () => SVGBuilder.Circle
-                        .withCenter(center)
-                        .withRadius(FingerlessIndicator.Style.radius)
-                        .withClass("open-string-indicator")};}};
+                    .withClass("dead-string-indicator")};
+            const OpenStringBuilder = {
+                withCenter: (center) => SVGBuilder.Circle
+                    .withCenter(center)
+                    .withRadius(FingerlessIndicator.Style.radius)
+                    .withClass("open-string-indicator")};
+            return {
+                forString: (string) => {
+                    const centerX = FingerlessIndicator.Style.startX + ((string - 1) * Fretboard.Style.stringSpacing);
+                    const centerTop = [
+                        centerX,
+                        FingerlessIndicator.Style.startY + FingerlessIndicator.Style.radius];
+                    return {
+                        topOnly: {
+                            dead: () => DeadStringBuilder.withCenter(centerTop),
+                            open: () => OpenStringBuilder.withCenter(centerTop)},
+                        topAndBottom: ({
+                            withMaxActiveRelativeFret: (relativeFret) => {
+                                const centerBottom = [
+                                    centerX,
+                                    Fretboard.fretToYCoordinate(relativeFret + .5) +
+                                        FingerlessIndicator.Style.radius];
+                                return {
+                                    dead: () => SVGBuilder.g()
+                                        .withClass("dead-string-indicators")
+                                        .withChild(DeadStringBuilder.withCenter(centerTop))
+                                        .withChild(DeadStringBuilder.withCenter(centerBottom)),
+                                    open: () => SVGBuilder.g()
+                                        .withClass("open-string-indicators")
+                                        .withChild(OpenStringBuilder.withCenter(centerTop))
+                                        .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};})();
         ShapeChart.Style.padding = Style.stroke.halfWidth + FingerlessIndicator.Style.radius;
         const FingerActions = {
             Builder: {
@@ -902,7 +926,7 @@ const ChordJogApp = (() => {
                 .g()
                 .withClass("fingerless-indicators")
                 .withChildren(Strings.all
-                    .map(FingerlessIndicator.Builder.forString)
+                    .map((string) => FingerlessIndicator.Builder.forString(string).topOnly)
                     .map(fingerIndicatorBuilder => [
                         fingerIndicatorBuilder.open(),
                         fingerIndicatorBuilder.dead()])
@@ -954,6 +978,8 @@ const ChordJogApp = (() => {
                         .filter(stringAction => stringAction.action === StringActions.open)
                         .map(stringAction => FingerlessIndicator.Builder
                             .forString(stringAction.string)
+                            .topAndBottom
+                            .withMaxActiveRelativeFret(maxFret)
                             .open()
                             .withAttribute("stroke", Style.colors.superHeavy)))
                     //Dead strings indicators
@@ -962,6 +988,8 @@ const ChordJogApp = (() => {
                         .map(stringAction => stringAction.string)
                         .map(deadString => FingerlessIndicator.Builder
                             .forString(deadString)
+                            .topAndBottom
+                            .withMaxActiveRelativeFret(maxFret)
                             .dead()
                             .withAttribute("stroke", Style.colors.superHeavy)))
                     //Finger indicators
@@ -1018,7 +1046,7 @@ const ChordJogApp = (() => {
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
                 .forShapeFilter(ShapeFilter.create(
-                    Shape.fromString(";01;23;23;23;34"),
+                    Shape.fromString(";o;23;23;23;34"),
                     Frets.Range.full))
                 .unfixed
                 .displayOnly())
