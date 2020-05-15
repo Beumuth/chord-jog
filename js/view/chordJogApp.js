@@ -63,25 +63,23 @@ const ChordJogApp = (() => {
         Fingers.pinky ];
 
     const Frets = {
-        dead: "x",
         open: "o",
         first: 1,
         last: 15,
         maxRoot: 11,
         Relative: {
-            root: 0,
-            max: 4 },
+            root: 1,
+            max: 5 },
         Range: {
             create: (min, max) => ({
                 min: min,
                 max: max
             })}};
-    Frets.fingerless = [Frets.dead, Frets.open];
-    Frets.fingerful = _.range(Frets.first, Frets.last);
-    Frets.roots = Frets.fingerful.slice(0, Frets.maxRoot);
-    Frets.all = Frets.fingerless.concat(Frets.fingerful);
-    Frets.isFingerless = Frets.fingerless.includes;
-    Frets.isFingerful = Frets.fingerful.includes;
+    Frets.fretted = _.range(Frets.first, Frets.last);
+    Frets.roots = Frets.fretted.slice(0, Frets.maxRoot);
+    Frets.all = [Frets.open].concat(Frets.fretted);
+    Frets.isFretted = Frets.fretted.includes;
+    Frets.isOpen = (fret) => ! Frets.isFretted(fret);
     Frets.Relative.all = _.range(
         Frets.Relative.root,
         Frets.Relative.max+1);
@@ -93,32 +91,38 @@ const ChordJogApp = (() => {
     const StringActions = {
         unsounded: "",
         open: "o",
-        fretFinger: (fret, finger) => ({
+        dead: "x",
+        fingered: (fret, finger) => ({
+            sounded: true,
             fret: fret,
             finger: finger })};
-    StringActions.deadened = (finger) => ({
-        fret: Frets.dead,
+    StringActions.deadened = (fret, finger) => ({
+        sounded: false,
+        fret: fret,
         finger: finger });
     StringActions.fromString = (string) =>
         string === StringActions.unsounded ?
             StringActions.unsounded :
             string === StringActions.open ?
                 StringActions.open :
-                string.charAt(0) === Frets.dead ?
-                    StringActions.deadened(string.charAt(1)) :
-                    StringActions.fretFinger(
+                string.charAt(0) === StringActions.dead ?
+                    StringActions.deadened(
+                        Number.parseInt(string.charAt(1)),
+                        string.charAt(2)) :
+                    StringActions.fingered(
                         Number.parseInt(string.charAt(0)),
                         string.charAt(1));
     StringActions.toString = (stringAction) =>
         stringAction === StringActions.unsounded ?
             StringActions.unsounded :
             stringAction === StringActions.open ?
-                StringActions.open :
-                `${stringAction.fret}` + `${stringAction.finger}`
+                StringActions.open : stringAction.sounded ?
+                    `${stringAction.fret}${stringAction.finger}` :
+                        `x${stringAction.fret}${stringAction.finger}`;
     StringActions.isFingerless = (stringAction) => [StringActions.unsounded, StringActions.open].includes(stringAction);
     StringActions.isFingered = (stringAction) => ! StringActions.isFingerless(stringAction);
     StringActions.isDeadened = (stringAction) =>
-        StringActions.isFingered(stringAction) && stringAction.fret === Frets.dead;
+        StringActions.isFingered(stringAction) && ! stringAction.sounded;
 
     const ObjectBuilder = (() => {
         const furtherOptions = {
@@ -785,7 +789,7 @@ const ChordJogApp = (() => {
         const FingerlessIndicator = {
             Style: {
                 radius: 5,
-                marginBottom: 2 },
+                margin: 2 },
             DeadString: {},
             OpenString: {}};
         FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
@@ -826,7 +830,7 @@ const ChordJogApp = (() => {
                                 const centerBottom = [
                                     centerX,
                                     Fretboard.fretToYCoordinate(relativeFret + .5) +
-                                        FingerlessIndicator.Style.radius];
+                                        FingerlessIndicator.Style.radius + FingerlessIndicator.Style.margin];
                                 return {
                                     dead: () => SVGBuilder.g()
                                         .withClass("dead-string-indicators")
@@ -859,9 +863,9 @@ const ChordJogApp = (() => {
                 startX: ShapeChart.Style.padding,
                 startY: FingerlessIndicator.Style.startY +
                     FingerlessIndicator.Style.diameter +
-                    FingerlessIndicator.Style.marginBottom },
+                    FingerlessIndicator.Style.margin },
             stringToXCoordinate: (string) => Fretboard.Style.startX + (string - 1) * Fretboard.Style.stringSpacing,
-            fretToYCoordinate: (fret) => Fretboard.Style.startY + (fret + .5) * Fretboard.Style.fretHeight};
+            fretToYCoordinate: (fret) => Fretboard.Style.startY + (fret -.5) * Fretboard.Style.fretHeight};
         Fretboard.stringFretToXY = (string, fret) => [
             Fretboard.stringToXCoordinate(string),
             Fretboard.fretToYCoordinate(fret)];
@@ -981,7 +985,7 @@ const ChordJogApp = (() => {
                             .topAndBottom
                             .withMaxActiveRelativeFret(maxFret)
                             .open()
-                            .withAttribute("stroke", Style.colors.superHeavy)))
+                            .withAttribute("stroke", Style.colors.black)))
                     //Dead strings indicators
                     .withChildren(activeStringActions
                         .filter(stringAction => StringActions.isDeadened(stringAction.action))
@@ -991,7 +995,7 @@ const ChordJogApp = (() => {
                             .topAndBottom
                             .withMaxActiveRelativeFret(maxFret)
                             .dead()
-                            .withAttribute("stroke", Style.colors.superHeavy)))
+                            .withAttribute("stroke", Style.colors.black)))
                     //Finger indicators
                     .withChildren(activeStringActions
                         //Filter out open strings
@@ -1032,7 +1036,6 @@ const ChordJogApp = (() => {
                     return {
                         fixed: (fret) => displayTypeStep,
                         unfixed: displayTypeStep };}}}})();
-
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1046,7 +1049,7 @@ const ChordJogApp = (() => {
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
                 .forShapeFilter(ShapeFilter.create(
-                    Shape.fromString(";o;23;23;23;34"),
+                    Shape.fromString(";;23;23;23;o"),
                     Frets.Range.full))
                 .unfixed
                 .displayOnly())
