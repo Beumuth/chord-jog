@@ -279,6 +279,14 @@ const ChordJogApp = (() => {
                 withTextContent: (textContent) => createElement("text")
                     .withMutation((element) =>
                         element.textContent = textContent)
+                    .withMethods({
+                        withTextLength: function(value) { this.setAttribute("textLength", value); return this; },
+                        withLengthAdjustSpacing: function() {
+                            this.setAttribute("lengthAdjust", "spacing");
+                            return this; },
+                        withLengthAdjustSpacingAndGlyphs: function() {
+                            this.setAttribute("lengthAdjust", "spacingAndGlyphs");
+                            return this; }})
                     .withAttributes({
                         fill: Style.textColor,
                         fontFamily: Style.font,})}) }; })();
@@ -783,9 +791,6 @@ const ChordJogApp = (() => {
 
     const ShapeChart = (() => {
         const halfRoot2 = .5 * Math.SQRT2;
-        const ShapeChart = {
-            Style: {},
-            Builder: {} };
         const FingerlessIndicator = {
             Style: {
                 radius: 5,
@@ -840,7 +845,12 @@ const ChordJogApp = (() => {
                                         .withClass("open-string-indicators")
                                         .withChild(OpenStringBuilder.withCenter(centerTop))
                                         .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};})();
-        ShapeChart.Style.padding = Style.stroke.halfWidth + FingerlessIndicator.Style.radius;
+        const ShapeChart = {
+            Style: {
+                padding: {
+                    x: 20,
+                    y: Style.stroke.halfWidth + FingerlessIndicator.Style.radius } },
+            Builder: {} };
         const FingerActions = {
             Builder: {
                 withFinger: (finger) => ({
@@ -851,16 +861,16 @@ const ChordJogApp = (() => {
                                 fret: fret,
                                 range: Strings.range(fromString, toString)})})})})},
             sameFingerAndFret: (a, b) => a.finger === b.finger && a.fret === b.fret};
-        FingerlessIndicator.Style.startX = ShapeChart.Style.padding;
-        FingerlessIndicator.Style.startY = ShapeChart.Style.padding;
+        FingerlessIndicator.Style.startX = ShapeChart.Style.padding.x;
+        FingerlessIndicator.Style.startY = ShapeChart.Style.padding.y;
         const FingerIndicator = {
             Style: { radius: 11 } };
         FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
         const Fretboard = {
             Style: {
                 stringSpacing: 25,
-                fretHeight: 30,
-                startX: ShapeChart.Style.padding,
+                fretHeight: 29.5,
+                startX: ShapeChart.Style.padding.x,
                 startY: FingerlessIndicator.Style.startY +
                     FingerlessIndicator.Style.diameter +
                     FingerlessIndicator.Style.margin },
@@ -919,6 +929,23 @@ const ChordJogApp = (() => {
                         stroke: "none",
                         fill: Style.colors.superLight,
                         fontSize: 17}))};
+        const RootFretLabelBuilder = (() => {
+            const forText = (text) => {
+                const label = SVGBuilder.Text
+                    .withTextContent(text)
+                    .withAttributes({
+                        x: Fretboard.stringToXCoordinate(1) - (text.length <= 1 ? 5 : 4),
+                        y: Fretboard.fretToYCoordinate(Frets.Relative.first),
+                        dominantBaseline: "central",
+                        textAnchor: "end",
+                        fontFamily: "monospace",
+                        fontSize: 15});
+                return text.length <= 1 ? label : label
+                    .withTextLength(17)
+                    .withLengthAdjustSpacingAndGlyphs(); };
+            return {
+                fixed: (fret) => forText(`${fret}`),
+                unfixed: () => forText("r") }; })();
 
         //The 'skeleton' consists of the passive portion of the ShapeFilterView -
         //fretboard and finger indicator placeholders.
@@ -1020,11 +1047,13 @@ const ChordJogApp = (() => {
                                         ).string)]),
                             [])
                         .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)))}};
-        const containerBuilder = () => SVGBuilder
-            .g()
-            .withClass("shape-chart")
-            .disableTextSelection()
-            .withChild(skeletonBuilder());
+        const containerBuilder = () => ObjectBuilder
+            .fromExisting(SVGBuilder
+                .g()
+                .withClass("shape-chart")
+                .disableTextSelection()
+                .withChild(skeletonBuilder()))
+
         return {
             Builder: {
                 blank: containerBuilder,
@@ -1034,8 +1063,12 @@ const ChordJogApp = (() => {
                     const displayTypeStep = {
                         displayOnly: () => container };
                     return {
-                        fixed: (fret) => displayTypeStep,
-                        unfixed: displayTypeStep };}}}})();
+                        fixed: (fret) => {
+                            container.withChild(RootFretLabelBuilder.fixed(fret));
+                            return displayTypeStep; },
+                        unfixed: () => {
+                            container.withChild(RootFretLabelBuilder.unfixed());
+                            return displayTypeStep; }};}}};})();
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1051,6 +1084,6 @@ const ChordJogApp = (() => {
                 .forShapeFilter(ShapeFilter.create(
                     Shape.fromString(";;23;23;23;o"),
                     Frets.Range.full))
-                .unfixed
+                .fixed(2)
                 .displayOnly())
     };})();
