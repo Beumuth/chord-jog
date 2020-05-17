@@ -73,8 +73,7 @@ const ChordJogApp = (() => {
         Range: {
             create: (min, max) => ({
                 min: min,
-                max: max
-            })}};
+                max: max })}};
     Frets.fretted = _.range(Frets.first, Frets.last);
     Frets.roots = Frets.fretted.slice(0, Frets.maxRoot);
     Frets.all = [Frets.open].concat(Frets.fretted);
@@ -131,6 +130,11 @@ const ChordJogApp = (() => {
                 return this; },
             withSetter: function(key, setter) {
                 Object.defineProperty(this, key, {set: setter});
+                return this; },
+            withGetterAndSetter: function(key, getter, setter) {
+                Object.defineProperty(this, key, {
+                    get: getter,
+                    set: setter});
                 return this; },
             withFields(fields) {
                 Object.keys(fields).forEach(key => this[key] = fields[key]);
@@ -293,7 +297,7 @@ const ChordJogApp = (() => {
     //A Schema is an array of 6 StringActions
     const Shape = {
         fromString: (string) => string.split(";").map(StringActions.fromString),
-        toString: (shape) => shape.map(StringActions.toString)};
+        toString: (shape) => shape.map(StringActions.toString).join(";")};
 
     const ShapeFilter = {
         create: (shape, range) => ({
@@ -929,20 +933,34 @@ const ChordJogApp = (() => {
                         stroke: "none",
                         fill: Style.colors.superLight,
                         fontSize: 17}))};
-        const RootFretLabelBuilder = (() => {
+        const RootFretLabel = {
+            Style: {
+                fontSize: 15,
+                fontFamily: "monospace" },
+            adjustText: (rootFretLabel) => {
+                let rootFretLabelPadding = rootFretLabel.textContent.length = 5;
+                if(rootFretLabel.textContent.length > 1) {
+                    rootFretLabelPadding = 4;
+                    rootFretLabel.withTextLength(17);
+                } else {
+                    rootFretLabel.removeAttribute("textLength");
+                }
+                rootFretLabel.withAttribute("x", Fretboard.stringToXCoordinate(1) - rootFretLabelPadding); } };
+        RootFretLabel.Builder = (() => {
             const forText = (text) => {
                 const label = SVGBuilder.Text
                     .withTextContent(text)
+                    .withClass("r-label")
                     .withAttributes({
                         x: Fretboard.stringToXCoordinate(1) - (text.length <= 1 ? 5 : 4),
                         y: Fretboard.fretToYCoordinate(Frets.Relative.first),
                         dominantBaseline: "central",
                         textAnchor: "end",
                         fontFamily: "monospace",
-                        fontSize: 15});
+                        fontSize: 15})
+                    .withLengthAdjustSpacingAndGlyphs()
                 return text.length <= 1 ? label : label
-                    .withTextLength(17)
-                    .withLengthAdjustSpacingAndGlyphs(); };
+                    .withTextLength(17); };
             return {
                 fixed: (fret) => forText(`${fret}`),
                 unfixed: () => forText("r") }; })();
@@ -951,7 +969,7 @@ const ChordJogApp = (() => {
         //fretboard and finger indicator placeholders.
         const skeletonBuilder = () => SVGBuilder
             .g()
-            .withClass("shape-filter-skeleton")
+            .withClass("shape-chart-skeleton")
             .withAttribute("stroke", Style.colors.light)
             .withChild(SVGBuilder
                 .g()
@@ -989,7 +1007,7 @@ const ChordJogApp = (() => {
                         action: shape[stringIndex]}));
                 return SVGBuilder
                     .g()
-                    .withClass("shape-filter-meat")
+                    .withClass("shape-chart-meat")
                     .withAttribute("stroke", Style.colors.heavy)
                     //Active strings
                     .withChildren(activeStringActions
@@ -1052,22 +1070,60 @@ const ChordJogApp = (() => {
                 .g()
                 .withClass("shape-chart")
                 .disableTextSelection()
-                .withChild(skeletonBuilder()))
-
+                .withChild(skeletonBuilder()));
         return {
             Builder: {
                 blank: containerBuilder,
-                forShapeFilter: (shapeFilter) => {
+                forShape: (shape) => {
                     const container = containerBuilder()
-                        .withChild(MeatBuilder.forShape(shapeFilter.shape))
+                        .withChild(MeatBuilder.forShape(shape))
+                        .withDataAttribute("shape", Shape.toString(shape))
+                        .withGetterAndSetter("shape",
+                            function() { return this.dataset.shape; },
+                            function(shape) { this.dataset.shape = shape; })
+                        .withMutationObserver(new MutationObserver((mutations) => mutations
+                            .map(mutation => ({
+                                shapeChart: mutation.target,
+                                shape: mutation.target.shape}))
+                            .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
+                                .querySelector(".shape-chart-meat")
+                                .replaceWith(MeatBuilder.forShape(Shape.fromString(shapeChangeEvent.shape))))),
+                            {attributeFilter: ["data-shape"]})
+                        .withGetterAndSetter("r",
+                            function() { return this.dataset.r; },
+                            function(r) {this.dataset.r = r; })
+                        .withMutationObserver((() => {
+                            const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
+                                .map(fret => `${fret}`)
+                                .includes(r);
+                            return new MutationObserver((mutations) => mutations
+                                .map(mutation => ({
+                                    shapeChart: mutation.target,
+                                    oldR: mutation.oldValue,
+                                    r: mutation.target.r}))
+                                .forEach(rChangeEvent => {
+                                    const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
+                                    if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
+                                        rootLabel.textContent = "r";
+                                        RootFretLabel.adjustText(rootLabel);}
+                                    else if(isValidR(rChangeEvent.r)) {
+                                        rootLabel.textContent = rChangeEvent.r;
+                                        RootFretLabel.adjustText(rootLabel);}
+                                    else {
+                                        rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
+                                {
+                                    attributeFilter: ["data-r"],
+                                    attributeOldValue: true});
                     const displayTypeStep = {
                         displayOnly: () => container };
                     return {
                         fixed: (fret) => {
-                            container.withChild(RootFretLabelBuilder.fixed(fret));
+                            container
+                                .withChild(RootFretLabel.Builder.fixed(fret))
+                                .withDataAttribute("r", fret);
                             return displayTypeStep; },
                         unfixed: () => {
-                            container.withChild(RootFretLabelBuilder.unfixed());
+                            container.withChild(RootFretLabel.Builder.unfixed());
                             return displayTypeStep; }};}}};})();
     return {
         create: () => SVGBuilder.SVG
@@ -1081,9 +1137,7 @@ const ChordJogApp = (() => {
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
-                .forShapeFilter(ShapeFilter.create(
-                    Shape.fromString(";;23;23;23;o"),
-                    Frets.Range.full))
+                .forShape(Shape.fromString(";;23;23;23;o"))
                 .fixed(2)
                 .displayOnly())
     };})();
