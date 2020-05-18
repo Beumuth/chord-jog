@@ -187,6 +187,12 @@ const ChordJogApp = (() => {
                         Object.keys(attributes).forEach(name =>
                             this.setAttribute(dashifyAttributeName(name), attributes[name]));
                         return this; },
+                    withoutAttribute: function(name) {
+                        this.removeAttribute(name);
+                        return this; },
+                    withoutAttributes: function(names) {
+                        names.forEach(name => this.removeAttribute(name));
+                        return this; },
                     withDataAttribute: function(name, value) {
                         this.dataset[name] = value;
                         return this; },
@@ -994,7 +1000,16 @@ const ChordJogApp = (() => {
 
         //The 'meat' consists of the active portion of the ShapeFilterView -
         // darkened fretboard strings and finger indicators.
-        const MeatBuilder = {
+        const Meat = {
+            Style: {
+                previewOpacity: .5,
+                activeWithPreviewOpacity: .7 }};
+        Meat.activeWithPreview = (active) => active.withAttributes({
+            fillOpacity: Meat.Style.activeWithPreviewOpacity,
+            strokeOpacity: Meat.Style.activeWithPreviewOpacity});
+        Meat.activeWithoutPreview = (active) => active.withoutAttribute("fill-opacity");
+        Meat.Builder = {
+            blankPreview: () => SVGBuilder.g().withClass("shape-chart-preview"),
             forShape: (shape) => {
                 const fingeredStringActions = shape.filter(StringActions.isFingered);
                 const maxFret = fingeredStringActions.length === 0 ? undefined : fingeredStringActions
@@ -1005,9 +1020,8 @@ const ChordJogApp = (() => {
                     .map(stringIndex => ({
                         string: stringIndex + 1,
                         action: shape[stringIndex]}));
-                return SVGBuilder
+                const builder = SVGBuilder
                     .g()
-                    .withClass("shape-chart-meat")
                     .withAttribute("stroke", Style.colors.heavy)
                     //Active strings
                     .withChildren(activeStringActions
@@ -1064,7 +1078,18 @@ const ChordJogApp = (() => {
                                             (existing) => FingerActions.sameFingerAndFret(existing, current)
                                         ).string)]),
                             [])
-                        .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)))}};
+                        .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)));
+                return {
+                    active: () => {
+                        builder.withClass("shape-chart-meat");
+                        return {
+                            withPreview: (preview) => preview ?
+                                Meat.activeWithPreview(builder) : Meat.activeWithoutPreview(builder)}; },
+                    preview: () => builder
+                        .withClass("shape-chart-preview")
+                        .withAttributes({
+                            fillOpacity: Meat.Style.previewOpacity,
+                            strokeOpacity: Meat.Style.previewOpacity})};}};
         const containerBuilder = () => ObjectBuilder
             .fromExisting(SVGBuilder
                 .g()
@@ -1075,8 +1100,8 @@ const ChordJogApp = (() => {
             Builder: {
                 blank: containerBuilder,
                 forShape: (shape) => {
+                    const activeMeat = Meat.Builder.forShape(shape).active();
                     const container = containerBuilder()
-                        .withChild(MeatBuilder.forShape(shape))
                         .withDataAttribute("shape", Shape.toString(shape))
                         .withGetterAndSetter("shape",
                             function() { return this.dataset.shape; },
@@ -1087,36 +1112,62 @@ const ChordJogApp = (() => {
                                 shape: mutation.target.shape}))
                             .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
                                 .querySelector(".shape-chart-meat")
-                                .replaceWith(MeatBuilder.forShape(Shape.fromString(shapeChangeEvent.shape))))),
+                                .replaceWith(Meat.Builder
+                                    .forShape(Shape.fromString(shapeChangeEvent.shape))
+                                    .active()
+                                    .withPreview(shapeChangeEvent.shapeChart.preview === null)))),
                             {attributeFilter: ["data-shape"]})
                         .withGetterAndSetter("r",
                             function() { return this.dataset.r; },
                             function(r) {this.dataset.r = r; })
-                        .withMutationObserver((() => {
-                            const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
-                                .map(fret => `${fret}`)
-                                .includes(r);
-                            return new MutationObserver((mutations) => mutations
+                        .withMutationObserver(
+                            (() => {
+                                const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
+                                    .map(fret => `${fret}`)
+                                    .includes(r);
+                                return new MutationObserver((mutations) => mutations
+                                    .map(mutation => ({
+                                        shapeChart: mutation.target,
+                                        oldR: mutation.oldValue,
+                                        r: mutation.target.r}))
+                                    .forEach(rChangeEvent => {
+                                        const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
+                                        if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
+                                            rootLabel.textContent = "r";
+                                            RootFretLabel.adjustText(rootLabel);}
+                                        else if(isValidR(rChangeEvent.r)) {
+                                            rootLabel.textContent = rChangeEvent.r;
+                                            RootFretLabel.adjustText(rootLabel);}
+                                        else {
+                                            rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
+                            {
+                                attributeFilter: ["data-r"],
+                                attributeOldValue: true})
+                        .withGetterAndSetter("preview",
+                            function() { return this.dataset.previewShape; },
+                            function(previewShape) {this.dataset.previewShape = previewShape; })
+                        .withMutationObserver(
+                            new MutationObserver((mutations) => mutations
                                 .map(mutation => ({
                                     shapeChart: mutation.target,
-                                    oldR: mutation.oldValue,
-                                    r: mutation.target.r}))
-                                .forEach(rChangeEvent => {
-                                    const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
-                                    if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
-                                        rootLabel.textContent = "r";
-                                        RootFretLabel.adjustText(rootLabel);}
-                                    else if(isValidR(rChangeEvent.r)) {
-                                        rootLabel.textContent = rChangeEvent.r;
-                                        RootFretLabel.adjustText(rootLabel);}
+                                    preview: mutation.target.preview}))
+                                .forEach(shapeChangeEvent => {
+                                    const shapeChartPreview = shapeChangeEvent.shapeChart
+                                        .querySelector(".shape-chart-preview");
+                                    const shapeChartMeat = shapeChangeEvent.shapeChart
+                                        .querySelector(".shape-chart-meat");
+                                    if([null, undefined, ""].includes(shapeChangeEvent.preview)) {
+                                        shapeChartPreview.style.display = "none";
+                                        Meat.activeWithoutPreview(shapeChartMeat); }
                                     else {
-                                        rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
-                                {
-                                    attributeFilter: ["data-r"],
-                                    attributeOldValue: true});
+                                        shapeChartPreview.replaceWith(Meat.Builder
+                                            .forShape(Shape.fromString(shapeChangeEvent.preview))
+                                            .preview());
+                                        Meat.activeWithPreview(shapeChartMeat);}})),
+                            {attributeFilter: ["data-preview-shape"]});
                     const displayTypeStep = {
                         displayOnly: () => container };
-                    return {
+                    const fixednessStep = {
                         fixed: (fret) => {
                             container
                                 .withChild(RootFretLabel.Builder.fixed(fret))
@@ -1124,7 +1175,19 @@ const ChordJogApp = (() => {
                             return displayTypeStep; },
                         unfixed: () => {
                             container.withChild(RootFretLabel.Builder.unfixed());
-                            return displayTypeStep; }};}}};})();
+                            return displayTypeStep; }};
+                    return {
+                        withPreviewShape: (previewShape) => {
+                            container
+                                .withChild(activeMeat.withPreview(true))
+                                .withChild(Meat.Builder.forShape(previewShape).preview())
+                                .withDataAttribute("previewShape", Shape.toString(previewShape));
+                            return fixednessStep; },
+                        withoutPreviewShape: () => {
+                            container
+                                .withChild(activeMeat.withPreview(false))
+                                .withChild(Meat.Builder.blankPreview());
+                            return fixednessStep; }};}}};})();
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1138,6 +1201,7 @@ const ChordJogApp = (() => {
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
                 .forShape(Shape.fromString(";;23;23;23;o"))
+                .withPreviewShape(Shape.fromString(";o;23;23;23;o"))
                 .fixed(2)
                 .displayOnly())
     };})();
