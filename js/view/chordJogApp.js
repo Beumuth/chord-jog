@@ -1001,95 +1001,76 @@ const ChordJogApp = (() => {
         //The 'meat' consists of the active portion of the ShapeFilterView -
         // darkened fretboard strings and finger indicators.
         const Meat = {
-            Style: {
-                previewOpacity: .5,
-                activeWithPreviewOpacity: .7 }};
-        Meat.activeWithPreview = (active) => active.withAttributes({
-            fillOpacity: Meat.Style.activeWithPreviewOpacity,
-            strokeOpacity: Meat.Style.activeWithPreviewOpacity});
-        Meat.activeWithoutPreview = (active) => active.withoutAttribute("fill-opacity");
-        Meat.Builder = {
-            blankPreview: () => SVGBuilder.g().withClass("shape-chart-preview"),
-            forShape: (shape) => {
-                const fingeredStringActions = shape.filter(StringActions.isFingered);
-                const maxFret = fingeredStringActions.length === 0 ? undefined : fingeredStringActions
-                    .map(stringAction => stringAction.fret)
-                    .reduce((a, b) => a >= b ? a : b);
-                const activeStringActions = _.range(0, Strings.count)
-                    .filter(stringIndex => shape[stringIndex] !== StringActions.unsounded)
-                    .map(stringIndex => ({
-                        string: stringIndex + 1,
-                        action: shape[stringIndex]}));
-                const builder = SVGBuilder
-                    .g()
-                    .withAttribute("stroke", Style.colors.heavy)
-                    //Active strings
-                    .withChildren(activeStringActions
-                        .map(stringAction => Fretboard.StringLineBuilder
-                            .forString(stringAction.string)
-                            .toFret(maxFret)
-                            .withAttribute("strokeWidth", 1.5)))
-                    //Active frets dividers
-                    .withChildren(_.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
-                        Fretboard.FretDividerBuilder
-                            .belowFret(belowFret)
-                            .fromString(activeStringActions[0].string)
-                            .toString(activeStringActions[activeStringActions.length-1].string)
-                            .withAttribute("strokeWidth", 1.5)))
-                    //Open strings indicators
-                    .withChildren(activeStringActions
-                        .filter(stringAction => stringAction.action === StringActions.open)
-                        .map(stringAction => FingerlessIndicator.Builder
-                            .forString(stringAction.string)
-                            .topAndBottom
-                            .withMaxActiveRelativeFret(maxFret)
-                            .open()
-                            .withAttribute("stroke", Style.colors.black)))
-                    //Dead strings indicators
-                    .withChildren(activeStringActions
-                        .filter(stringAction => StringActions.isDeadened(stringAction.action))
-                        .map(stringAction => stringAction.string)
-                        .map(deadString => FingerlessIndicator.Builder
-                            .forString(deadString)
-                            .topAndBottom
-                            .withMaxActiveRelativeFret(maxFret)
-                            .dead()
-                            .withAttribute("stroke", Style.colors.black)))
-                    //Finger indicators
-                    .withChildren(activeStringActions
-                        //Filter out open strings
-                        .filter(stringAction => stringAction.action !== StringActions.open)
-                        //Map to {finger, fret, string} objects
-                        .map(stringAction => ({
-                            finger: stringAction.action.finger,
-                            fret: stringAction.action.fret,
-                            string: stringAction.string }))
-                        //Merge objects with same finger and fret into a FingerAction object
-                        .reduce((fingerActions, current, i, source) => fingerActions.some((existing) =>
-                            FingerActions.sameFingerAndFret(existing, current)) ?
-                                fingerActions :
-                                fingerActions.concat([
-                                    FingerActions.Builder
-                                        .withFinger(current.finger)
-                                        .atFret(current.fret)
-                                        .fromString(current.string)
-                                        .toString(_.findLast(
-                                            source,
-                                            (existing) => FingerActions.sameFingerAndFret(existing, current)
-                                        ).string)]),
-                            [])
-                        .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)));
-                return {
-                    active: () => {
-                        builder.withClass("shape-chart-meat");
-                        return {
-                            withPreview: (preview) => preview ?
-                                Meat.activeWithPreview(builder) : Meat.activeWithoutPreview(builder)}; },
-                    preview: () => builder
-                        .withClass("shape-chart-preview")
-                        .withAttributes({
-                            fillOpacity: Meat.Style.previewOpacity,
-                            strokeOpacity: Meat.Style.previewOpacity})};}};
+            Builder: {
+                forShape: (shape) => {
+                    const fingeredStringActions = shape.filter(StringActions.isFingered);
+                    const maxFret = fingeredStringActions.length === 0 ? undefined : fingeredStringActions
+                        .map(stringAction => stringAction.fret)
+                        .reduce((a, b) => a >= b ? a : b);
+                    const activeStringActions = _.range(0, Strings.count)
+                        .filter(stringIndex => shape[stringIndex] !== StringActions.unsounded)
+                        .map(stringIndex => ({
+                            string: stringIndex + 1,
+                            action: shape[stringIndex]}));
+                    return SVGBuilder
+                        .g()
+                        .withAttribute("stroke", Style.colors.heavy)
+                        //Active strings
+                        .withChildren(activeStringActions
+                            .map(stringAction => Fretboard.StringLineBuilder
+                                .forString(stringAction.string)
+                                .toFret(maxFret)
+                                .withAttribute("strokeWidth", 1.5)))
+                        //Active frets dividers
+                        .withChildren(_.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
+                            Fretboard.FretDividerBuilder
+                                .belowFret(belowFret)
+                                .fromString(activeStringActions[0].string)
+                                .toString(activeStringActions[activeStringActions.length-1].string)
+                                .withAttribute("strokeWidth", 1.5)))
+                        //Open strings indicators
+                        .withChildren(activeStringActions
+                            .filter(stringAction => stringAction.action === StringActions.open)
+                            .map(stringAction => FingerlessIndicator.Builder
+                                .forString(stringAction.string)
+                                .topAndBottom
+                                .withMaxActiveRelativeFret(maxFret)
+                                .open()
+                                .withAttribute("stroke", Style.colors.black)))
+                        //Dead strings indicators
+                        .withChildren(activeStringActions
+                            .filter(stringAction => StringActions.isDeadened(stringAction.action))
+                            .map(stringAction => stringAction.string)
+                            .map(deadString => FingerlessIndicator.Builder
+                                .forString(deadString)
+                                .topAndBottom
+                                .withMaxActiveRelativeFret(maxFret)
+                                .dead()
+                                .withAttribute("stroke", Style.colors.black)))
+                        //Finger indicators
+                        .withChildren(activeStringActions
+                            //Filter out open strings
+                            .filter(stringAction => stringAction.action !== StringActions.open)
+                            //Map to {finger, fret, string} objects
+                            .map(stringAction => ({
+                                finger: stringAction.action.finger,
+                                fret: stringAction.action.fret,
+                                string: stringAction.string }))
+                            //Merge objects with same finger and fret into a FingerAction object
+                            .reduce((fingerActions, current, i, source) => fingerActions.some((existing) =>
+                                FingerActions.sameFingerAndFret(existing, current)) ?
+                                    fingerActions :
+                                    fingerActions.concat([
+                                        FingerActions.Builder
+                                            .withFinger(current.finger)
+                                            .atFret(current.fret)
+                                            .fromString(current.string)
+                                            .toString(_.findLast(
+                                                source,
+                                                (existing) => FingerActions.sameFingerAndFret(existing, current)
+                                            ).string)]),
+                                [])
+                            .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)));}}};
         const containerBuilder = () => ObjectBuilder
             .fromExisting(SVGBuilder
                 .g()
@@ -1100,8 +1081,10 @@ const ChordJogApp = (() => {
             Builder: {
                 blank: containerBuilder,
                 forShape: (shape) => {
-                    const activeMeat = Meat.Builder.forShape(shape).active();
                     const container = containerBuilder()
+                        //shape-chart-meat
+                        .withChild(Meat.Builder.forShape(shape))
+                        //data-shape
                         .withDataAttribute("shape", Shape.toString(shape))
                         .withGetterAndSetter("shape",
                             function() { return this.dataset.shape; },
@@ -1117,6 +1100,7 @@ const ChordJogApp = (() => {
                                     .active()
                                     .withPreview(shapeChangeEvent.shapeChart.preview === null)))),
                             {attributeFilter: ["data-shape"]})
+                        //data-r
                         .withGetterAndSetter("r",
                             function() { return this.dataset.r; },
                             function(r) {this.dataset.r = r; })
@@ -1143,7 +1127,7 @@ const ChordJogApp = (() => {
                             {
                                 attributeFilter: ["data-r"],
                                 attributeOldValue: true})
-                        .withGetterAndSetter("preview",
+                        /*.withGetterAndSetter("preview",
                             function() { return this.dataset.previewShape; },
                             function(previewShape) {this.dataset.previewShape = previewShape; })
                         .withMutationObserver(
@@ -1164,30 +1148,33 @@ const ChordJogApp = (() => {
                                             .forShape(Shape.fromString(shapeChangeEvent.preview))
                                             .preview());
                                         Meat.activeWithPreview(shapeChartMeat);}})),
-                            {attributeFilter: ["data-preview-shape"]});
-                    const displayTypeStep = {
-                        displayOnly: () => container };
-                    const fixednessStep = {
-                        fixed: (fret) => {
-                            container
-                                .withChild(RootFretLabel.Builder.fixed(fret))
-                                .withDataAttribute("r", fret);
-                            return displayTypeStep; },
-                        unfixed: () => {
-                            container.withChild(RootFretLabel.Builder.unfixed());
-                            return displayTypeStep; }};
+                            {attributeFilter: ["data-preview-shape"]})*/;
                     return {
-                        withPreviewShape: (previewShape) => {
-                            container
-                                .withChild(activeMeat.withPreview(true))
-                                .withChild(Meat.Builder.forShape(previewShape).preview())
-                                .withDataAttribute("previewShape", Shape.toString(previewShape));
-                            return fixednessStep; },
-                        withoutPreviewShape: () => {
-                            container
-                                .withChild(activeMeat.withPreview(false))
-                                .withChild(Meat.Builder.blankPreview());
-                            return fixednessStep; }};}}};})();
+                        fixed: (fret) => container
+                            .withChild(RootFretLabel.Builder.fixed(fret))
+                            .withDataAttribute("r", fret),
+                        unfixed: () => container.withChild(RootFretLabel.Builder.unfixed())};}}};})();
+    // const ShapeFilterInput = (() => {
+    //     const ShapeFilterInput = {
+    //         Style: {
+    //             ShapeChart: {
+    //                 margin : {
+    //                     right: 5,
+    //                     bottom: 3 }}}}})();
+    //     const ShapeChartInput = {
+    //         Builder: {
+    //             forShape: (shape) => ShapeChart.Builder.forShape(shape).,
+    //             blank: () => }};
+    // ShapeFilterInput.Builder = (() => {
+    //     const shapeFilterInput = SVGBuilder.g()
+    //         .withClass('shape-filter-input')
+    //     return {
+    //         forShapeFilter: (shapeFilter) => {
+    //
+    //         },
+    //         blank: () => {
+    //
+    //         }};})();
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1201,7 +1188,5 @@ const ChordJogApp = (() => {
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
                 .forShape(Shape.fromString(";;23;23;23;o"))
-                .withPreviewShape(Shape.fromString(";o;23;23;23;o"))
-                .fixed(2)
-                .displayOnly())
+                .fixed(2))
     };})();
