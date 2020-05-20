@@ -1011,9 +1011,11 @@ const ChordJogApp = (() => {
                         .map(stringIndex => ({
                             string: stringIndex + 1,
                             action: shape[stringIndex]}));
-                    return SVGBuilder
+                    const meat = SVGBuilder
                         .g()
                         .withAttribute("stroke", Style.colors.heavy)
+                        .withClass("shape-chart-meat");
+                    return activeStringActions.length === 0 ? meat : meat
                         //Active strings
                         .withChildren(activeStringActions
                             .map(stringAction => Fretboard.StringLineBuilder
@@ -1170,6 +1172,9 @@ const ChordJogApp = (() => {
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeChart.Builder
+                    .blank()
+                    .fixed(2)
+                /*ShapeChart.Builder
                 .forShape(Shape.fromString(";;23;23;23;o"))
-                .fixed(2))
+                .blank(2)*/)
     };})();
