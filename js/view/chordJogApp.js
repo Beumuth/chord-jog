@@ -304,6 +304,7 @@ const ChordJogApp = (() => {
     const Shape = {
         fromString: (string) => string.split(";").map(StringActions.fromString),
         toString: (shape) => shape.map(StringActions.toString).join(";")};
+    Shape.allUnsounded = Shape.fromString(";;;;;");
 
     const ShapeFilter = {
         create: (shape, range) => ({
@@ -855,12 +856,10 @@ const ChordJogApp = (() => {
                                         .withClass("open-string-indicators")
                                         .withChild(OpenStringBuilder.withCenter(centerTop))
                                         .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};})();
-        const ShapeChart = {
-            Style: {
-                padding: {
-                    x: 20,
-                    y: Style.stroke.halfWidth + FingerlessIndicator.Style.radius } },
-            Builder: {} };
+        const ShapeChartStyle = {
+            padding: {
+                x: 20,
+                y: Style.stroke.halfWidth + FingerlessIndicator.Style.radius } };
         const FingerActions = {
             Builder: {
                 withFinger: (finger) => ({
@@ -871,8 +870,8 @@ const ChordJogApp = (() => {
                                 fret: fret,
                                 range: Strings.range(fromString, toString)})})})})},
             sameFingerAndFret: (a, b) => a.finger === b.finger && a.fret === b.fret};
-        FingerlessIndicator.Style.startX = ShapeChart.Style.padding.x;
-        FingerlessIndicator.Style.startY = ShapeChart.Style.padding.y;
+        FingerlessIndicator.Style.startX = ShapeChartStyle.padding.x;
+        FingerlessIndicator.Style.startY = ShapeChartStyle.padding.y;
         const FingerIndicator = {
             Style: { radius: 11 } };
         FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
@@ -880,7 +879,7 @@ const ChordJogApp = (() => {
             Style: {
                 stringSpacing: 25,
                 fretHeight: 29.5,
-                startX: ShapeChart.Style.padding.x,
+                startX: ShapeChartStyle.padding.x,
                 startY: FingerlessIndicator.Style.startY +
                     FingerlessIndicator.Style.diameter +
                     FingerlessIndicator.Style.margin },
@@ -1071,89 +1070,69 @@ const ChordJogApp = (() => {
                                             ).string)]),
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)));}}};
-        const containerBuilder = () => ObjectBuilder
-            .fromExisting(SVGBuilder
-                .g()
-                .withClass("shape-chart")
-                .disableTextSelection()
-                .withChild(skeletonBuilder()));
+        Meat.Builder.blank = () => Meat.Builder.forShape(Shape.allUnsounded);
+        const containerBuilder = () => SVGBuilder
+            .g()
+            .withClass("shape-chart")
+            .disableTextSelection()
+            .withChild(skeletonBuilder())
+            .withGetterAndSetter("shape",
+                function() { return this.dataset.shape; },
+                function(shape) { this.dataset.shape = shape; })
+            .withMutationObserver(new MutationObserver((mutations) => mutations
+                    .map(mutation => ({
+                        shapeChart: mutation.target,
+                        shape: mutation.target.shape}))
+                    .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
+                        .querySelector(".shape-chart-meat")
+                        .replaceWith(Meat.Builder
+                            .forShape(Shape.fromString(shapeChangeEvent.shape))
+                            .active()
+                            .withPreview(shapeChangeEvent.shapeChart.preview === null)))),
+                {attributeFilter: ["data-shape"]})
+            //data-r
+            .withGetterAndSetter("r",
+                function() { return this.dataset.r; },
+                function(r) {this.dataset.r = r; })
+            .withMutationObserver(
+                (() => {
+                    const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
+                        .map(fret => `${fret}`)
+                        .includes(r);
+                    return new MutationObserver((mutations) => mutations
+                        .map(mutation => ({
+                            shapeChart: mutation.target,
+                            oldR: mutation.oldValue,
+                            r: mutation.target.r}))
+                        .forEach(rChangeEvent => {
+                            const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
+                            if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
+                                rootLabel.textContent = "r";
+                                RootFretLabel.adjustText(rootLabel);}
+                            else if(isValidR(rChangeEvent.r)) {
+                                rootLabel.textContent = rChangeEvent.r;
+                                RootFretLabel.adjustText(rootLabel);}
+                            else {
+                                rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
+                {
+                    attributeFilter: ["data-r"],
+                    attributeOldValue: true});
         return {
-            Builder: {
-                blank: containerBuilder,
-                forShape: (shape) => {
-                    const container = containerBuilder()
-                        //shape-chart-meat
+            Meat: Meat,
+            Builder: (() => {
+                const fixednessStep = (shapeChart) => ({
+                    fixed: (fret) => shapeChart
+                        .withChild(RootFretLabel.Builder.fixed(fret))
+                        .withDataAttribute("r", fret),
+                    unfixed: () => shapeChart
+                        .withChild(RootFretLabel.Builder.unfixed())});
+                const forShape = (shape) => fixednessStep(
+                    containerBuilder()
                         .withChild(Meat.Builder.forShape(shape))
-                        //data-shape
-                        .withDataAttribute("shape", Shape.toString(shape))
-                        .withGetterAndSetter("shape",
-                            function() { return this.dataset.shape; },
-                            function(shape) { this.dataset.shape = shape; })
-                        .withMutationObserver(new MutationObserver((mutations) => mutations
-                            .map(mutation => ({
-                                shapeChart: mutation.target,
-                                shape: mutation.target.shape}))
-                            .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
-                                .querySelector(".shape-chart-meat")
-                                .replaceWith(Meat.Builder
-                                    .forShape(Shape.fromString(shapeChangeEvent.shape))
-                                    .active()
-                                    .withPreview(shapeChangeEvent.shapeChart.preview === null)))),
-                            {attributeFilter: ["data-shape"]})
-                        //data-r
-                        .withGetterAndSetter("r",
-                            function() { return this.dataset.r; },
-                            function(r) {this.dataset.r = r; })
-                        .withMutationObserver(
-                            (() => {
-                                const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
-                                    .map(fret => `${fret}`)
-                                    .includes(r);
-                                return new MutationObserver((mutations) => mutations
-                                    .map(mutation => ({
-                                        shapeChart: mutation.target,
-                                        oldR: mutation.oldValue,
-                                        r: mutation.target.r}))
-                                    .forEach(rChangeEvent => {
-                                        const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
-                                        if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
-                                            rootLabel.textContent = "r";
-                                            RootFretLabel.adjustText(rootLabel);}
-                                        else if(isValidR(rChangeEvent.r)) {
-                                            rootLabel.textContent = rChangeEvent.r;
-                                            RootFretLabel.adjustText(rootLabel);}
-                                        else {
-                                            rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
-                            {
-                                attributeFilter: ["data-r"],
-                                attributeOldValue: true})
-                        /*.withGetterAndSetter("preview",
-                            function() { return this.dataset.previewShape; },
-                            function(previewShape) {this.dataset.previewShape = previewShape; })
-                        .withMutationObserver(
-                            new MutationObserver((mutations) => mutations
-                                .map(mutation => ({
-                                    shapeChart: mutation.target,
-                                    preview: mutation.target.preview}))
-                                .forEach(shapeChangeEvent => {
-                                    const shapeChartPreview = shapeChangeEvent.shapeChart
-                                        .querySelector(".shape-chart-preview");
-                                    const shapeChartMeat = shapeChangeEvent.shapeChart
-                                        .querySelector(".shape-chart-meat");
-                                    if([null, undefined, ""].includes(shapeChangeEvent.preview)) {
-                                        shapeChartPreview.style.display = "none";
-                                        Meat.activeWithoutPreview(shapeChartMeat); }
-                                    else {
-                                        shapeChartPreview.replaceWith(Meat.Builder
-                                            .forShape(Shape.fromString(shapeChangeEvent.preview))
-                                            .preview());
-                                        Meat.activeWithPreview(shapeChartMeat);}})),
-                            {attributeFilter: ["data-preview-shape"]})*/;
-                    return {
-                        fixed: (fret) => container
-                            .withChild(RootFretLabel.Builder.fixed(fret))
-                            .withDataAttribute("r", fret),
-                        unfixed: () => container.withChild(RootFretLabel.Builder.unfixed())};}}};})();
+                        .withDataAttribute("shape", Shape.toString(shape)));
+                return {
+                    blank: () => forShape(Shape.allUnsounded),
+                    forShape: forShape };})()};})();
     // const ShapeFilterInput = (() => {
     //     const ShapeFilterInput = {
     //         Style: {
@@ -1162,9 +1141,13 @@ const ChordJogApp = (() => {
     //                     right: 5,
     //                     bottom: 3 }}}}})();
     //     const ShapeChartInput = {
-    //         Builder: {
-    //             forShape: (shape) => ShapeChart.Builder.forShape(shape).,
-    //             blank: () => }};
+    //         Builder: (() => {
+    //             const containerBuilder = () => SVGBuilder.g()
+    //                 .withClass("shape-chart-input");
+    //             forShape: (shape) => containerBuilder()
+    //                 .withChild(ShapeChart.Builder.forShape(shape).unfixed()),
+    //             blank: () => containerBuilder()
+    //                 .withChild(ShapeChart.Builder.blank())}};
     // ShapeFilterInput.Builder = (() => {
     //     const shapeFilterInput = SVGBuilder.g()
     //         .withClass('shape-filter-input')
