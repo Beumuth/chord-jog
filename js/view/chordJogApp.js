@@ -1171,12 +1171,16 @@ const ChordJogApp = (() => {
                             .withEventListener("mouseMove", function(e) {
                                 console.log(`fretboard ${e.clientX} ${e.offsetY}`);}))
                         .withChild(SVGBuilder.Rect  //fingerless-indicator-mouse-trap
-                            .withX(ShapeChart.FingerlessIndicator.Style.startX - ShapeChart.FingerlessIndicator.Style.radius)
-                            .withY(ShapeChart.FingerlessIndicator.Style.startY)
+                            .withX(ShapeChart.FingerlessIndicator.Style.startX -
+                                ShapeChart.FingerlessIndicator.Style.radius -
+                                mouseTrapPadding)
+                            .withY(ShapeChart.FingerlessIndicator.Style.startY - mouseTrapPadding)
                             .withWidth(ShapeChart.Fretboard.Style.width +
-                                ShapeChart.FingerlessIndicator.Style.diameter)
+                                ShapeChart.FingerlessIndicator.Style.diameter +
+                                2 * mouseTrapPadding)
                             .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                ShapeChart.FingerlessIndicator.Style.margin)
+                                ShapeChart.FingerlessIndicator.Style.margin +
+                                mouseTrapPadding)
                             .withClass("fingerless-indicators-mouse-trap")
                             .withAttributes({
                                 pointerEvents: "fill",
