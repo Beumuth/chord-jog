@@ -300,6 +300,12 @@ const ChordJogApp = (() => {
                     .withAttributes({
                         fill: Style.textColor,
                         fontFamily: Style.font,})}) }; })();
+    SVGBuilder.Rect.copy = (svgRect) => SVGBuilder.Rect
+        .withX(svgRect.x)
+        .withY(svgRect.y)
+        .withWidth(svgRect.width)
+        .withHeight(svgRect.height);
+
     //A Schema is an array of 6 StringActions
     const Shape = {
         fromString: (string) => string.split(";").map(StringActions.fromString),
@@ -805,26 +811,24 @@ const ChordJogApp = (() => {
         const FingerlessIndicator = {
             Style: {
                 radius: 5,
-                margin: 2 },
-            DeadString: {},
-            OpenString: {}};
+                margin: 2 }};
         FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
         FingerlessIndicator.Builder = (() => {
             const DeadStringBuilder = {
                 withCenter: (center) => SVGBuilder.Path
                     .withD(
                         `M
-                                ${center[0] - FingerlessIndicator.Style.radius * halfRoot2},
-                                ${center[1] - FingerlessIndicator.Style.radius * halfRoot2}
-                            l
-                                ${FingerlessIndicator.Style.diameter * halfRoot2},
-                                ${FingerlessIndicator.Style.diameter * halfRoot2}
-                            m
-                                0,
-                                ${-FingerlessIndicator.Style.diameter * halfRoot2}
-                            l
-                                ${-FingerlessIndicator.Style.diameter * halfRoot2},
-                                ${FingerlessIndicator.Style.diameter * halfRoot2}`)
+                            ${center[0] - FingerlessIndicator.Style.radius * halfRoot2},
+                            ${center[1] - FingerlessIndicator.Style.radius * halfRoot2}
+                        l
+                            ${FingerlessIndicator.Style.diameter * halfRoot2},
+                            ${FingerlessIndicator.Style.diameter * halfRoot2}
+                        m
+                            0,
+                            ${-FingerlessIndicator.Style.diameter * halfRoot2}
+                        l
+                            ${-FingerlessIndicator.Style.diameter * halfRoot2},
+                            ${FingerlessIndicator.Style.diameter * halfRoot2}`)
                     .withClass("dead-string-indicator")};
             const OpenStringBuilder = {
                 withCenter: (center) => SVGBuilder.Circle
@@ -885,6 +889,8 @@ const ChordJogApp = (() => {
                     FingerlessIndicator.Style.margin },
             stringToXCoordinate: (string) => Fretboard.Style.startX + (string - 1) * Fretboard.Style.stringSpacing,
             fretToYCoordinate: (fret) => Fretboard.Style.startY + (fret -.5) * Fretboard.Style.fretHeight};
+        Fretboard.Style.width = Fretboard.Style.stringSpacing * (Strings.count - 1);
+        Fretboard.Style.height = Fretboard.Style.fretHeight * Frets.Relative.count;
         Fretboard.stringFretToXY = (string, fret) => [
             Fretboard.stringToXCoordinate(string),
             Fretboard.fretToYCoordinate(fret)];
@@ -1088,9 +1094,7 @@ const ChordJogApp = (() => {
                     .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
                         .querySelector(".shape-chart-meat")
                         .replaceWith(Meat.Builder
-                            .forShape(Shape.fromString(shapeChangeEvent.shape))
-                            .active()
-                            .withPreview(shapeChangeEvent.shapeChart.preview === null)))),
+                            .forShape(Shape.fromString(shapeChangeEvent.shape))))),
                 {attributeFilter: ["data-shape"]})
             //data-r
             .withGetterAndSetter("r",
@@ -1121,6 +1125,16 @@ const ChordJogApp = (() => {
                     attributeOldValue: true});
         return {
             Meat: Meat,
+            Fretboard: {
+                Style: {
+                    x: Fretboard.Style.startX,
+                    y: Fretboard.Style.startY,
+                    stringSpacing: Fretboard.Style.stringSpacing,
+                    fretHeight: Fretboard.Style.fretHeight,
+                    width: Fretboard.Style.width,
+                    height: Fretboard.Style.height}},
+            FingerlessIndicator: {
+                Style: FingerlessIndicator.Style},
             Builder: (() => {
                 const fixednessStep = (shapeChart) => ({
                     fixed: (fret) => shapeChart
@@ -1135,31 +1149,53 @@ const ChordJogApp = (() => {
                 return {
                     blank: () => forShape(Shape.allUnsounded),
                     forShape: forShape };})()};})();
-    // const ShapeFilterInput = (() => {
-    //     const ShapeFilterInput = {
-    //         Style: {
-    //             ShapeChart: {
-    //                 margin : {
-    //                     right: 5,
-    //                     bottom: 3 }}}}})();
-    //     const ShapeChartInput = {
-    //         Builder: (() => {
-    //             const containerBuilder = () => SVGBuilder.g()
-    //                 .withClass("shape-chart-input");
-    //             forShape: (shape) => containerBuilder()
-    //                 .withChild(ShapeChart.Builder.forShape(shape).unfixed()),
-    //             blank: () => containerBuilder()
-    //                 .withChild(ShapeChart.Builder.blank())}};
-    // ShapeFilterInput.Builder = (() => {
-    //     const shapeFilterInput = SVGBuilder.g()
-    //         .withClass('shape-filter-input')
-    //     return {
-    //         forShapeFilter: (shapeFilter) => {
-    //
-    //         },
-    //         blank: () => {
-    //
-    //         }};})();
+    const ShapeFilterInput = (() => {
+        const ShapeInput = {
+            Builder: (() => {
+                const mouseTrapPadding = 3;
+                const builder = (shapeChart) =>
+                    SVGBuilder.g()
+                        .withClass("shape-chart-input")
+                        .withChild(shapeChart)
+                        .withChild(SVGBuilder.Rect  //fretboard-mouse-trap
+                            .withX(ShapeChart.Fretboard.Style.x - mouseTrapPadding)
+                            .withY(ShapeChart.Fretboard.Style.y - mouseTrapPadding)
+                            .withWidth(ShapeChart.Fretboard.Style.width + 2 * mouseTrapPadding)
+                            .withHeight(ShapeChart.Fretboard.Style.height + 2 * mouseTrapPadding)
+                            .withClass("fretboard-mouse-trap")
+                            .withAttributes({
+                                pointerEvents: "fill",
+                                cursor: "pointer",
+                                fill: "none",
+                                stroke: "none"})
+                            .withEventListener("mouseMove", function(e) {
+                                console.log(`fretboard ${e.clientX} ${e.offsetY}`);}))
+                        .withChild(SVGBuilder.Rect  //fingerless-indicator-mouse-trap
+                            .withX(ShapeChart.FingerlessIndicator.Style.startX - ShapeChart.FingerlessIndicator.Style.radius)
+                            .withY(ShapeChart.FingerlessIndicator.Style.startY)
+                            .withWidth(ShapeChart.Fretboard.Style.width +
+                                ShapeChart.FingerlessIndicator.Style.diameter)
+                            .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                ShapeChart.FingerlessIndicator.Style.margin)
+                            .withClass("fingerless-indicators-mouse-trap")
+                            .withAttributes({
+                                pointerEvents: "fill",
+                                cursor: "pointer",
+                                fill: "none",
+                                stroke: "none"})
+                            .withEventListener("mouseMove", function(e) {
+                                console.log(`fingerless ${e.clientX} ${e.offsetY}`);}));
+                return {
+                    forShape: (shape) => builder(ShapeChart.Builder.forShape(shape).unfixed()),
+                    blank: () => builder(ShapeChart.Builder.blank().unfixed())}; })()};
+        const ShapeFilterInputBuilder = {
+            forShapeFilter: (shapeFilter) => SVGBuilder.g()
+                .withClass("shape-filter-input")
+                .withChild(ShapeInput.Builder.forShape(shapeFilter.shape))};
+        ShapeFilterInputBuilder.blank = () => ShapeFilterInputBuilder.forShapeFilter(
+            ShapeFilter.create(Shape.allUnsounded, Frets.Range.full));
+        return {
+            Builder: ShapeFilterInputBuilder}; })();
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1171,10 +1207,6 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeChart.Builder
-                    .blank()
-                    .fixed(2)
-                /*ShapeChart.Builder
-                .forShape(Shape.fromString(";;23;23;23;o"))
-                .blank(2)*/)
+            .withChild(ShapeFilterInput.Builder.forShapeFilter(
+                ShapeFilter.create(Shape.fromString(";;23;23;23;o"), Frets.Range.create(1, 5))))
     };})();
