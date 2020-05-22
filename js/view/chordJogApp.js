@@ -122,6 +122,7 @@ const ChordJogApp = (() => {
     StringActions.isFingered = (stringAction) => ! StringActions.isFingerless(stringAction);
     StringActions.isDeadened = (stringAction) =>
         StringActions.isFingered(stringAction) && ! stringAction.sounded;
+    StringActions.equals = (a, b) => StringActions.toString(a) === StringActions.toString(b);
 
     const ObjectBuilder = (() => {
         const furtherOptions = {
@@ -1150,97 +1151,128 @@ const ChordJogApp = (() => {
                 return {
                     blank: () => forShape(Shape.allUnsounded),
                     forShape: forShape };})()};})();
-    const ShapeFilterInput = (() => {
-        const ShapeInput = (() => {
-            const FretboardMouseTrap = {Style: {padding: 3}};
-            FretboardMouseTrap.xCoordinateToString = (x) => Strings.all
-                .map(string => ({
-                    string: string,
-                    distanceXToMouse: Math.abs(x -
-                        FretboardMouseTrap.Style.padding -
-                        ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-                .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
-                .string;
-            FretboardMouseTrap.yCoordinateToFret = (y) => Frets.Relative.all
-                .map(fret => ({
-                    fret: fret,
-                    distanceYToMouse: Math.abs(y -
-                        FretboardMouseTrap.Style.padding -
-                        ShapeChart.Fretboard.Style.fretHeight * (fret - .5))}))
-                .reduce((a, b) => a.distanceYToMouse <= b.distanceYToMouse ? a : b)
-                .fret;
-            FretboardMouseTrap.create = () => SVGBuilder.Rect
-                .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
-                .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
-                .withWidth(ShapeChart.Fretboard.Style.width + 2 * FretboardMouseTrap.Style.padding)
-                .withHeight(ShapeChart.Fretboard.Style.height + 2 * FretboardMouseTrap.Style.padding)
-                .withClass("fretboard-mouse-trap")
-                .withAttributes({
-                    pointerEvents: "fill",
-                    cursor: "pointer",
-                    fill: "none",
-                    stroke: "none"});
-            return {
-                Builder: (() => {
-                    const builder = (shapeChart) => {
-                        const previewMeatContainer = SVGBuilder.g()
-                            .withClass("preview-meat-container")
-                            .withAttributes({
-                                display: "none",
-                                fillOpacity: .5,
-                                strokeOpacity: .5});
-                        const makePreview = (mouseX, mouseY) => {
-                            const activeShape = Shape.fromString(shapeChart.shape);
-                            const previewShape = activeShape.slice();
-                            const previewString = FretboardMouseTrap.xCoordinateToString(mouseX);
-                            const previewFret = FretboardMouseTrap.yCoordinateToFret(mouseY);
-                            const finger = Fingers.index.label; //todo
-                            const sounded = true; //todo
-                            previewShape[previewString - 1] = StringActions.fingered(previewFret, finger);
-                            return previewShape;}
-                        const shapeInput = SVGBuilder.g()
-                            .withClass("shape-input")
-                            .withChild(shapeChart)
-                            .withChild(previewMeatContainer)
-                            .withChild(FretboardMouseTrap.create()
-                                .withEventListeners({
-                                    mousemove: function(e) {
-                                        const activeShape = Shape.fromString(shapeChart.shape);
-                                        const previewShape = makePreview(e.offsetX, e.offsetY);
-                                        previewMeatContainer.innerHTML = "";
-                                        previewMeatContainer.withChild(ShapeChart.Meat.Builder.forShape(previewShape));
-                                        if(Shape.equals(activeShape, previewShape)) {
-                                            previewMeatContainer.withAttribute("display", "none");}
-                                        else {
-                                            previewMeatContainer.withoutAttribute("display");}},
-                                    mouseout: function() {previewMeatContainer.withAttribute("display", "none");},
-                                    mousedown: function(e) {
-                                        shapeChart.shape = makePreview(e.offsetX, e.offsetY);
-                                        previewMeatContainer.withAttribute("display", "none");}}))
-                            .withChild(SVGBuilder.Rect  //fingerless-indicator-mouse-trap
-                                .withX(ShapeChart.FingerlessIndicator.Style.startX -
-                                    ShapeChart.FingerlessIndicator.Style.radius -
-                                    FretboardMouseTrap.Style.padding)
-                                .withY(ShapeChart.FingerlessIndicator.Style.startY - FretboardMouseTrap.Style.padding)
-                                .withWidth(ShapeChart.Fretboard.Style.width +
-                                    ShapeChart.FingerlessIndicator.Style.diameter +
-                                    2 * FretboardMouseTrap.Style.padding)
-                                .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                    ShapeChart.FingerlessIndicator.Style.margin +
-                                    FretboardMouseTrap.Style.padding)
-                                .withClass("fingerless-indicators-mouse-trap")
-                                .withAttributes({
-                                    pointerEvents: "fill",
-                                    cursor: "pointer",
-                                    fill: "none",
-                                    stroke: "none"})
-                                .withEventListener("mouseMove", function(e) {
-                                    console.log(`fingerless ${e.offsetX} ${e.offsetY}`);}));
+    const ShapeInput = (() => {
+        const FretboardMouseTrap = {Style: {padding: 3}};
+        FretboardMouseTrap.xCoordinateToString = (x) => Strings.all
+            .map(string => ({
+                string: string,
+                distanceXToMouse: Math.abs(x -
+                    FretboardMouseTrap.Style.padding -
+                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
+            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
+            .string;
+        FretboardMouseTrap.yCoordinateToFret = (y) => Frets.Relative.all
+            .map(fret => ({
+                fret: fret,
+                distanceYToMouse: Math.abs(y -
+                    FretboardMouseTrap.Style.padding -
+                    ShapeChart.Fretboard.Style.fretHeight * (fret - .5))}))
+            .reduce((a, b) => a.distanceYToMouse <= b.distanceYToMouse ? a : b)
+            .fret;
+        FretboardMouseTrap.create = () => SVGBuilder.Rect
+            .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
+            .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
+            .withWidth(ShapeChart.Fretboard.Style.width + 2 * FretboardMouseTrap.Style.padding)
+            .withHeight(ShapeChart.Fretboard.Style.height + 2 * FretboardMouseTrap.Style.padding)
+            .withClass("fretboard-mouse-trap")
+            .withAttributes({
+                pointerEvents: "fill",
+                cursor: "pointer",
+                fill: "none",
+                stroke: "none"});
+        return {
+            Builder: (() => {
+                const builder = (shapeChart) => {
+                    const previewMeatContainer = SVGBuilder.g()
+                        .withClass("preview-meat-container")
+                        .withAttributes({
+                            display: "none",
+                            fillOpacity: .5,
+                            strokeOpacity: .5});
+                    const makePreview = (mouseX, mouseY) => {
+                        const activeShape = Shape.fromString(shapeChart.shape);
+                        const previewShape = activeShape.slice();
+                        const previewString = FretboardMouseTrap.xCoordinateToString(mouseX);
+                        const previewFret = FretboardMouseTrap.yCoordinateToFret(mouseY);
+                        const finger = Fingers.ring.label; //todo
+                        const sounded = true; //todo
+                        previewShape[previewString - 1] = StringActions.fingered(previewFret, finger);
 
-                            return shapeInput; }
-                    return {
-                        forShape: (shape) => builder(ShapeChart.Builder.forShape(shape).unfixed()),
-                        blank: () => builder(ShapeChart.Builder.blank().unfixed())}; })()};})();
+                        //Does the preview involve a finger bar spanning more than 2 strings?
+                        let previewFingerBarRange = previewShape
+                            .map((stringAction, string) => ({
+                                string: string + 1,
+                                action: stringAction}))
+                            .filter(stringAction =>         //Get fingered string actions with same finger an fret
+                                StringActions.isFingered(stringAction.action) &&
+                                stringAction.action.finger === finger &&
+                                stringAction.action.fret === previewFret)
+                            .reduce((a, b) => undefined !== a.string ?
+                                {min: a.string, max: b.string} :
+                                {min: a.min, max: b.string});
+                        if(previewFingerBarRange.max - previewFingerBarRange.min >= 2) {
+                            //There is a finger bar spanning more than 2 strings involved in the preview. Get the range
+                            _.range(    //The first and the last will never need to be corrected. Exclude them.
+                                previewFingerBarRange.min + 1,
+                                previewFingerBarRange.max)
+                            .filter(string =>   //Only include
+                                StringActions.isFingerless(previewShape[string - 1]) || //fingerless string actions or
+                                previewShape[string - 1].fret < previewFret) //fingered with fret < previewFret
+                            .forEach(string => //Replace it with the finger bar string action in the previewShape
+                                previewShape[string - 1] = StringActions.fingered(previewFret, finger))}
+                        return previewShape; };
+                    const showPreview = () => {
+                        previewMeatContainer.withoutAttribute("display");
+                        shapeChart.querySelector(".shape-chart-meat").withAttributes({
+                            fillOpacity: .5,
+                            strokeOpacity: .5})};
+                    const hidePreview = () => {
+                        previewMeatContainer.withAttribute("display", "none");
+                        shapeChart.querySelector(".shape-chart-meat").withoutAttributes(
+                            ["fill-opacity", "stroke-opacity"]);};
+                    return SVGBuilder.g()
+                        .withClass("shape-input")
+                        .withChild(shapeChart)
+                        .withChild(previewMeatContainer)
+                        .withChild(FretboardMouseTrap.create()
+                            .withEventListeners({
+                                mousemove: function(e) {
+                                    const activeShape = Shape.fromString(shapeChart.shape);
+                                    const previewShape = makePreview(e.offsetX, e.offsetY);
+                                    previewMeatContainer.innerHTML = "";
+                                    previewMeatContainer.withChild(ShapeChart.Meat.Builder.forShape(previewShape));
+                                    if(Shape.equals(activeShape, previewShape)) {
+                                        hidePreview();}
+                                    else { showPreview();}},
+                                mouseout: function() { hidePreview(); },
+                                mousedown: function(e) {
+                                    shapeChart.shape = makePreview(e.offsetX, e.offsetY);
+                                    hidePreview();}}))
+                        .withChild(SVGBuilder.Rect  //fingerless-indicator-mouse-trap
+                            .withX(ShapeChart.FingerlessIndicator.Style.startX -
+                                ShapeChart.FingerlessIndicator.Style.radius -
+                                FretboardMouseTrap.Style.padding)
+                            .withY(ShapeChart.FingerlessIndicator.Style.startY - FretboardMouseTrap.Style.padding)
+                            .withWidth(ShapeChart.Fretboard.Style.width +
+                                ShapeChart.FingerlessIndicator.Style.diameter +
+                                2 * FretboardMouseTrap.Style.padding)
+                            .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                ShapeChart.FingerlessIndicator.Style.margin +
+                                FretboardMouseTrap.Style.padding)
+                            .withClass("fingerless-indicators-mouse-trap")
+                            .withAttributes({
+                                pointerEvents: "fill",
+                                cursor: "pointer",
+                                fill: "none",
+                                stroke: "none"})
+                            .withEventListener("mouseMove", function(e) {
+                                console.log(`fingerless ${e.offsetX} ${e.offsetY}`);}));}
+                return {
+                    forShape: (shape) => builder(ShapeChart.Builder.forShape(shape).unfixed()),
+                    blank: () => builder(ShapeChart.Builder.blank().unfixed())}; })()};})();
+
+    /*
+    const ShapeFilterInput = (() => {
         const ShapeFilterInputBuilder = {
             forShapeFilter: (shapeFilter) => SVGBuilder.g()
                 .withClass("shape-filter-input")
@@ -1249,6 +1281,7 @@ const ChordJogApp = (() => {
             ShapeFilter.create(Shape.allUnsounded, Frets.Range.full));
         return {
             Builder: ShapeFilterInputBuilder}; })();
+     */
     return {
         create: () => SVGBuilder.SVG
             .withWidth(250)
@@ -1260,6 +1293,5 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeFilterInput.Builder.forShapeFilter(
-                ShapeFilter.create(Shape.fromString(";;;11;23;o"), Frets.Range.create(1, 5))))
+            .withChild(ShapeInput.Builder.forShape(Shape.fromString(";;;11;23;o")))
     };})();
