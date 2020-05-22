@@ -1086,6 +1086,7 @@ const ChordJogApp = (() => {
             .withClass("shape-chart")
             .disableTextSelection()
             .withChild(skeletonBuilder())
+            //data-shape
             .withGetterAndSetter("shape",
                 function() { return this.dataset.shape; },
                 function(shape) { this.dataset.shape = shape; })
@@ -1246,7 +1247,7 @@ const ChordJogApp = (() => {
                                     else { showPreview();}},
                                 mouseout: function() { hidePreview(); },
                                 mousedown: function(e) {
-                                    shapeChart.shape = makePreview(e.offsetX, e.offsetY);
+                                    shapeChart.shape = Shape.toString(makePreview(e.offsetX, e.offsetY));
                                     hidePreview();}}))
                         .withChild(SVGBuilder.Rect  //fingerless-indicator-mouse-trap
                             .withX(ShapeChart.FingerlessIndicator.Style.startX -
@@ -1293,5 +1294,5 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeInput.Builder.forShape(Shape.fromString(";;;11;23;o")))
+            .withChild(ShapeInput.Builder.forShape(Shape.fromString(";;11;11;23;o")))
     };})();
