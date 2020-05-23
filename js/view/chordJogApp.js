@@ -124,49 +124,56 @@ const ChordJogApp = (() => {
         StringActions.isFingered(stringAction) && ! stringAction.sounded;
     StringActions.equals = (a, b) => StringActions.toString(a) === StringActions.toString(b);
 
-    const ObjectBuilder = (() => {
-        const furtherOptions = {
-            withGetter: function(key, getter) {
-                Object.defineProperty(this, key, {get: getter});
-                return this; },
-            withSetter: function(key, setter) {
-                Object.defineProperty(this, key, {set: setter});
-                return this; },
-            withGetterAndSetter: function(key, getter, setter) {
-                Object.defineProperty(this, key, {
-                    get: getter,
-                    set: setter});
-                return this; },
-            withFields(fields) {
-                Object.keys(fields).forEach(key => this[key] = fields[key]);
-                return this;},
-            withProperty: function (key, property) {
-                Object.defineProperty(this, key, property);
-                return this; },
-            withProperties: function(properties) {
-                Object.defineProperties(this, properties);
-                return this},
-            withMutation: function(mutation) {
-                mutation(this);
-                return this; },
-            withMutations: function(mutations) {
-                mutations.forEach(mutation => mutation.bind(this)());
-                return this; },
-            withMethod: function(name, method) {
-                this[name] = method.bind(this);
-                return this; },
-            withMethods: function(methods) {
-                Object.keys(methods).forEach(key =>
-                    this[key] = methods[key].bind(this));
-                return this; },
-            merge: (other) => {
-                _.merge(this, other);
-                return this; } };
-        return {
-            fromScratch: () => furtherOptions,
-            fromExisting: (existing) => {
-                _.merge(existing, furtherOptions);
-                return existing; }}; })();
+    const Objects = {
+        changeFieldAndReturn: (object, key, value) => {
+            object[key] = value;
+            return object;},
+        Builder: (() => {
+            const furtherOptions = {
+                withGetter: function(key, getter) {
+                    Object.defineProperty(this, key, {get: getter});
+                    return this; },
+                withSetter: function(key, setter) {
+                    Object.defineProperty(this, key, {set: setter});
+                    return this; },
+                withGetterAndSetter: function(key, getter, setter) {
+                    Object.defineProperty(this, key, {
+                        get: getter,
+                        set: setter});
+                    return this; },
+                withField(field, value=undefined) {
+                  this[field] = value;
+                  return this;},
+                withFields(fields) {
+                    Object.keys(fields).forEach(key => this[key] = fields[key]);
+                    return this;},
+                withProperty: function (key, property) {
+                    Object.defineProperty(this, key, property);
+                    return this; },
+                withProperties: function(properties) {
+                    Object.defineProperties(this, properties);
+                    return this},
+                withMutation: function(mutation) {
+                    mutation(this);
+                    return this; },
+                withMutations: function(mutations) {
+                    mutations.forEach(mutation => mutation.bind(this)());
+                    return this; },
+                withMethod: function(name, method) {
+                    this[name] = method.bind(this);
+                    return this; },
+                withMethods: function(methods) {
+                    Object.keys(methods).forEach(key =>
+                        this[key] = methods[key].bind(this));
+                    return this; },
+                merge: (other) => {
+                    _.merge(this, other);
+                    return this; } };
+            return {
+                fromScratch: () => furtherOptions,
+                fromExisting: (existing) => {
+                    _.merge(existing, furtherOptions);
+                    return existing; }}; })()};
 
     const SVGBuilder = (() => {
         const dashifyAttributeName = (name) =>
@@ -177,7 +184,7 @@ const ChordJogApp = (() => {
                     name.charAt(charIndex)))
                 .join("");
         const createElement = function(tagName) {
-            return ObjectBuilder
+            return Objects.Builder
                 .fromExisting(
                     document.createElementNS("http://www.w3.org/2000/svg", tagName))
                 .withMethods({
@@ -1060,26 +1067,26 @@ const ChordJogApp = (() => {
                         .withChildren(activeStringActions
                             //Filter out open strings
                             .filter(stringAction => stringAction.action !== StringActions.open)
-                            //Map to {finger, fret, string} objects
-                            .map(stringAction => ({
-                                finger: stringAction.action.finger,
-                                fret: stringAction.action.fret,
-                                string: stringAction.string }))
-                            //Merge objects with same finger and fret into a FingerAction object
-                            .reduce((fingerActions, current, i, source) => fingerActions.some((existing) =>
-                                FingerActions.sameFingerAndFret(existing, current)) ?
-                                    fingerActions :
-                                    fingerActions.concat([
-                                        FingerActions.Builder
-                                            .withFinger(current.finger)
-                                            .atFret(current.fret)
-                                            .fromString(current.string)
-                                            .toString(_.findLast(
-                                                source,
-                                                (existing) => FingerActions.sameFingerAndFret(existing, current)
-                                            ).string)]),
+                            //Convert to finger actions, merging string-adjacent ones with the same finger and fret
+                            .reduce((() => {
+                                const stringActionToFingerAction = (stringAction) => FingerActions.Builder
+                                    .withFinger(stringAction.action.finger)
+                                    .atFret(stringAction.action.fret)
+                                    .fromString(stringAction.string)
+                                    .toString(stringAction.string);
+                                return (fingerActions, stringAction) =>
+                                    fingerActions.length === 0 ?
+                                    [stringActionToFingerAction(stringAction)] : (() => {
+                                        const previous = _.last(fingerActions);
+                                        return FingerActions.sameFingerAndFret(previous, stringAction.action) ?
+                                            fingerActions
+                                                .slice(0, -1)
+                                                .concat(Objects.changeFieldAndReturn(previous, "range", {
+                                                    min: previous.range.min,
+                                                    max: previous.range.max + 1})) :
+                                            fingerActions.concat(stringActionToFingerAction(stringAction));})();})(),
                                 [])
-                            .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)));}}};
+                            .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forShape(Shape.allUnsounded);
         const containerBuilder = () => SVGBuilder
             .g()
