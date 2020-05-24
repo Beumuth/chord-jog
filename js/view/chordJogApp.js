@@ -1021,11 +1021,11 @@ const ChordJogApp = (() => {
                     const maxFret = fingeredStringActions.length === 0 ? undefined : fingeredStringActions
                         .map(stringAction => stringAction.fret)
                         .reduce((a, b) => a >= b ? a : b);
-                    const activeStringActions = _.range(0, Strings.count)
-                        .filter(stringIndex => shape[stringIndex] !== StringActions.unsounded)
-                        .map(stringIndex => ({
-                            string: stringIndex + 1,
-                            action: shape[stringIndex]}));
+                    const activeStringActions = shape
+                        .map((action, index) => ({
+                            string: index + 1,
+                            action: action}))
+                        .filter(stringAction => stringAction.action !== StringActions.unsounded);
                     const meat = SVGBuilder
                         .g()
                         .withAttribute("stroke", Style.colors.heavy)
@@ -1078,13 +1078,14 @@ const ChordJogApp = (() => {
                                     fingerActions.length === 0 ?
                                     [stringActionToFingerAction(stringAction)] : (() => {
                                         const previous = _.last(fingerActions);
-                                        return FingerActions.sameFingerAndFret(previous, stringAction.action) ?
-                                            fingerActions
-                                                .slice(0, -1)
-                                                .concat(Objects.changeFieldAndReturn(previous, "range", {
-                                                    min: previous.range.min,
-                                                    max: previous.range.max + 1})) :
-                                            fingerActions.concat(stringActionToFingerAction(stringAction));})();})(),
+                                        return 1 === stringAction.string - previous.range.max &&
+                                            FingerActions.sameFingerAndFret(previous, stringAction.action) ?
+                                                fingerActions
+                                                    .slice(0, -1)
+                                                    .concat(Objects.changeFieldAndReturn(previous, "range", {
+                                                        min: previous.range.min,
+                                                        max: previous.range.max + 1})) :
+                                                fingerActions.concat(stringActionToFingerAction(stringAction));})();})(),
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forShape(Shape.allUnsounded);
@@ -1207,8 +1208,8 @@ const ChordJogApp = (() => {
                                 fill: "none",
                                 stroke: "none"})
                             .withDataAttribute("preview", shapeChart.shape)
-                            .withEventListeners({
-                                mousemove: function(e) {
+                            .withEventListeners((() => {
+                                const setPreviewFromMouseEvent = (e) => {
                                     shapeChart.preview = Shape.toString((() => {
                                         const previewShape = Shape.fromString(shapeChart.shape).slice();
                                         const previewString = FretboardMouseTrap.xCoordinateToString(e.offsetX);
@@ -1220,9 +1221,9 @@ const ChordJogApp = (() => {
                                             currentAction.finger !== finger ||
                                             currentAction.fret !== previewFret ?
                                                 StringActions.fingered(previewFret, finger) :
-                                            currentAction.sounded === true ?
-                                                StringActions.deadened(previewFret, finger) :
-                                            StringActions.unsounded;
+                                                currentAction.sounded === true ?
+                                                    StringActions.deadened(previewFret, finger) :
+                                                    StringActions.unsounded;
                                         return previewShape[previewString - 1] === StringActions.unsounded ?
                                             previewShape : (() => {
                                                 //Does the preview involve a finger bar spanning more than 2 strings?
@@ -1247,11 +1248,18 @@ const ChordJogApp = (() => {
                                                             previewShape[string - 1].fret < previewFret)
                                                         .forEach(string => previewShape[string - 1] =
                                                             StringActions.fingered(previewFret, finger))}
-                                                return previewShape;})();})());},
-                                mouseout: function() { previewMeatContainer.hide(); },
-                                mousedown: function(e) {
-                                    shapeChart.shape = shapeChart.preview;
-                                    previewMeatContainer.hide();}}),
+                                                return previewShape;
+                                    })();})())};
+                                return {
+                                    mouseenter: () => previewMeatContainer.show(),
+                                    mousemove: setPreviewFromMouseEvent,
+                                    mousedown: () => {
+                                        shapeChart.shape = shapeChart.preview;
+                                        previewMeatContainer.hide();},
+                                    mouseup: (e) => {
+                                        previewMeatContainer.show();
+                                        setPreviewFromMouseEvent(e);},
+                                    mouseout: () => previewMeatContainer.hide()}; })()),
                         FingerlessIndicators: SVGBuilder.Rect
                             .withX(ShapeChart.FingerlessIndicator.Style.startX -
                                 ShapeChart.FingerlessIndicator.Style.radius -
@@ -1271,21 +1279,21 @@ const ChordJogApp = (() => {
                                 fill: "none",
                                 stroke: "none"})
                             .withEventListeners({
-                                mousemove: function(e) {
-                                    const activeShape = Shape.fromString(shapeChart.shape);
-                                    const previewShape = (() => {
-                                        const activeShape = Shape.fromString(shapeChart.shape);
-                                        const previewShape = activeShape.slice();
-                                        const previewString = FingerlessIndicatorMouseTrap.xCoordinateToString(e.offsetX);
-                                        previewShape[previewString - 1] = (() => {
-                                            const previousStringAction = activeShape[previewString - 1];
-                                            return previousStringAction === StringActions.unsounded ? StringActions.open :
-                                                previousStringAction.sounded === true ?
-                                                    StringActions.deadened(
-                                                        previousStringAction.fret, previousStringAction.finger) :
-                                                    StringActions.unsounded;})();
-                                        return previewShape; })();
-                                    shapeChart.preview = Shape.toString(previewShape);
+                                mousemove: (e) => {
+                                    shapeChart.preview = Shape.toString(
+                                        (() => {
+                                            const activeShape = Shape.fromString(shapeChart.shape);
+                                            const previewShape = activeShape.slice();
+                                            const previewString = FingerlessIndicatorMouseTrap.xCoordinateToString(e.offsetX);
+                                            previewShape[previewString - 1] = (() => {
+                                                const previousStringAction = activeShape[previewString - 1];
+                                                return previousStringAction === StringActions.unsounded ? StringActions.open :
+                                                    previousStringAction.sounded === true ?
+                                                        StringActions.deadened(
+                                                            previousStringAction.fret, previousStringAction.finger) :
+                                                        StringActions.unsounded;})();
+                                            return previewShape; })()
+                                    );
                                 },
                                 mouseout: function() { previewMeatContainer.hide(); },
                                 mousedown: function(e) {
