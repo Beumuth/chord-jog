@@ -1261,7 +1261,7 @@ const ChordJogApp = (() => {
                                                 StringActions.isFingerless(dragAction) ?
                                                     dragAction :
                                                 dragAction.sounded === true ?
-                                                    StringActions.fingered(previewFret, ) :
+                                                    StringActions.fingered(previewFret, previewFinger) :
                                                     StringActions.deadened(previewFret, previewFinger)) :
                                             StringActions.isFingerless(currentAction) ||
                                             currentAction.finger !== previewFinger ||
