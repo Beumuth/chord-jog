@@ -872,7 +872,7 @@ const ChordJogApp = (() => {
                                         .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};})();
         const ShapeChartStyle = {
             padding: {
-                x: 20,
+                x: 30,
                 y: Style.stroke.halfWidth + FingerlessIndicator.Style.radius } };
         const FingerActions = {
             Builder: {
@@ -957,23 +957,14 @@ const ChordJogApp = (() => {
         const RootFretLabel = {
             Style: {
                 fontSize: 15,
-                fontFamily: "monospace" },
-            adjustText: (rootFretLabel) => {
-                let rootFretLabelPadding = rootFretLabel.textContent.length = 5;
-                if(rootFretLabel.textContent.length > 1) {
-                    rootFretLabelPadding = 4;
-                    rootFretLabel.withTextLength(17);
-                } else {
-                    rootFretLabel.removeAttribute("textLength");
-                }
-                rootFretLabel.withAttribute("x", Fretboard.stringToXCoordinate(1) - rootFretLabelPadding); } };
+                fontFamily: "monospace" }};
         RootFretLabel.Builder = (() => {
             const forText = (text) => {
                 const label = SVGBuilder.Text
                     .withTextContent(text)
                     .withClass("r-label")
                     .withAttributes({
-                        x: Fretboard.stringToXCoordinate(1) - (text.length <= 1 ? 5 : 4),
+                        x: Fretboard.stringToXCoordinate(1) - FingerIndicator.Style.radius - 2,
                         y: Fretboard.fretToYCoordinate(Frets.Relative.first),
                         dominantBaseline: "central",
                         textAnchor: "end",
@@ -1126,11 +1117,9 @@ const ChordJogApp = (() => {
                         .forEach(rChangeEvent => {
                             const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
                             if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
-                                rootLabel.textContent = "r";
-                                RootFretLabel.adjustText(rootLabel);}
+                                rootLabel.textContent = "r";}
                             else if(isValidR(rChangeEvent.r)) {
-                                rootLabel.textContent = rChangeEvent.r;
-                                RootFretLabel.adjustText(rootLabel);}
+                                rootLabel.textContent = rChangeEvent.r;}
                             else {
                                 rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))})(),
                 {
