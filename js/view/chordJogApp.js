@@ -1,8 +1,7 @@
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
-            width: 1
-        },
+            width: 1},
         colors: {
             black: "#000000",
             superHeavy: "#202020",
@@ -10,12 +9,61 @@ const ChordJogApp = (() => {
             medium: "#909090",
             light: "#A0A0A0",
             superLight: "#F6F6F6",
-            white: "#FFFFFF"
-        }
-    };
+            white: "#ffffff"}};
     Style.stroke.halfWidth = Style.stroke.width * .5;
     Style.textColor = Style.colors.heavy;
     Style.font = "Helvetica";
+
+    const Objects = {
+        changeFieldAndReturn: (object, key, value) => {
+            object[key] = value;
+            return object;},
+        Builder: (() => {
+            const furtherOptions = {
+                withGetter: function(key, getter) {
+                    Object.defineProperty(this, key, {get: getter});
+                    return this; },
+                withSetter: function(key, setter) {
+                    Object.defineProperty(this, key, {set: setter});
+                    return this; },
+                withGetterAndSetter: function(key, getter, setter) {
+                    Object.defineProperty(this, key, {
+                        get: getter,
+                        set: setter});
+                    return this; },
+                withField(field, value=undefined) {
+                    this[field] = value;
+                    return this;},
+                withFields(fields) {
+                    Object.keys(fields).forEach(key => this[key] = fields[key]);
+                    return this;},
+                withProperty: function (key, property) {
+                    Object.defineProperty(this, key, property);
+                    return this; },
+                withProperties: function(properties) {
+                    Object.defineProperties(this, properties);
+                    return this},
+                withMutation: function(mutation) {
+                    mutation(this);
+                    return this; },
+                withMutations: function(mutations) {
+                    mutations.forEach(mutation => mutation.bind(this)());
+                    return this; },
+                withMethod: function(name, method) {
+                    this[name] = method.bind(this);
+                    return this; },
+                withMethods: function(methods) {
+                    Object.keys(methods).forEach(key =>
+                        this[key] = methods[key].bind(this));
+                    return this; },
+                merge: (other) => {
+                    _.merge(this, other);
+                    return this; } };
+            return {
+                fromScratch: () => furtherOptions,
+                fromExisting: (existing) => {
+                    _.merge(existing, furtherOptions);
+                    return existing; }}; })()};
 
     const Geometry = {
         distance2: (a, b) =>
@@ -29,6 +77,18 @@ const ChordJogApp = (() => {
                 k = _.clamp((px*ux + py*uy) / (ux*ux + uy*uy), 0, 1)
             //proj(p, u) = k*u
             return [segment[0][0] + k * ux, segment[0][1] + k * uy]; }};
+
+    const AffineTransformations = {
+        Builder: ({
+            fromABCDEFArray: (arr) => [
+                [arr[0], arr[1], arr[2]],
+                [arr[3], arr[4], arr[5]],
+                [0, 0, 1]]}),
+        multiply: (A,B) => A.map((ai) =>
+           _.range(0, B[0].length).map(j =>
+               ai.reduce((sum, Aik, k) => sum + Aik * B[k][j], 0)))};
+    AffineTransformations.Builder.identity = () => ((identity) => identity.slice())(
+        AffineTransformations.Builder.fromABCDEFArray([1,0,0,0,1,0]));
 
     const Strings = {
         count: 6,
@@ -124,57 +184,6 @@ const ChordJogApp = (() => {
     StringActions.isDeadened = (stringAction) =>
         StringActions.isFingered(stringAction) && ! stringAction.sounded;
     StringActions.equals = (a, b) => StringActions.toString(a) === StringActions.toString(b);
-
-    const Objects = {
-        changeFieldAndReturn: (object, key, value) => {
-            object[key] = value;
-            return object;},
-        Builder: (() => {
-            const furtherOptions = {
-                withGetter: function(key, getter) {
-                    Object.defineProperty(this, key, {get: getter});
-                    return this; },
-                withSetter: function(key, setter) {
-                    Object.defineProperty(this, key, {set: setter});
-                    return this; },
-                withGetterAndSetter: function(key, getter, setter) {
-                    Object.defineProperty(this, key, {
-                        get: getter,
-                        set: setter});
-                    return this; },
-                withField(field, value=undefined) {
-                  this[field] = value;
-                  return this;},
-                withFields(fields) {
-                    Object.keys(fields).forEach(key => this[key] = fields[key]);
-                    return this;},
-                withProperty: function (key, property) {
-                    Object.defineProperty(this, key, property);
-                    return this; },
-                withProperties: function(properties) {
-                    Object.defineProperties(this, properties);
-                    return this},
-                withMutation: function(mutation) {
-                    mutation(this);
-                    return this; },
-                withMutations: function(mutations) {
-                    mutations.forEach(mutation => mutation.bind(this)());
-                    return this; },
-                withMethod: function(name, method) {
-                    this[name] = method.bind(this);
-                    return this; },
-                withMethods: function(methods) {
-                    Object.keys(methods).forEach(key =>
-                        this[key] = methods[key].bind(this));
-                    return this; },
-                merge: (other) => {
-                    _.merge(this, other);
-                    return this; } };
-            return {
-                fromScratch: () => furtherOptions,
-                fromExisting: (existing) => {
-                    _.merge(existing, furtherOptions);
-                    return existing; }}; })()};
 
     const SVGBuilder = (() => {
         const dashifyAttributeName = (name) =>
