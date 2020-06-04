@@ -78,17 +78,30 @@ const ChordJogApp = (() => {
             //proj(p, u) = k*u
             return [segment[0][0] + k * ux, segment[0][1] + k * uy]; }};
 
-    const AffineTransformations = {
-        Builder: ({
-            fromABCDEFArray: (arr) => [
-                [arr[0], arr[1], arr[2]],
-                [arr[3], arr[4], arr[5]],
-                [0, 0, 1]]}),
-        multiply: (A,B) => A.map((ai) =>
-           _.range(0, B[0].length).map(j =>
-               ai.reduce((sum, Aik, k) => sum + Aik * B[k][j], 0)))};
-    AffineTransformations.Builder.identity = () => ((identity) => identity.slice())(
-        AffineTransformations.Builder.fromABCDEFArray([1,0,0,0,1,0]));
+    const AffineTransformations = (() => {  //for 2d space
+        const indices = [0, 1, 2];
+        const AffineTransformations = {
+            fromABCDEF: (a,b,c,d,e,f) => [[a,b,c],[d,e,f],[0, 0, 1]],
+            transform: (T, x) => ((x1=x.concat(1)) =>
+                indices.map((i) =>
+                    indices.reduce(
+                        (sum, j) => sum + T[i][j] * x1[j],
+                        0)))()
+                .slice(0,2),
+            compose: (A, B) => indices.map((i) =>
+                indices.map((j) =>
+                    indices.reduce(
+                        (sum, k) => sum + A[i][k] * B[k][j],
+                        0)))};
+        AffineTransformations.identity = () => (
+            (identity=AffineTransformations.fromABCDEF(1,0,0,0,1,0)) => identity.slice())();
+        AffineTransformations.reflection = () => (
+            (reflection=AffineTransformations.fromABCDEF(-1,0,0,0,1,0)) => reflection.slice())();
+        AffineTransformations.translation = (x,y) => AffineTransformations.fromABCDEF(1,0,x,0,1,y);
+        AffineTransformations.scale = (sx, sy=sx) => AffineTransformations.fromABCDEF(sx,0,0,0,sy,0);
+        AffineTransformations.rotation = (theta) => ((cos=Math.cos(theta), sin=Math.sin(theta)) =>
+            AffineTransformations.fromABCDEF(cos,-sin,0,sin,cos,0,0,0,1))();
+        return AffineTransformations;})();
 
     const Strings = {
         count: 6,
