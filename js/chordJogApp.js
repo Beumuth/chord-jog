@@ -65,6 +65,11 @@ const ChordJogApp = (() => {
                     _.merge(existing, furtherOptions);
                     return existing; }}; })()};
 
+    const Arrays = {
+        updateItem: (array, index, modification) => {
+            modification(array[index]);
+            return array;}}
+
     const Geometry = {
         distance2: (a, b) =>
             Math.pow(a[0] - b[0], 2) +
@@ -1089,25 +1094,23 @@ const ChordJogApp = (() => {
                         .withChildren(activeStringActions
                             //Filter out open strings
                             .filter(stringAction => stringAction.action !== StringActions.open)
-                            //Convert to finger actions, merging string-adjacent ones with the same finger and fret
-                            .reduce((() => {
-                                const stringActionToFingerAction = (stringAction) => FingerActions.Builder
+                            //Convert to finger actions, merging ones with the same finger and fret
+                            .reduce(
+                                ((stringActionToFingerAction = (stringAction) => FingerActions.Builder
                                     .withFinger(stringAction.action.finger)
                                     .atFret(stringAction.action.fret)
                                     .fromString(stringAction.string)
-                                    .toString(stringAction.string);
-                                return (fingerActions, stringAction) =>
-                                    fingerActions.length === 0 ?
-                                    [stringActionToFingerAction(stringAction)] : (() => {
-                                        const previous = _.last(fingerActions);
-                                        return 1 === stringAction.string - previous.range.max &&
-                                            FingerActions.sameFingerAndFret(previous, stringAction.action) ?
-                                                fingerActions
-                                                    .slice(0, -1)
-                                                    .concat(Objects.changeFieldAndReturn(previous, "range", {
-                                                        min: previous.range.min,
-                                                        max: previous.range.max + 1})) :
-                                                fingerActions.concat(stringActionToFingerAction(stringAction));})();})(),
+                                    .toString(stringAction.string)
+                                ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
+                                    [stringActionToFingerAction(stringAction)] :
+                                    ((indexMatchingFingerAction=fingerActions.findIndex(fingerAction =>
+                                        FingerActions.sameFingerAndFret(fingerAction, stringAction.action))) =>
+                                        indexMatchingFingerAction === -1 ?
+                                            fingerActions.concat(stringActionToFingerAction(stringAction)) :
+                                            Arrays.updateItem(
+                                                fingerActions,
+                                                indexMatchingFingerAction,
+                                                (fingerAction) => fingerAction.range.max = stringAction.string))())(),
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forShape(Shape.allUnsounded);
