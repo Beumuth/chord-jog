@@ -1,3 +1,11 @@
+/*
+ * TODO
+ *      FingerSelect's linesegment hitboxes need to be hidden children in order for scaling to take effect
+ *      Add MouseTrap to SVGBuilder (MouseTrap.for().withPadding())
+ *          Use MouseTrap for finger-select
+ *      Add withAttributeChangeListener to SVG.Builder.createElement to wrap mutation observers
+ */
+
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -268,7 +276,45 @@ const ChordJogApp = (() => {
                     disableTextSelection: function() {
                         ["webkitUserSelect", "mozUserSelect", "msUserSelect", "userSelect"]
                             .forEach(selectAttribute => this.style[selectAttribute] = "none");
-                        return this; }})};
+                        return this; }})
+                .withMethods((() => {
+                    const updateTransform = (element, transformKey, updater) => {
+                        const transformAttribute = element.getAttribute("transform");
+                        if(transformAttribute === null) {   //Does the element have a transform attribute?
+                            //No. Add it.
+                            element.setAttribute("transform", `${transformKey}(${updater().join()})`);
+                            return;}
+                        const indexTransform = transformAttribute.lastIndexOf(transformKey);
+                        if(indexTransform === -1) { //Does the transform attribute include a matching transform type?
+                            //No. Create and append a transform of the given type the to attribute
+                            element.setAttribute("transform",
+                                transformAttribute + `${transformKey}(${updater().join()})`);
+                            return;
+                        }
+                        //Transform of the given type does exist.
+                        //Replace the transform attribute with its arguments updated.
+                        const indexArgsStart = indexTransform + "translate(".length;
+                        const indexArgsEnd = transformAttribute.indexOf(")", indexArgsStart);
+                        const transformArgs = transformAttribute
+                            .substring(indexArgsStart, indexArgsEnd)
+                            .split(",")
+                            .map(arg => Number.parseFloat(arg.trim()));
+                        element.setAttribute("transform",
+                            transformAttribute.slice(0, indexArgsStart) +
+                            updater(...transformArgs).join() +
+                            transformAttribute.slice(indexArgsEnd));};
+                    return {
+                        move: function(x, y) {
+                            updateTransform(this, "translate",
+                                (currentX=0, currentY=0) => [currentX+x, currentY+y]);
+                            return this;},
+                        moveTo: function(x, y) {
+                            const boundingClientRect = this.getBoundingClientRect();
+                            return this.move(x - boundingClientRect.x, y - boundingClientRect.y);},
+                        scale: function(scaleX, scaleY=scaleX) {
+                            updateTransform(this, "scale",
+                                (currentScaleX=0, currentScaleY=0) => [currentScaleX+scaleX, currentScaleY+scaleY]);
+                            return this;}};})());};
         return {
             element: createElement,
             g: () => createElement("g"),
@@ -465,18 +511,9 @@ const ChordJogApp = (() => {
             const object = {};
             _.range(0, keys.length).forEach(index => object[keys[index]] = values[index]);
             return object; };
-        return {
-            builder: () => SVGBuilder
-                .g()
-                .withAttributes({
-                    cursor: "pointer",
-                    pointerEvents: "fill",
-                    width: 233,
-                    height: 291 })
-                .withClass("finger-select")
-                .withChild(SVGBuilder.Path //Hand outline
-                    .withD(
-                        `M
+        const handOutline = SVGBuilder.Path
+            .withD(
+                `M
                             90.24086,	287.90208
                         C
                             65.553543,	278.2203
@@ -707,7 +744,17 @@ const ChordJogApp = (() => {
                             -94.248694,		2.47411
                             -100.724424,	-0.0632
                         z`.replace(/\s+/g, " "))
-                    .withAttribute("class", "outline"))
+            .withAttribute("class", "outline");
+        return {
+            builder: () => SVGBuilder
+                .g()
+                .withAttributes({
+                    cursor: "pointer",
+                    pointerEvents: "fill",
+                    width: 233,
+                    height: 291 })
+                .withClass("finger-select")
+                .withChild(handOutline)
                 .withChildren(Regions.all.map((region) => //Finger labels
                     Regions.FingerLabel.createForRegion(region)))
                 .withMethods({
@@ -731,8 +778,11 @@ const ChordJogApp = (() => {
                             .finger } })
                 .withEventListeners({
                     mouseMove: function(e) {
+                        const rect = handOutline.getBoundingClientRect();
+                        const mouseX =  2*(e.clientX - rect.left);
+                        const mouseY = 2*(e.clientY - rect.top);
                         //Get the preview region based on closest point to mouse
-                        const previewFinger = Regions.closestToPoint([e.offsetX, e.offsetY]).finger;
+                        const previewFinger = Regions.closestToPoint([mouseX, mouseY]).finger;
 
                         //Set the cursor to 'auto' if the preview region is 'unselectable',
                         //otherwise 'pointer'.
@@ -847,7 +897,7 @@ const ChordJogApp = (() => {
                                 //Yes. Preview it.
                                 //(only unselected regions can be previewed)
                                 this.setFingerState(finger, "preview"); } } } })
-                .disableTextSelection() } })();
+                .disableTextSelection()} })();
 
     const ShapeChart = (() => {
         const halfRoot2 = .5 * Math.SQRT2;
@@ -1375,10 +1425,9 @@ const ChordJogApp = (() => {
                         .withChild(mouseTrapsBuilder.FingerlessIndicators)
                         .withChild(FingerSelect.builder()
                             .withFinger(ShapeInput.initialActiveFinger)
-                            .withAttributes({
-                                transform: `translate(${ShapeChart.Style.width + 2},${ShapeChart.Fretboard.Style.y})
-                                    scale(.50)`,
-                                strokeWidth: 2}))}
+                            .withAttribute("stroke-width", 2)
+                            .moveTo(ShapeChart.Style.width + 2, ShapeChart.Fretboard.Style.y)
+                            .scale(.5))}
                 return {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
                     blank: () => buildStep(ShapeChart.Builder.blank().unfixed())}; })()};})();
