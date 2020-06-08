@@ -3,7 +3,6 @@
  *      Add keydown listeners to window for ShapeInput's finger selection
  *      Add MouseTrap to SVGBuilder (MouseTrap.for().withPadding())
  *      Use MouseTrap for finger-select
- *      Add withAttributeChangeListener to SVG.Builder.createElement to wrap mutation observers
  */
 const ChordJogApp = (() => {
     const Style = {
@@ -280,6 +279,31 @@ const ChordJogApp = (() => {
                     withMutationObserver: function(mutationObserver, configuration={}) {
                         mutationObserver.observe(this, configuration);
                         return this; },
+                    withAttributeChangeListener: function(
+                        attributeName,
+                        listener,
+                        attributeExtractor=(mutation) => mutation.target.getAttribute(attributeName)
+                    ) {
+                        new MutationObserver((mutations) => mutations
+                            .map(mutation => ({
+                                oldValue: mutation.oldValue,
+                                value: attributeExtractor.bind(mutation.target)(mutation),
+                                target: mutation.target}))
+                            .forEach(e => listener.bind(e.target)({
+                                oldValue: e.oldValue,
+                                value: e.value})))
+                        .observe(this, {
+                            attributeFilter: [attributeName],
+                            attributeOldValue: true});
+                        return this;},
+                    withAttributeChangeListeners: function(attributeChangeListeners) {
+                        Object
+                            .entries(attributeChangeListeners)
+                            .forEach(entry => this.withAttributeChangeListener(
+                                entry[0],
+                                entry[1].listener,
+                                entry[1].attributeExtractor));
+                        return this;},
                     withModification: function(modification) {
                         modification.bind(this)();
                         return this;},
@@ -551,43 +575,39 @@ const ChordJogApp = (() => {
                                         this.dataset.state = state;}})
                             .withChild(Regions.FingerLabel.instantiate(staticRegion))
                             .withChildren(joints)
-                            .withMutationObserver(new MutationObserver(
-                                (mutations) => mutations
-                                    .map(mutation => ({
-                                        region: mutation.target,
-                                        oldState: mutation.oldValue,
-                                        newState: mutation.target.state}))
-                                    .forEach((e) => {
-                                        //Is the new state valid?
-                                        if (! Regions.States.isValid(e.newState)) {
-                                            //No - reset to the old value and return
-                                            return e.region.state = e.oldState; }
-                                        //Valid. Is this an exclusive state?
-                                        if (["preview", "selected"].includes(e.newState)) {
-                                            //Yes. If there's another region with the exclusive state,
-                                            //switch it to 'unselected'.
-                                            const otherRegionsWithState = e.region.parentElement.regions
-                                                .filter(region => region.state === e.newState)
-                                                .filter(region => region.finger !== e.region.finger)
-                                                .forEach(region => region.state = "unselected");}
-                                        //Is it the selected state?
-                                        if("selected" === e.newState) {
-                                            //Yes. Notify the regionChangeObservers.
-                                            regionChangeObserver(e.region.finger);}
-                                        //Style the region according to the new state.
-                                        const fingerLabel = e.region.querySelector(`.finger-label`);
-                                        const fingerLabelOutline = fingerLabel.querySelector("circle");
-                                        //Hide the label if 'unselectable'
-                                        fingerLabel.setAttribute("display",
-                                            "unselectable" === e.newState ? "none" : "inline");
-                                        //Show the stroke if 'preview' or 'selected'
-                                        fingerLabelOutline.setAttribute("stroke",
-                                            ["preview", "selected"].includes(e.newState) ? "black" : "none");
-                                        //Dash the stroke if 'preview'
-                                        fingerLabelOutline.setAttribute("stroke-dasharray",
-                                            "preview" === e.newState ? "4 5" : null); } )),
-                                {attributeFilter: ["data-state"]})
-                            .withDataAttribute("state", staticRegion.finger === Fingers.index ? "selected" : "unselected")})
+                            .withAttributeChangeListener("data-state",
+                                function(e) {
+                                    //Is the new state valid?
+                                    if (! Regions.States.isValid(e.value)) {
+                                        //No - reset to the old value and return
+                                        return e.region.state = e.oldValue; }
+                                    //Valid. Is this an exclusive state?
+                                    if (["preview", "selected"].includes(e.value)) {
+                                        //Yes. If there's another region with the exclusive state,
+                                        //switch it to 'unselected'.
+                                        const otherRegionsWithState = this.parentElement.regions
+                                            .filter(region => region.state === e.value)
+                                            .filter(region => region.finger !== this.finger)
+                                            .forEach(region => region.state = "unselected");}
+                                    //Is it the selected state?
+                                    if("selected" === e.value) {
+                                        //Yes. Notify the regionChangeObservers.
+                                        regionChangeObserver(this.finger);}
+                                    //Style the region according to the new state.
+                                    const fingerLabel = this.querySelector(`.finger-label`);
+                                    const fingerLabelOutline = fingerLabel.querySelector("circle");
+                                    //Hide the label if 'unselectable'
+                                    fingerLabel.setAttribute("display",
+                                        "unselectable" === e.value ? "none" : "inline");
+                                    //Show the stroke if 'preview' or 'selected'
+                                    fingerLabelOutline.setAttribute("stroke",
+                                        ["preview", "selected"].includes(e.value) ? "black" : "none");
+                                    //Dash the stroke if 'preview'
+                                    fingerLabelOutline.setAttribute("stroke-dasharray",
+                                        "preview" === e.value ? "4 5" : null);},
+                                function() {return this.state;})
+                            .withDataAttribute("state",
+                                staticRegion.finger === Fingers.index ? "selected" : "unselected")})
                     .withGetterAndSetter("state",
                         function() { return this.element.state; },
                         function(state) { this.element.state = state});})};
@@ -1204,40 +1224,29 @@ const ChordJogApp = (() => {
             .withGetterAndSetter("shape",
                 function() { return this.dataset.shape; },
                 function(shape) { this.dataset.shape = shape; })
-            .withMutationObserver(new MutationObserver((mutations) => mutations
-                    .map(mutation => ({
-                        shapeChart: mutation.target,
-                        shape: mutation.target.shape}))
-                    .forEach(shapeChangeEvent => shapeChangeEvent.shapeChart
-                        .querySelector(".shape-chart-meat")
-                        .replaceWith(Meat.Builder
-                            .forShape(Shape.fromString(shapeChangeEvent.shape))))),
-                {attributeFilter: ["data-shape"]})
-            //data-r
             .withGetterAndSetter("r",
                 function() { return this.dataset.r; },
                 function(r) {this.dataset.r = r; })
-            .withMutationObserver(
-                Module.of(() => {
-                    const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
-                        .map(fret => `${fret}`)
-                        .includes(r);
-                    return new MutationObserver((mutations) => mutations
-                        .map(mutation => ({
-                            shapeChart: mutation.target,
-                            oldR: mutation.oldValue,
-                            r: mutation.target.r}))
-                        .forEach(rChangeEvent => {
-                            const rootLabel = rChangeEvent.shapeChart.querySelector(".r-label");
-                            if([undefined, null, "", "null"].includes(rChangeEvent.r)) {
+            .withAttributeChangeListeners({
+                "data-shape":  {
+                    listener: function(e) {
+                        this.querySelector(".shape-chart-meat")
+                            .replaceWith(Meat.Builder.forShape(
+                                Shape.fromString(e.value)))},
+                    attributeExtractor: function() {return this.shape;}},
+                "data-r": {
+                    listener: Module.of(() => {
+                        const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
+                            .map(fret => `${fret}`)
+                            .includes(r);
+                        return function(e) {
+                            const rootLabel = this.querySelector(".r-label");
+                            if([undefined, null, "", "null"].includes(e.value)) {
                                 rootLabel.textContent = "r";}
-                            else if(isValidR(rChangeEvent.r)) {
-                                rootLabel.textContent = rChangeEvent.r;}
+                            else if(isValidR(e.value)) {
+                                rootLabel.textContent = e.value;}
                             else {
-                                rChangeEvent.shapeChart.dataset["r"] = rChangeEvent.oldR; }}))}),
-                {
-                    attributeFilter: ["data-r"],
-                    attributeOldValue: true});
+                                this.r = e.oldValue; }}})}});
         return {
             Style: {
                 width: Fretboard.Style.startX +
@@ -1262,7 +1271,8 @@ const ChordJogApp = (() => {
                         .withChild(RootFretLabel.Builder.fixed(fret))
                         .withDataAttribute("r", fret),
                     unfixed: () => shapeChart
-                        .withChild(RootFretLabel.Builder.unfixed())});
+                        .withChild(RootFretLabel.Builder.unfixed())
+                        .withDataAttribute("r", null)});
                 const forShape = (shape) => fixednessStep(
                     containerBuilder()
                         .withChild(Meat.Builder.forShape(shape))
@@ -1441,14 +1451,12 @@ const ChordJogApp = (() => {
                         .withGetterAndSetter("preview",
                             function() {return this.dataset.preview;},
                             function(preview) {this.dataset.preview = preview;})
-                        .withMutationObserver(
-                            new MutationObserver((mutations) => mutations
-                                .map(mutation => mutation.target.preview)
-                                .forEach(preview => {
-                                    previewMeatContainer.innerHTML = "";
-                                    previewMeatContainer.withChild(ShapeChart.Meat.Builder
-                                        .forShape(Shape.fromString(preview)));})),
-                            {attributeFilter: ["data-preview"]});
+                        .withAttributeChangeListener("data-preview",
+                            function(e) {
+                                previewMeatContainer.innerHTML = "";
+                                previewMeatContainer.withChild(ShapeChart.Meat.Builder
+                                    .forShape(Shape.fromString(e.value)));},
+                            function() { return this.preview; })
                     const mouseTrapsBuilder = MouseTrapsBuilder
                         .withShapeChart(shapeChart)
                         .withPreviewMeatContainer(previewMeatContainer);
@@ -1490,5 +1498,5 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeInput.Builder.forShape(Shape.fromString(";;11;11;23;o")))
-    };})();
+            .withChild(ShapeInput.Builder.forShape(
+                Shape.fromString(";;11;11;23;o")))};})();
