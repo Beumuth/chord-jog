@@ -1,6 +1,5 @@
 /*
  * TODO
- *      Add Functions.callWith method to replace ((parameter1=arg1, parameter2=arg2, ...) =>
  *      Move FingerSelect data-[finger.name] attributes to corresponding finger-select-region data-state attribute
  *      Fire onchange event for finger-select selections
  *      Listen to fingerSelect.onChange in shape-input, update active finger
@@ -28,13 +27,13 @@ const ChordJogApp = (() => {
     /**
      * A wrapper for the Module pattern
      */
-    const Modules = {do: (f) => f()};
+    const Module = {of: (f) => f()};
 
     const Objects = {
         changeFieldAndReturn: (object, key, value) => {
             object[key] = value;
             return object;},
-        Builder: Modules.do(() => {
+        Builder: Module.of(() => {
             const furtherOptions = {
                 withGetter: function(key, getter) {
                     Object.defineProperty(this, key, {get: getter});
@@ -99,7 +98,7 @@ const ChordJogApp = (() => {
             //proj(p, u) = k*u
             return [segment[0][0] + k * ux, segment[0][1] + k * uy]; }};
 
-    const AffineTransformations = Modules.do(() => {  //for 2d space
+    const AffineTransformations = Module.of(() => {  //for 2d space
         const indices = [0, 1, 2];
         const AffineTransformations = {
             fromABCDEF: (a,b,c,d,e,f) => [[a,b,c],[d,e,f],[0, 0, 1]],
@@ -219,7 +218,7 @@ const ChordJogApp = (() => {
         StringActions.isFingered(stringAction) && ! stringAction.sounded;
     StringActions.equals = (a, b) => StringActions.toString(a) === StringActions.toString(b);
 
-    const SVGBuilder = Modules.do(() => {
+    const SVGBuilder = Module.of(() => {
         const dashifyAttributeName = (name) =>
             _.range(0, name.length)
                 .map(charIndex => ((curChar) =>
@@ -285,7 +284,7 @@ const ChordJogApp = (() => {
                         ["webkitUserSelect", "mozUserSelect", "msUserSelect", "userSelect"]
                             .forEach(selectAttribute => this.style[selectAttribute] = "none");
                         return this; }})
-                .withMethods(Modules.do(() => {
+                .withMethods(Module.of(() => {
                     const updateTransform = (element, transformKey, updater) => {
                         const transformAttribute = element.getAttribute("transform");
                         if(transformAttribute === null) {   //Does the element have a transform attribute?
@@ -432,7 +431,7 @@ const ChordJogApp = (() => {
         saveToLocalStorage: () => localStorage.setItem(
             ShapeFilter.localStorageKey,
             ShapeFilter.toString(ShapeFilter.all)) };
-    const FingerSelect = Modules.do(() => {
+    const FingerSelect = Module.of(() => {
         const Regions = {
             States: {
                 all: [
@@ -466,7 +465,7 @@ const ChordJogApp = (() => {
                         Regions.FingerLabel.Text.createForRegion(region),
                         Regions.FingerLabel.Outline.createForRegion(region)]) },
             Joint: {
-                createForRegion: Modules.do(() => {
+                createForRegion: Module.of(() => {
                     const pointToJoint = (p) => SVGBuilder.Circle
                         .withCenter(p)
                         .withRadius(1)
@@ -760,7 +759,7 @@ const ChordJogApp = (() => {
             const joints = Regions.Joint.createForRegion(region);
             return {
                 finger: region.finger,
-                distance2Mapper: Modules.do(() => {
+                distance2Mapper: Module.of(() => {
                     const jointToPoint = (joint) => {
                         const boundingClientRect = joint.getBoundingClientRect();
                         return [boundingClientRect.x, boundingClientRect.y]; };
@@ -873,7 +872,7 @@ const ChordJogApp = (() => {
                     keysValuesToObject(
                         Regions.all.map(region => region.finger.name),
                         _.times(Regions.all.length, () => "unselected") ) )
-                .withProperties(Modules.do(() => {
+                .withProperties(Module.of(() => {
                     //Add a getter and setter for each region state
                     const keys = Regions.all.map(region => region.finger.name);
                     return keysValuesToObject(keys, keys.map(key => ({
@@ -932,14 +931,14 @@ const ChordJogApp = (() => {
                                 this.setFingerState(finger, "preview"); } } } })
                 .disableTextSelection()} });
 
-    const ShapeChart = Modules.do(() => {
+    const ShapeChart = Module.of(() => {
         const halfRoot2 = .5 * Math.SQRT2;
         const FingerlessIndicator = {
             Style: {
                 radius: 5,
                 margin: 2 }};
         FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
-        FingerlessIndicator.Builder = Modules.do(() => {
+        FingerlessIndicator.Builder = Module.of(() => {
             const DeadStringBuilder = {
                 withCenter: (center) => SVGBuilder.Path
                     .withD(
@@ -1061,7 +1060,7 @@ const ChordJogApp = (() => {
                 .withChild(SVGBuilder.Text
                     .withTextContent(fingerAction.finger)
                     .withAttributes({
-                        x: Modules.do(() => {
+                        x: Module.of(() => {
                             const min = Fretboard.stringToXCoordinate(fingerAction.range.min);
                             return min + .5 * (Fretboard.stringToXCoordinate(fingerAction.range.max) - min);}),
                         y: Fretboard.fretToYCoordinate(fingerAction.fret),
@@ -1074,7 +1073,7 @@ const ChordJogApp = (() => {
             Style: {
                 fontSize: 15,
                 fontFamily: "monospace" }};
-        RootFretLabel.Builder = Modules.do(() => {
+        RootFretLabel.Builder = Module.of(() => {
             const forText = (text) => {
                 const label = SVGBuilder.Text
                     .withTextContent(text)
@@ -1219,7 +1218,7 @@ const ChordJogApp = (() => {
                 function() { return this.dataset.r; },
                 function(r) {this.dataset.r = r; })
             .withMutationObserver(
-                Modules.do(() => {
+                Module.of(() => {
                     const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
                         .map(fret => `${fret}`)
                         .includes(r);
@@ -1257,7 +1256,7 @@ const ChordJogApp = (() => {
                 Style: FingerIndicator.Style},
             FingerlessIndicator: {
                 Style: FingerlessIndicator.Style},
-            Builder: Modules.do(() => {
+            Builder: Module.of(() => {
                 const fixednessStep = (shapeChart) => ({
                     fixed: (fret) => shapeChart
                         .withChild(RootFretLabel.Builder.fixed(fret))
@@ -1271,7 +1270,7 @@ const ChordJogApp = (() => {
                 return {
                     blank: () => forShape(Shape.allUnsounded),
                     forShape: forShape };})};});
-    const ShapeInput = Modules.do(() => {
+    const ShapeInput = Module.of(() => {
         const ShapeInput = {
             Style: {
                 shapeChartMarginRight: 2},
@@ -1405,7 +1404,7 @@ const ChordJogApp = (() => {
                                         const previewString = FingerlessIndicatorMouseTrap.xCoordinateToString(e.offsetX);
                                         previewShape[previewString - 1] = dragActive ? (
                                             StringActions.isFingerless(dragAction) ? dragAction :
-                                                previewShape[previewString -1]) : Modules.do(() => {
+                                                previewShape[previewString -1]) : Module.of(() => {
                                             const previousStringAction = activeShape[previewString - 1];
                                             return previousStringAction === StringActions.unsounded ? StringActions.open :
                                                     StringActions.unsounded;});
@@ -1413,7 +1412,7 @@ const ChordJogApp = (() => {
                                             change: previewShape[previewString - 1],
                                             shape: Shape.toString(previewShape)};}))};}};}};
         return {
-            Builder: Modules.do(() => {
+            Builder: Module.of(() => {
                 const buildStep = (shapeChart) => {
                     const previewMeatContainer = Objects.Builder
                         .fromExisting(SVGBuilder.g()
