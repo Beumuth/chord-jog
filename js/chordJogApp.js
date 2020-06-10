@@ -353,7 +353,7 @@ const ChordJogApp = (() => {
                             updateTransform(this, "scale",
                                 (currentScaleX=0, currentScaleY=0) => [currentScaleX+scaleX, currentScaleY+scaleY]);
                             return this;}};}));};
-        return {
+        const svgBuilder = {
             element: createElement,
             g: () => createElement("g"),
             Circle: ({
@@ -422,12 +422,28 @@ const ChordJogApp = (() => {
                             return this; }})
                     .withAttributes({
                         fill: Style.textColor,
-                        fontFamily: Style.font,})}) }; });
-    SVGBuilder.Rect.copy = (svgRect) => SVGBuilder.Rect
-        .withX(svgRect.x)
-        .withY(svgRect.y)
-        .withWidth(svgRect.width)
-        .withHeight(svgRect.height);
+                        fontFamily: Style.font,})}) };
+        svgBuilder.Rect.copy = (svgRect) => SVGBuilder.Rect
+            .withX(svgRect.x)
+            .withY(svgRect.y)
+            .withWidth(svgRect.width)
+            .withHeight(svgRect.height);
+        svgBuilder.MouseTrap = {
+            withX: (x) => ({
+                withY: (y) => ({
+                    withWidth: (width) => ({
+                        withHeight: (height) =>
+                            svgBuilder.Rect
+                                .withX(x)
+                                .withY(y)
+                                .withWidth(width)
+                                .withHeight(height)
+                                .withAttributes({
+                                    pointerEvents: "fill",
+                                    cursor: "pointer",
+                                    fill: "none",
+                                    stroke: "none"})})})})};
+        return svgBuilder;});
 
     //A Schema is an array of 6 StringActions
     const Shape = {
@@ -1389,17 +1405,12 @@ const ChordJogApp = (() => {
                                     return {
                                         change: previewShape[previewString - 1],
                                         shape: Shape.toString(previewShape)};};
-                                return SVGBuilder.Rect
+                                return SVGBuilder.MouseTrap
                                     .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
                                     .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
                                     .withWidth(ShapeChart.Fretboard.Style.width + 2 * FretboardMouseTrap.Style.padding)
                                     .withHeight(ShapeChart.Fretboard.Style.height + 2 * FretboardMouseTrap.Style.padding)
                                     .withClass("fretboard-mouse-trap")
-                                    .withAttributes({
-                                        pointerEvents: "fill",
-                                        cursor: "pointer",
-                                        fill: "none",
-                                        stroke: "none"})
                                     .withDataAttribute("preview", shapeChart.shape)
                                     .withEventListeners(mouseTrapEventListeners.withMousePositionToShapeFunction(
                                         mousePositionToShapeFunction))
@@ -1407,9 +1418,8 @@ const ChordJogApp = (() => {
                                         if(currentTarget === mouseTraps.fretboard && ! dragActive()) {
                                             shapeChart.preview = mousePositionToShapeFunction(previousMousePosition)
                                                 .shape;}});}),
-                            fingerlessIndicators: SVGBuilder.Rect
-                                .withX(ShapeChart.FingerlessIndicator.Style.startX -
-                                    ShapeChart.FingerlessIndicator.Style.radius -
+                            fingerlessIndicators: SVGBuilder.MouseTrap
+                                .withX(ShapeChart.FingerlessIndicator.Style.startX  -
                                     FingerlessIndicatorMouseTrap.Style.padding.horizontal)
                                 .withY(ShapeChart.FingerlessIndicator.Style.startY -
                                     FingerlessIndicatorMouseTrap.Style.padding.vertical)
@@ -1420,11 +1430,6 @@ const ChordJogApp = (() => {
                                     ShapeChart.FingerlessIndicator.Style.margin +
                                     FingerlessIndicatorMouseTrap.Style.padding.vertical)
                                 .withClass("fingerless-indicators-mouse-trap")
-                                .withAttributes({
-                                    pointerEvents: "fill",
-                                    cursor: "pointer",
-                                    fill: "none",
-                                    stroke: "none"})
                                 .withEventListeners(mouseTrapEventListeners
                                     .withMousePositionToShapeFunction((p) => {
                                         const activeShape = Shape.fromString(shapeChart.shape);
