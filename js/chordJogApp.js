@@ -2,6 +2,7 @@
  * TODO
  *      Add MouseTrap to SVGBuilder (MouseTrap.for().withPadding())
  *      Use MouseTrap for finger-select
+ *
  */
 const ChordJogApp = (() => {
     const Style = {
@@ -24,66 +25,72 @@ const ChordJogApp = (() => {
      */
     const Module = {of: (f) => f()};
 
-    const Objects = {
-        changeFieldAndReturn: (object, key, value) => {
-            object[key] = value;
-            return object;},
-        Builder: Module.of(() => {
-            const furtherOptions = {
-                withGetter: function(key, getter) {
-                    Object.defineProperty(this, key, {get: getter});
-                    return this; },
-                withSetter: function(key, setter) {
-                    Object.defineProperty(this, key, {set: setter});
-                    return this; },
-                withGetterAndSetter: function(key, getter, setter) {
-                    Object.defineProperty(this, key, {
-                        get: getter,
-                        set: setter});
-                    return this; },
-                withGettersAndSetters: function(gettersAndSetters) {
-                    gettersAndSetters.forEach(property =>
-                        Object.defineProperty(this, property.key, {
-                            get: property.get,
-                            set: property.set}));
-                    return this;},
-                withField(field, value=undefined) {
-                    this[field] = value;
-                    return this;},
-                withFields(fields) {
-                    Object.keys(fields).forEach(key => this[key] = fields[key]);
-                    return this;},
-                withProperty: function (key, property) {
-                    Object.defineProperty(this, key, property);
-                    return this; },
-                withProperties: function(properties) {
-                    Object.defineProperties(this, properties);
-                    return this},
-                withMutation: function(mutation) {
-                    mutation(this);
-                    return this; },
-                withMutations: function(mutations) {
-                    mutations.forEach(mutation => mutation.bind(this)());
-                    return this; },
-                withMethod: function(name, method) {
-                    this[name] = method.bind(this);
-                    return this; },
-                withMethods: function(methods) {
-                    Object.keys(methods).forEach(key =>
-                        this[key] = methods[key].bind(this));
-                    return this; },
-                merge: (other) => {
-                    _.merge(this, other);
-                    return this; } };
-            return {
-                fromScratch: () => furtherOptions,
-                fromExisting: (existing) => {
-                    _.merge(existing, furtherOptions);
-                    return existing; }}; })};
+    const Functions = {
+        ifThen: (condition, f) => condition === true ? f() : undefined};
+
+    const Objects = Module.of(() => {
+        const helpers = {
+            withGetter: function(key, getter) {
+                Object.defineProperty(this, key, {get: getter});
+                return this; },
+            withSetter: function(key, setter) {
+                Object.defineProperty(this, key, {set: setter});
+                return this; },
+            withGetterAndSetter: function(key, getter, setter) {
+                Object.defineProperty(this, key, {
+                    get: getter,
+                    set: setter});
+                return this; },
+            withGettersAndSetters: function(gettersAndSetters) {
+                gettersAndSetters.forEach(property =>
+                    Object.defineProperty(this, property.key, {
+                        get: property.get,
+                        set: property.set}));
+                return this;},
+            withField(key, value=undefined) {
+                this[key] = value;
+                return this;},
+            withFields(fields) {
+                Object.keys(fields).forEach(key => this[key] = fields[key]);
+                return this;},
+            withProperty: function (key, property) {
+                Object.defineProperty(this, key, property);
+                return this; },
+            withProperties: function(properties) {
+                Object.defineProperties(this, properties);
+                return this},
+            withMutation: function(mutation) {
+                mutation(this);
+                return this; },
+            withMutations: function(mutations) {
+                mutations.forEach(mutation => mutation.bind(this)());
+                return this; },
+            withMethod: function(name, method) {
+                this[name] = method.bind(this);
+                return this; },
+            withMethods: function(methods) {
+                Object.keys(methods).forEach(key =>
+                    this[key] = methods[key].bind(this));
+                return this; }};
+        const objects = {
+            using: (object) => helpers.withMethods.bind(object)(helpers)};
+        objects.new = () => objects.using({});
+        return objects;});
     const Arrays = {
         updateItem: (array, index, modification) => {
             modification(array[index]);
-            return array;}}
+            return array;}};
+
+    const KeyboardCommands = Module.of(() => {
+        const keyCommands = {};
+        window.addEventListener("keydown", (e) => Functions.ifThen(
+            e.key in keyCommands,
+            keyCommands[e.key]));
+        return {
+            set: (key, command) => keyCommands[key] = command,
+            setAll: (keyCommandMap) => Objects.using(keyCommands).withFields(keyCommandMap),
+            remove: (key) => delete keyCommands[key],
+            removeAll: (keys) => keys.forEach(key => delete keyCommands[key]) };});
 
     const Geometry = {
         distance2: (a, b) =>
@@ -227,9 +234,8 @@ const ChordJogApp = (() => {
                     name.charAt(charIndex)))
                 .join("");
         const createElement = function(tagName) {
-            return Objects.Builder
-                .fromExisting(
-                    document.createElementNS("http://www.w3.org/2000/svg", tagName))
+            return Objects
+                .using(document.createElementNS("http://www.w3.org/2000/svg", tagName))
                 .withMethods({
                     withAttribute: function(name, value) {
                         this.setAttribute(dashifyAttributeName(name), value)
@@ -550,8 +556,7 @@ const ChordJogApp = (() => {
                 //They are added as SVG elements instead of within the static Regions module
                 //to allow svg transformations to apply to the coordinates of these points.
                 const joints = Regions.Joint.instantiate(staticRegion);
-                return Objects.Builder
-                    .fromExisting({
+                return Objects.using({
                         finger: staticRegion.finger,
                         distance2Mapper: Module.of(() => {
                             const jointToPoint = (joint) => {
@@ -1442,8 +1447,8 @@ const ChordJogApp = (() => {
         return {
             Builder: Module.of(() => {
                 const buildStep = (shapeChart) => {
-                    const previewMeatContainer = Objects.Builder
-                        .fromExisting(SVGBuilder.g()
+                    const previewMeatContainer = Objects
+                        .using(SVGBuilder.g()
                             .withClass("preview-meat-container")
                             .withAttributes({
                                 display: "none",
@@ -1487,24 +1492,26 @@ const ChordJogApp = (() => {
                         .withChild(mouseTrapsBuilder.fretboard)
                         .withChild(mouseTrapsBuilder.fingerlessIndicators)
                         .withChild(fingerSelect)
-                        .withMethods(Module.of(() => {  //keyboard-related methods: focus() and unfocus()
-                            const keyCodeFingerMap = {
-                                1: Fingers.index,
-                                2: Fingers.middle,
-                                3: Fingers.ring,
-                                4: Fingers.pinky,
-                                t: Fingers.thumb};
-                            const eventListener = function(e) {
-                                if(Object.keys(keyCodeFingerMap).includes(e.key.toLowerCase())) {
-                                    const selectedFinger = keyCodeFingerMap[e.key];
-                                    shapeChart.activeFinger = selectedFinger;
-                                    fingerSelect.selected = selectedFinger;}};
+                        .withMethods(Module.of(() => {  //focus() and unfocus()
+                            const keyCommands = Module.of(() => {
+                                const command = (finger) => {
+                                    shapeChart.activeFinger = finger;
+                                    fingerSelect.selected = finger;};
+                                const keyCommands = {
+                                    1: Fingers.index,
+                                    2: Fingers.middle,
+                                    3: Fingers.ring,
+                                    4: Fingers.pinky,
+                                    t: Fingers.thumb};
+                                Object.entries(keyCommands).forEach(keyFinger =>
+                                    keyCommands[keyFinger[0]] = () => command(keyFinger[1]));
+                                return keyCommands;});
                             return {
                                 focus: function() {
-                                    window.addEventListener("keydown", eventListener);
+                                    KeyboardCommands.setAll(keyCommands);
                                     return this;},
                                 unfocus: function() {
-                                    window.removeEventListener("keydown", eventListener);
+                                    KeyboardCommands.removeAll(Object.keys(keyCommands));
                                     return this;}};}))}
                 return {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
