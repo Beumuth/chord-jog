@@ -1,8 +1,6 @@
 /*
  * TODO
- *      Add MouseTrap to SVGBuilder (MouseTrap.for().withPadding())
- *      Use MouseTrap for finger-select
- *
+ *  -Create root-fret-range-input
  */
 const ChordJogApp = (() => {
     const Style = {
@@ -478,7 +476,7 @@ const ChordJogApp = (() => {
         saveToLocalStorage: () => localStorage.setItem(
             ShapeFilter.localStorageKey,
             ShapeFilter.toString(ShapeFilter.all)) };
-    const FingerSelect = Module.of(() => {
+    const FingerInput = Module.of(() => {
         const Regions = {
             States: {
                 all: [
@@ -516,7 +514,7 @@ const ChordJogApp = (() => {
                     const pointToJoint = (p) => SVGBuilder.Circle
                         .withCenter(p)
                         .withRadius(1)
-                        .withClass("finger-select-region-joint")
+                        .withClass("finger-input-region-joint")
                         .withAttribute("strokeWidth", 0);
                     return (staticRegion) => staticRegion.jointInfo.length === 1 ?
                         [pointToJoint(staticRegion.jointInfo[0])] :
@@ -584,7 +582,7 @@ const ChordJogApp = (() => {
                                     Geometry.projectPointOnLineSegment(p,
                                         joints.map(jointToPoint)))}),
                         element: SVGBuilder.g()
-                            .withClass("finger-select-region")
+                            .withClass("finger-input-region")
                             .withDataAttribute("finger", staticRegion.finger.label)
                             .withGetter("finger", () => staticRegion.finger)
                             .withGetterAndSetter("state",
@@ -650,7 +648,7 @@ const ChordJogApp = (() => {
                         pointerEvents: "fill",
                         width: 233,
                         height: 291 })
-                    .withClass("finger-select")
+                    .withClass("finger-input")
                     .withChild(SVGBuilder.Path
                         .withD(
                             `M
@@ -1484,7 +1482,7 @@ const ChordJogApp = (() => {
                     const mouseTrapsBuilder = MouseTrapsBuilder
                         .withShapeChart(shapeChart)
                         .withPreviewMeatContainer(previewMeatContainer);
-                    const fingerSelect = FingerSelect.Builder
+                    const fingerSelect = FingerInput.Builder
                         .withRegionChangeObserver((region) => shapeChart.activeFinger = region)
                         .withFinger(ShapeInput.initialActiveFinger)
                         .withAttribute("stroke-width", 2)
