@@ -1,12 +1,12 @@
 /*
  * TODO
- *  -Rethink Shape/ShapeFilter/Chord distinction
+ *  -root-fret-range state-based click events
  */
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
             width: 1},
-        colors: {
+        Colors: {
             black: "#000000",
             superHeavy: "#202020",
             heavy: "#464646",
@@ -15,7 +15,7 @@ const ChordJogApp = (() => {
             superLight: "#F6F6F6",
             white: "#ffffff"}};
     Style.stroke.halfWidth = Style.stroke.width * .5;
-    Style.textColor = Style.colors.heavy;
+    Style.textColor = Style.Colors.heavy;
     Style.font = "Helvetica";
 
     /**
@@ -1109,7 +1109,7 @@ const ChordJogApp = (() => {
                     fret: fingerAction.fret,
                     minString: fingerAction.range.min,
                     maxString: fingerAction.range.max})
-                .withAttribute("stroke", Style.colors.superHeavy)
+                .withAttribute("stroke", Style.Colors.superHeavy)
                 .withChild(SVGBuilder.Rect
                     .withX(Fretboard.stringToXCoordinate(fingerAction.range.min) - FingerIndicator.Style.radius)
                     .withY(Fretboard.fretToYCoordinate(fingerAction.fret) - FingerIndicator.Style.radius)
@@ -1118,7 +1118,7 @@ const ChordJogApp = (() => {
                     .withHeight(FingerIndicator.Style.diameter)
                     .withRadius(FingerIndicator.Style.radius)
                     .withClass("finger-indicator-outline")
-                    .withAttribute("fill", Style.colors.superHeavy))
+                    .withAttribute("fill", Style.Colors.superHeavy))
                 .withChild(SVGBuilder.Text
                     .withTextContent(fingerAction.finger)
                     .withAttributes({
@@ -1129,7 +1129,7 @@ const ChordJogApp = (() => {
                         dominantBaseline: "central",
                         textAnchor: "middle",
                         stroke: "none",
-                        fill: Style.colors.superLight,
+                        fill: Style.Colors.superLight,
                         fontSize: 17}))};
         const RootFretLabel = {
             Style: {
@@ -1145,7 +1145,7 @@ const ChordJogApp = (() => {
                         y: Fretboard.fretToYCoordinate(Frets.Relative.first),
                         dominantBaseline: "central",
                         textAnchor: "end",
-                        fontFamily: "monospace",
+                        fontFamily: "Courier New",
                         fontSize: 15})
                     .withLengthAdjustSpacingAndGlyphs()
                 return text.length <= 1 ? label : label
@@ -1159,7 +1159,7 @@ const ChordJogApp = (() => {
         const skeletonBuilder = () => SVGBuilder
             .g()
             .withClass("shape-chart-skeleton")
-            .withAttribute("stroke", Style.colors.light)
+            .withAttribute("stroke", Style.Colors.light)
             .withChild(SVGBuilder
                 .g()
                 .withClass("fingerless-indicators")
@@ -1197,7 +1197,7 @@ const ChordJogApp = (() => {
                         .filter(stringAction => stringAction.action !== Shapes.StringAction.unsounded);
                     const meat = SVGBuilder
                         .g()
-                        .withAttribute("stroke", Style.colors.heavy)
+                        .withAttribute("stroke", Style.Colors.heavy)
                         .withClass("shape-chart-meat");
                     if(maxFret !== undefined) {meat
                         //Active strings
@@ -1222,7 +1222,7 @@ const ChordJogApp = (() => {
                                 .topAndBottom
                                 .withMaxActiveRelativeFret(maxFret)
                                 .open()
-                                .withAttribute("stroke", Style.colors.black)))
+                                .withAttribute("stroke", Style.Colors.black)))
                         //Dead strings indicators
                         .withChildren(activeStringActions
                             .filter(stringAction => Shapes.StringAction.isDeadened(stringAction.action))
@@ -1232,7 +1232,7 @@ const ChordJogApp = (() => {
                                 .topAndBottom
                                 .withMaxActiveRelativeFret(maxFret)
                                 .dead()
-                                .withAttribute("stroke", Style.colors.black)))
+                                .withAttribute("stroke", Style.Colors.black)))
                         //Finger indicators
                         .withChildren(activeStringActions
                             //Filter out open strings
@@ -1514,48 +1514,49 @@ const ChordJogApp = (() => {
                         .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
                         .scale(fingerInputScale);
                     const rootFretRangeInput = Module.of(() => {
-                        const RootFretRangeStyle = Module.of(
-                            (
-                                padding = 0,
-                                marginTop = 25,
-                                startX = ShapeChart.Fretboard.Style.x + padding,
-                                endX = startX +
-                                    ShapeChart.Fretboard.Style.width +
-                                    shapeChartMarginRight +
-                                    FingerInput.Style.width * fingerInputScale -
-                                    2 * padding,
-                                tickRadius = 5,
-                                width = endX - startX,
-                            ) => ({
-                                startX: startX,
-                                endX: endX,
-                                y: ShapeChart.Style.height + marginTop,
-                                width: width,
-                                height: 2 * tickRadius,
-                                baselineStrokeWidth: 1.5,
-                                tickRadius: tickRadius,
-                                tickStrokeWidth: 1.5,
-                                tickLabelMarginTop: 3,
-                                tickLabelFontSize: 12,
-                                tickLabelFont: "Courier New",
-                                tickSpacing: width / (Frets.roots.length - 1),
-                                rangeMarkerRadius: 6,
-                                rangeMarkerStrokeWidth: 1}));
+                        const RootFretRangeStyle = Module.of((
+                            padding = 0,
+                            marginTop = 25,
+                            startX = ShapeChart.Fretboard.Style.x + padding,
+                            endX = startX +
+                                ShapeChart.Fretboard.Style.width +
+                                shapeChartMarginRight +
+                                FingerInput.Style.width * fingerInputScale -
+                                2 * padding,
+                            tickRadius = 5,
+                            width = endX - startX
+                        ) => ({
+                            startX: startX,
+                            endX: endX,
+                            y: ShapeChart.Style.height + marginTop,
+                            width: width,
+                            height: 2 * tickRadius,
+                            baselineStrokeWidth: 1.5,
+                            tickRadius: tickRadius,
+                            tickStrokeWidth: 1.5,
+                            rangeLabelFontSize: 12,
+                            rangeLabelFont: "Courier New",
+                            rangeLabelMarginTop: 14,
+                            mouseTrapHorizontalPadding: 7,
+                            mouseTrapHeight: 20,
+                            tickSpacing: width / (Frets.roots.length - 1),
+                            rangeMarkerRadius: 7,
+                            rangeMarkerStrokeWidth: 1}));
                         const rootFretToXCoordinate = (rootFret) => (rootFret-1) * RootFretRangeStyle.tickSpacing;
                         const rootFretXCoordinates = Frets.roots.map(rootFret => ({
                             rootFret: rootFret,
                             x: rootFretToXCoordinate(rootFret)}));
                         const xCoordinateToRootFret = Module.of((
-                            binarySearchEven = (candidates, x, halfIndex=-1 + candidates.length/2) => {
-                                console.log("even", candidates, x, halfIndex);
-                                return x < candidates[halfIndex].x ?
-                                    candidates.slice(0, halfIndex+1) :
-                                    candidates.slice(halfIndex, candidates.length);},
+                            binarySearchEven = (candidates, x, halfLength = candidates.length/2) => {
+                                console.log("even", candidates, x, halfLength);
+                                return x < .5 * (candidates[halfLength-1].x + candidates[halfLength].x) ?
+                                    candidates.slice(0, halfLength) :
+                                    candidates.slice(halfLength, candidates.length);},
                             binarySearchOdd = (candidates, x, halfIndex=(candidates.length-1) / 2) => {
                                 console.log("odd", candidates, x, halfIndex);
-                                return x < .5 * (candidates[halfIndex].x + candidates[halfIndex+1].x) ?
+                                return x < candidates[halfIndex].x ?
                                     candidates.slice(0, halfIndex + 1) :
-                                    candidates.slice(halfIndex + 1, candidates.length);},
+                                    candidates.slice(halfIndex, candidates.length);},
                             binarySearch = (candidates, x) => candidates.length > 1 ?
                                 binarySearch(
                                     1 === candidates.length % 2 ?
@@ -1563,22 +1564,86 @@ const ChordJogApp = (() => {
                                         binarySearchEven(candidates, x),
                                     x) :
                                 candidates[0]) => (x) => binarySearch(rootFretXCoordinates, x));
-
-                        const RangeMarkerBuilder = Module.of((
+                        const rangeLabel = SVGBuilder.Text
+                            .withTextContent(`${Frets.roots.first} <= r <= ${Frets.roots.last}`)
+                            .withClass("rangeLabel")
+                            .withAttributes({
+                                fontFamily: RootFretRangeStyle.rangeLabelFont,
+                                fontSize: RootFretRangeStyle.rangeLabelFontSize,
+                                textAnchor: "middle"})
+                            .disableTextSelection()
+                            .moveTo(
+                                .5 * RootFretRangeStyle.width,
+                                RootFretRangeStyle.tickRadius + RootFretRangeStyle.rangeLabelMarginTop);
+                        const RangeMarkers = Module.of((
                             withMarkerType=(markerType) => ({
-                                atRootFret: (rootFret) => SVGBuilder.Circle
-                                    .withCenter([rootFretXCoordinates[rootFret - 1].x, 0])
+                                atRootFret: (
+                                    rootFret,
+                                    rootFretToCenter=(rootFret)=>[rootFretXCoordinates[rootFret - 1].x, 0]
+                                ) => SVGBuilder.Circle
+                                    .withCenter(rootFretToCenter(rootFret))
                                     .withRadius(RootFretRangeStyle.rangeMarkerRadius)
                                     .withClass("root-fret-range-marker")
                                     .withAttributes({
                                         cursor: "grab",
-                                        pointerEvents: "all",
-                                        strokeWidth: RootFretRangeStyle.rangeMarkerStrokeWidth})
-                                    .withDataAttribute("markerType", markerType)})) => ({
-                            min: withMarkerType("min"),
-                            max: withMarkerType("max"),
+                                        pointerEvents: "visible",
+                                        strokeWidth: RootFretRangeStyle.rangeMarkerStrokeWidth,
+                                        fill: Style.Colors.medium,
+                                        fillOpacity: .7})
+                                    .withDataAttribute("markerType", markerType)
+                                    .withMethod("atRootFret", function(rootFret) {
+                                        console.log(rootFret);
+                                        const center = rootFretToCenter(rootFret);
+                                        return this.withAttributes({
+                                            cx: center[0],
+                                            cy: center[1]});})})) => ({
+                            min: withMarkerType("min").atRootFret(Frets.roots.first),
+                            max: withMarkerType("max").atRootFret(Frets.roots.last),
                             minAndMax: withMarkerType("minAndMax")}));
-
+                        const rootFretRangeMouseTrap = SVGBuilder.MouseTrap
+                            .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
+                            .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
+                            .withWidth(RootFretRangeStyle.width + 2 * RootFretRangeStyle.mouseTrapHorizontalPadding)
+                            .withHeight(RootFretRangeStyle.mouseTrapHeight)
+                            .withClass("root-fret-range-mouse-trap");
+                        const RootFretRangeEventHandler = Module.of(() => {
+                            const RangeHandler = {},
+                                EqualsHandler = {};
+                            let ActiveHandler = RangeHandler;
+                            const rangeMarkerMouseDown = (marker) => {
+                                rootFretRangeMouseTrap.style.cursor = "grab";
+                                window.addEventListener("mousemove", (e) => rangeMarkerMouseMove(marker, e.offsetX));
+                            };
+                            const rangeMarkerMouseUp = (marker) => {
+                                rootFretRangeMouseTrap.style.cursor = "pointer";
+                                window.removeEventListener("mousemove", rangeMarkerMouseMove);};
+                            const rangeMarkerMouseMove = (marker, mouseX) => {
+                                marker.atRootFret(xCoordinateToRootFret(mouseX).rootFret); };
+                            RangeHandler.minMouseDown = () => {
+                                rangeMarkerMouseDown(RangeMarkers.min);
+                                window.addEventListener("mouseup", RangeHandler.minMouseUp);
+                            };
+                            RangeHandler.minMouseUp = () => {
+                                rangeMarkerMouseUp(RangeMarkers.min);
+                                window.removeEventListener("mouseup", RangeHandler.minMouseUp);
+                            };
+                            RangeHandler.maxMouseDown = () => {
+                                rangeMarkerMouseDown(RangeMarkers.max);
+                                window.addEventListener("mouseup", RangeHandler.maxMouseUp);
+                            };
+                            RangeHandler.maxMouseUp = () => {
+                                rangeMarkerMouseUp(RangeMarkers.max);
+                                window.removeEventListener("mouseup", RangeHandler.maxMouseUp);
+                            }
+                            RangeHandler.lineGraphMouseDown = (e) => {};
+                            ActiveHandler = RangeHandler;
+                            return ActiveHandler; });
+                        RangeMarkers.min.withEventListeners({
+                            mouseDown: RootFretRangeEventHandler.minMouseDown,
+                            mouseUp: RootFretRangeEventHandler.minMouseUp});
+                        RangeMarkers.max.withEventListeners({
+                            mouseDown: RootFretRangeEventHandler.maxMouseDown,
+                            mouseUp: RootFretRangeEventHandler.maxMouseUp});
                         return SVGBuilder.g()
                             .withClass("root-fret-range-input")
                             .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
@@ -1588,30 +1653,19 @@ const ChordJogApp = (() => {
                                     [RootFretRangeStyle.width, 0])
                                 .withClass("root-fret-range-input-baseline")
                                 .withAttribute("stroke-width", RootFretRangeStyle.baselineStrokeWidth))
-                            .withChild(RangeMarkerBuilder.min.atRootFret(Frets.roots.first))
-                            .withChild(RangeMarkerBuilder.max.atRootFret(Frets.roots.last))
-                            .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVGBuilder.g()
-                                .withClass("root-fret-range-value")
-                                .moveTo(rootFretXCoordinate.x, 0)
-                                .withChild(SVGBuilder.Line
+                            .withChild(SVGBuilder.g()
+                                .withClass("root-fret-range-ticks")
+                                .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth)
+                                .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVGBuilder.Line
                                     .withEndpoints(
-                                        [0, -RootFretRangeStyle.tickRadius],
-                                        [0, RootFretRangeStyle.tickRadius])
-                                    .withClass("root-fret-range-value-tick")
-                                    .withDataAttribute("value", rootFretXCoordinate.rootFret)
-                                    .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth))
-                                .withChild(SVGBuilder.Text
-                                    .withTextContent(rootFretXCoordinate.rootFret)
-                                    .withClass("root-fret-range-value-label")
-                                    .withAttributes({
-                                        dominantBaseline: "hanging",
-                                        textAnchor: "middle",
-                                        font: RootFretRangeStyle.tickLabelFont,
-                                        fontSize: RootFretRangeStyle.tickLabelFontSize})
-                                    .moveTo(0,
-                                        RootFretRangeStyle.tickRadius +
-                                        RootFretRangeStyle.tickLabelMarginTop)
-                                    .disableTextSelection())));});
+                                        [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                                        [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                                    .withClass("root-fret-range-tick")
+                                    .withDataAttribute("value", rootFretXCoordinate.rootFret))))
+                            .withChild(rootFretRangeMouseTrap)
+                            .withChild(RangeMarkers.min)
+                            .withChild(RangeMarkers.max)
+                            .withChild(rangeLabel);});
                     return SVGBuilder.g()
                         .withClass("shape-input")
                         .withChild(shapeChart)
@@ -1651,7 +1705,7 @@ const ChordJogApp = (() => {
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
-                stroke: Style.colors.heavy,
+                stroke: Style.Colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
