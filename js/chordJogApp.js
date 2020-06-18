@@ -1648,19 +1648,20 @@ const ChordJogApp = (() => {
                                 MouseEvents.relativeMousePosition(e, baseline)[0]);
                             Objects.using(States.extremaInactive).withFields(Module.of(() => {
                                 let deactivate;
-                                const rangeMouseDown = (e, rootFret=mouseEventToRootFret(e)) => {
+                                const rangeMouseDown = (e) => {
                                     deactivate();
-                                    RangeMarkers.all.forEach(rangeMarker => rangeMarker.atRootFret(rootFret));
                                     showMinAndMaxRangeMarker();
-                                    States.pivot.activate();};
+                                    States.pivot.activate(mouseEventToRootFret(e));};
                                 deactivate = () => {
                                     rootFretRangeMouseTrap.removeEventListener("mousedown", rangeMouseDown);}
-                                RangeMarkers.min.addEventListener("mousedown", () => {
+                                RangeMarkers.min.addEventListener("mousedown", (e) => {
                                     deactivate();
-                                    States.extremumDragging.activate().forMin()});
-                                RangeMarkers.max.addEventListener("mousedown", () => {
+                                    States.extremumDragging.activate(mouseEventToRootFret(e))
+                                        .forMin()});
+                                RangeMarkers.max.addEventListener("mousedown", (e) => {
                                     deactivate();
-                                    States.extremumDragging.activate().forMax()});
+                                    States.extremumDragging.activate(mouseEventToRootFret(e))
+                                        .forMax();});
                                 return {
                                     activate: () => {
                                         rootFretRangeMouseTrap.addEventListener("mousedown", rangeMouseDown);}};}));
@@ -1689,8 +1690,7 @@ const ChordJogApp = (() => {
                                             setRangeLabel(rootFret);
                                             deactivate();
                                             showMinAndMaxRangeMarker();
-                                            RangeMarkers.all.forEach(rangeMarker => rangeMarker.atRootFret(rootFret));
-                                            States.pivot.activate();});
+                                            States.pivot.activate(rootFret);});
                                 const mouseUpHandler = () => {
                                     deactivate();
                                     States.extremaInactive.activate();};
@@ -1698,7 +1698,7 @@ const ChordJogApp = (() => {
                                     window.removeEventListener("mousemove", mouseMoveHandler);
                                     window.removeEventListener("mouseup", mouseUpHandler);};
                                 return {
-                                    activate: () => {
+                                    activate: (rootFret) => {
                                         window.addEventListener("mousemove", mouseMoveHandler);
                                         window.addEventListener("mouseup", mouseUpHandler);
                                         rangeLabel.withRange(
@@ -1706,11 +1706,13 @@ const ChordJogApp = (() => {
                                             RangeMarkers.max.rootFret);
                                         return {
                                             forMin: () => {
+                                                RangeMarkers.min.atRootFret(rootFret);
                                                 internalState.withFields({
                                                     activeRangeMarker: RangeMarkers.min,
                                                     inactiveRootFret: RangeMarkers.max.rootFret,
                                                     polarity: -1});},
                                             forMax: () => {
+                                                RangeMarkers.max.atRootFret(rootFret);
                                                 internalState.withFields({
                                                     activeRangeMarker: RangeMarkers.max,
                                                     inactiveRootFret: RangeMarkers.min.rootFret,
@@ -1729,49 +1731,31 @@ const ChordJogApp = (() => {
                                             Functions.ifThenElse(rootFret < pivotFret,
                                                 () => {
                                                     rangeLabel.withRange(rootFret, pivotFret);
-                                                    States.extremumDragging.activate().forMin();
-                                                },
+                                                    States.extremumDragging.activate(rootFret).forMin();},
                                                 () => {
                                                     rangeLabel.withRange(pivotFret, rootFret);
-                                                    States.extremumDragging.activate().forMax();})});
+                                                    States.extremumDragging.activate(rootFret).forMax();})});
                                 deactivate=() => {
                                     window.removeEventListener("mouseup", mouseUp);
                                     window.removeEventListener("mousemove", mouseMove);};
                             return {
-                                activate: () => {
-                                    pivotFret = RangeMarkers.minAndMax.rootFret;
-                                    rangeLabel.withValue(pivotFret);
+                                activate: (rootFret) => {
+                                    pivotFret = rootFret;
+                                    RangeMarkers.all.forEach(rangeMarker => rangeMarker.atRootFret(rootFret));
+                                    rangeLabel.withValue(rootFret);
                                     window.addEventListener("mouseup", mouseUp);
                                     window.addEventListener("mousemove", mouseMove);}};}));
                             Objects.using(States.pivotInactive).withFields(Module.of(() => {
                                 let deactivate;
-                                const minMaxMouseDown = () => {
+                                const mouseDown = (e) => {
                                     deactivate();
-                                    States.pivot.activate();};
-                                const rangeMouseDown = (e,
-                                    rootFret = mouseEventToRootFret(e),
-                                    minAndMaxFret = RangeMarkers.minAndMax.rootFret) => {
-                                    Functions.ifThenElse(rootFret === minAndMaxFret,
-                                        minMaxMouseDown,
-                                        () => {
-                                            showMinRangeMarkerAndMaxRangerMarker();
-                                            deactivate();
-                                            const activation = States.extremumDragging.activate();
-                                            Functions.ifThenElse(rootFret < minAndMaxFret,
-                                                () => {
-                                                    RangeMarkers.min.atRootFret(rootFret);
-                                                    activation.forMin();},
-                                                () => {
-                                                    RangeMarkers.max.atRootFret(rootFret);
-                                                    activation.forMax();});})};
+                                    States.pivot.activate(mouseEventToRootFret(e));};
                                 deactivate = () => {
-                                    rootFretRangeMouseTrap.removeEventListener("mousedown", rangeMouseDown);};
-                                RangeMarkers.minAndMax.withEventListener("mousedown", () => {
-                                    deactivate();
-                                    States.pivot.activate();});
+                                    rootFretRangeMouseTrap.removeEventListener("mousedown", mouseDown);};
+                                RangeMarkers.minAndMax.withEventListener("mousedown", mouseDown);
                                 return {
                                     activate: () => {
-                                        rootFretRangeMouseTrap.addEventListener("mousedown", rangeMouseDown);}};}));
+                                        rootFretRangeMouseTrap.addEventListener("mousedown", mouseDown);}};}));
                             States.extremaInactive.activate();});
 
                         return SVGBuilder.g()
