@@ -1537,7 +1537,7 @@ const ChordJogApp = (() => {
                         .scale(fingerInputScale);
                     const rootFretRangeInput = Module.of(() => {
                         const RootFretRangeStyle = Module.of((
-                            marginTop = 28,
+                            marginTop = 29,
                             startX = ShapeChart.Fretboard.Style.x,
                             endX = startX + (ShapeChart.Fretboard.Style.stringSpacing *
                                 (Frets.roots.length - 1)),
@@ -1555,9 +1555,10 @@ const ChordJogApp = (() => {
                             activeBaselineStrokeWidth: 2.5,
                             tickRadius: tickRadius,
                             tickStrokeWidth: 1,
-                            rangeLabelFontSize: 12,
+                            rangeLabelFontSize: 13,
                             rangeLabelFont: "Courier New",
-                            rangeLabelMarginTop: 14,
+                            rangeLabelMarginTop: 16,
+                            rangeLabelTextSpacing: 40,
                             mouseTrapHorizontalPadding: mouseTrapHorizontalPadding,
                             mouseTrapWidth: width + 2 * mouseTrapHorizontalPadding,
                             mouseTrapHeight: 2 * rangeMarkerRadius,
@@ -1616,21 +1617,35 @@ const ChordJogApp = (() => {
                                             [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
                                         .withClass("root-fret-range-tick")
                                         .withDataAttribute("value", rootFretXCoordinate.rootFret))));
-                        const rangeLabel = SVGBuilder.Text
-                            .withoutTextContent()
-                            .withClass("rangeLabel")
-                            .withAttributes({
-                                fontFamily: RootFretRangeStyle.rangeLabelFont,
-                                fontSize: RootFretRangeStyle.rangeLabelFontSize,
-                                textAnchor: "middle"})
-                            .disableTextSelection()
-                            .moveTo(.5 * RootFretRangeStyle.width,
-                                RootFretRangeStyle.height + RootFretRangeStyle.rangeLabelMarginTop)
-                            .withMethods({
-                                withRange: function(minRootFret, maxRootFret) {
-                                    return this.withTextContent(`${minRootFret} <= r <= ${maxRootFret}`);},
-                                withValue: function(rootFret) {
-                                    return this.withRange(rootFret, rootFret);}});
+                        const rangeLabel = Module.of((
+                            createText=() => SVGBuilder.Text
+                                .withoutTextContent()
+                                .withAttributes({
+                                    fontFamily: RootFretRangeStyle.rangeLabelFont,
+                                    fontSize: RootFretRangeStyle.rangeLabelFontSize,
+                                    textAnchor: "middle"}),
+                            expressionText=createText()
+                                .withTextContent("<= r <=")
+                                .withClass("root-fret-range-input-label-min"),
+                            minText=createText()
+                                .withClass("root-fret-range-input-label-min")
+                                .move(-RootFretRangeStyle.rangeLabelTextSpacing, 0),
+                            maxText=createText()
+                                .withClass("root-fret-range-input-label-max")
+                                .move(RootFretRangeStyle.rangeLabelTextSpacing, 0)) =>
+                            SVGBuilder.g()
+                                .withClass("root-fret-range-input-label")
+                                .withChildren([minText, expressionText, maxText])
+                                .disableTextSelection()
+                                .moveTo(.5 * RootFretRangeStyle.width,
+                                    RootFretRangeStyle.height + RootFretRangeStyle.rangeLabelMarginTop)
+                                .withMethods({
+                                    withRange: function(minRootFret, maxRootFret) {
+                                        minText.withTextContent(minRootFret);
+                                        maxText.withTextContent(maxRootFret);
+                                        return this;},
+                                    withValue: function(rootFret) {
+                                        return this.withRange(rootFret, rootFret);}}));
                         const RangeMarkers = Module.of((
                             rootFretToCenter=(rootFret)=>[rootFretToXCoordinate(rootFret), 0],
                             withMarkerType = (markerType) => SVGBuilder.Circle
