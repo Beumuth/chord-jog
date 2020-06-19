@@ -1,7 +1,3 @@
-/*
- * TODO
- *  -Add hide() and show() to SVGBuilder.createElement
- */
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -290,6 +286,8 @@ const ChordJogApp = (() => {
                     withModification: function(modification) {
                         modification.bind(this)();
                         return this;},
+                    hide: function() {return this.withAttribute("display", "none");},
+                    show: function() {return this.withoutAttribute("display");},
                     disableTextSelection: function() {
                         ["webkitUserSelect", "mozUserSelect", "msUserSelect", "userSelect"]
                             .forEach(selectAttribute => this.style[selectAttribute] = "none");
@@ -1602,8 +1600,8 @@ const ChordJogApp = (() => {
                                             .withEndpoints(
                                                 [rootFretToXCoordinate(min), 0],
                                                 [rootFretToXCoordinate(max), 0])
-                                            .withoutAttribute("display") :
-                                        this.withAttribute("display", "none");});
+                                            .show() :
+                                        this.hide();});
                             const skeleton = SVGBuilder.g()
                                 .withClass("root-fret-range-skeleton")
                                 .withChild(baseline)
@@ -1671,7 +1669,7 @@ const ChordJogApp = (() => {
                                             cy: center[1]});})) => ({
                             min: withMarkerType("min").atRootFret(Frets.roots.first),
                             max: withMarkerType("max").atRootFret(Frets.roots.last),
-                            pivot: withMarkerType("minAndMax").withAttribute("display", "none"),
+                            pivot: withMarkerType("minAndMax").hide(),
                             preview: withMarkerType("preview").withAttributes({
                                 display: "none",
                                 strokeDasharray: "3 4",
@@ -1709,14 +1707,13 @@ const ChordJogApp = (() => {
                                 pivotInactive: {}};
                             const displayForRange = () => {
                                 RangeMarkers.minAndMax.forEach(marker =>
-                                    marker.withoutAttribute("display"));
-                                RangeMarkers.pivot.withAttribute("display", "none");
-                                activeBaseline.withoutAttribute("display");};
+                                    marker.show());
+                                RangeMarkers.pivot.hide();
+                                activeBaseline.show();};
                             const displayForPivot = () => {
-                                RangeMarkers.pivot.withoutAttribute("display");
-                                RangeMarkers.minAndMax.forEach(marker =>
-                                    marker.withAttribute("display", "none"));
-                                activeBaseline.withAttribute("display", "none");};
+                                RangeMarkers.pivot.show();
+                                RangeMarkers.minAndMax.forEach(marker => marker.hide());
+                                activeBaseline.hide();};
                             const emphasizeMarker = (marker) => marker.withAttribute("stroke-width",
                                 RootFretRangeStyle.rangeMarkerPreviewStrokeWidth);
                             const unemphasizeMarker = (marker) => marker.withAttribute(
@@ -1747,10 +1744,10 @@ const ChordJogApp = (() => {
                                     rootFret !== previewRootFret,
                                     () => setPreviewRootFret(rootFret))};
                             const inactiveRangeMouseEnter = (e, relevantMarkers) => {
-                                RangeMarkers.preview.withoutAttribute("display");
+                                RangeMarkers.preview.show();
                                 inactivateRangeMouseMove(e, relevantMarkers); };
                             const inactiveRangeMouseLeave = () => {
-                                RangeMarkers.preview.setAttribute("display", "none");
+                                RangeMarkers.preview.hide();
                                 RangeMarkers.minAndMax.concat(RangeMarkers.pivot).forEach(marker =>
                                     unemphasizeMarker(marker));};
                             Objects.using(States.extremaInactive).withFields(Module.of(() => {
@@ -1844,7 +1841,7 @@ const ChordJogApp = (() => {
                                     activate: () => {
                                         window.addEventListener("mousemove", mouseMoveHandler);
                                         window.addEventListener("mouseup", mouseUpHandler);
-                                        RangeMarkers.preview.setAttribute("display", "none");
+                                        RangeMarkers.preview.hide();
                                         return {
                                             forMin: () => activateExtremum(
                                                 RangeMarkers.min, RangeMarkers.max, -1),
@@ -1877,7 +1874,7 @@ const ChordJogApp = (() => {
                                     emphasizeMarker(RangeMarkers.pivot);
                                     RangeMarkers.minAndMax.forEach(rangeMarker =>
                                         rangeMarker.atRootFret(pivotFret));
-                                    RangeMarkers.preview.setAttribute("display", "none");
+                                    RangeMarkers.preview.hide();
                                     rangeLabel.withValue(pivotFret);
                                     window.addEventListener("mouseup", mouseUp);
                                     window.addEventListener("mousemove", mouseMove);}};}));
