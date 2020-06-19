@@ -1552,6 +1552,7 @@ const ChordJogApp = (() => {
                             width: width,
                             height: 2 * tickRadius,
                             baselineStrokeWidth: 1.5,
+                            baselineMeatStrokeWidth: 2,
                             tickRadius: tickRadius,
                             tickStrokeWidth: 1.5,
                             rangeLabelFontSize: 12,
@@ -1584,6 +1585,35 @@ const ChordJogApp = (() => {
                                         binarySearchEven(candidates, x),
                                     x) :
                                 candidates[0].rootFret) => (x) => binarySearch(rootFretXCoordinates, x));
+                        const skeleton = Module.of(() => {
+                            const baseline = SVGBuilder.Line
+                                .withEndpoints(
+                                    [0, 0],
+                                    [RootFretRangeStyle.width, 0])
+                                .withClass("root-fret-range-input-baseline")
+                                .withAttribute("stroke-width", RootFretRangeStyle.baselineStrokeWidth);
+                            let baselineMeat = null;
+                            const updateBaselineMeat = (min, max) => baselineMeat = SVGBuilder.Line
+                                .withEndpoints(
+                                    [rootFretToXCoordinate(min), 0],
+                                    [rootFretToXCoordinate(max), 0])
+                                .withClass("root-fret-range-input-baseline-meat")
+                                .withAttribute("stroke-width", RootFretRangeStyle.baselineMeatStrokeWidth);
+                            updateBaselineMeat(Frets.roots.first, Frets.roots.last);
+                            return SVGBuilder.g()
+                                .withClass("root-fret-range-skeleton")
+                                .withChild(baselineMeat)
+                                .withChild(baseline)
+                                .withChild(SVGBuilder.g()
+                                    .withClass("root-fret-range-ticks")
+                                    .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth)
+                                    .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVGBuilder.Line
+                                        .withEndpoints(
+                                            [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                                            [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                                        .withClass("root-fret-range-tick")
+                                        .withDataAttribute("value", rootFretXCoordinate.rootFret))));
+                        });
                         const rangeLabel = SVGBuilder.Text
                             .withTextContent(null)
                             .withClass("rangeLabel")
@@ -1600,13 +1630,7 @@ const ChordJogApp = (() => {
                                 withValue: function(rootFret) {
                                     return this.withRange(rootFret, rootFret);}})
                             .withModification(function() {
-                                this.withRange(Frets.roots.first, Frets.roots.last);})
-                        const baseline = SVGBuilder.Line
-                            .withEndpoints(
-                                [0, 0],
-                                [RootFretRangeStyle.width, 0])
-                            .withClass("root-fret-range-input-baseline")
-                            .withAttribute("stroke-width", RootFretRangeStyle.baselineStrokeWidth);
+                                this.withRange(Frets.roots.first, Frets.roots.last);});
                         const RangeMarkers = Module.of((
                             rootFretToCenter=(rootFret)=>[rootFretToXCoordinate(rootFret), 0],
                             withMarkerType = (markerType) => SVGBuilder.Circle
@@ -1654,21 +1678,23 @@ const ChordJogApp = (() => {
                                 maxDragging: {},
                                 pivot: {},
                                 pivotInactive: {}};
-                            const showMinRangeMarkerAndMaxRangerMarker = () => {
+                            const displayForRange = () => {
                                 RangeMarkers.minAndMax.forEach(marker =>
                                     marker.withoutAttribute("display"));
-                                RangeMarkers.pivot.withAttribute("display", "none");};
-                            const showMinAndMaxRangeMarker = () => {
+                                RangeMarkers.pivot.withAttribute("display", "none");
+                                baselineMeat.withoutAttribute("display");};
+                            const displayForPivot = () => {
                                 RangeMarkers.pivot.withoutAttribute("display");
                                 RangeMarkers.minAndMax.forEach(marker =>
-                                    marker.withAttribute("display", "none"));};
+                                    marker.withAttribute("display", "none"));
+                                baselineMeat.withAttribute("display", "none");};
                             const emphasizeMarker = (marker) => marker.withAttribute("stroke-width",
                                 RootFretRangeStyle.rangeMarkerPreviewStrokeWidth);
                             const unemphasizeMarker = (marker) => marker.withAttribute(
                                 "stroke-width",
                                 RootFretRangeStyle.rangeMarkerStrokeWidth);
                             const mouseEventToRootFret = (e) => xCoordinateToRootFret(
-                                MouseEvents.relativeMousePosition(e, baseline)[0]);
+                                MouseEvents.relativeMousePosition(e, skeleton)[0]);
                             const emphasizeMarkerIfMouseOnRootFret = (marker, mouseEvent,
                                 relativeMousePosition=MouseEvents.relativeMousePosition(
                                     mouseEvent, rootFretRangeMouseTrap)) =>
@@ -1707,7 +1733,7 @@ const ChordJogApp = (() => {
                                     mouseMove: (e) => inactivateRangeMouseMove(e, RangeMarkers.minAndMax),
                                     mouseDown: (e) => {
                                         deactivate();
-                                        showMinAndMaxRangeMarker();
+                                        displayForPivot();
                                         States.pivot.activate(mouseEventToRootFret(e));},
                                     mouseLeave: inactiveRangeMouseLeave};
                                 const minMarkerEventListeners = {
@@ -1756,12 +1782,15 @@ const ChordJogApp = (() => {
                                             () => {
                                                 internalState.activeRootFret = rootFret;
                                                 internalState.activeRangeMarker.atRootFret(rootFret);
+                                                updateBaselineMeat(
+                                                    RangeMarkers.min.rootFret,
+                                                    RangeMarkers.max.rootFret);
                                                 setRangeLabel(rootFret);}),
                                         //Yes.
                                         () => {
                                             setRangeLabel(rootFret);
                                             deactivate();
-                                            showMinAndMaxRangeMarker();
+                                            displayForPivot();
                                             States.pivot.activate(internalState.inactiveRootFret);});
                                 const mouseUpHandler = (e) => {
                                     deactivate();
@@ -1807,13 +1836,15 @@ const ChordJogApp = (() => {
                                 const mouseMove = (e, rootFret=mouseEventToRootFret(e)) =>
                                     Functions.ifThen(rootFret !== pivotFret,
                                         () => {
-                                            showMinRangeMarkerAndMaxRangerMarker();
+                                            displayForRange();
                                             deactivate();
                                             Functions.ifThenElse(rootFret < pivotFret,
                                                 () => {
+                                                    updateBaselineMeat(rootFret, pivotFret);
                                                     rangeLabel.withRange(rootFret, pivotFret);
                                                     States.extremumDragging.activate(rootFret).forMin();},
                                                 () => {
+                                                    updateBaselineMeat(pivotFret, rootFret);
                                                     rangeLabel.withRange(pivotFret, rootFret);
                                                     States.extremumDragging.activate(rootFret).forMax();})});
                                 deactivate=() => {
@@ -1855,16 +1886,7 @@ const ChordJogApp = (() => {
                         return SVGBuilder.g()
                             .withClass("root-fret-range-input")
                             .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
-                            .withChild(baseline)
-                            .withChild(SVGBuilder.g()
-                                .withClass("root-fret-range-ticks")
-                                .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth)
-                                .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVGBuilder.Line
-                                    .withEndpoints(
-                                        [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
-                                        [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
-                                    .withClass("root-fret-range-tick")
-                                    .withDataAttribute("value", rootFretXCoordinate.rootFret))))
+                            .withChild(skeleton)
                             .withChild(rangeLabel)
                             .withChild(rootFretRangeMouseTrap)
                             .withChild(SVGBuilder.g()
