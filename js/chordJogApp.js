@@ -436,7 +436,7 @@ const ChordJogApp = (() => {
     //  • Unsounded means the string is unfingered and unplucked.
     //  • Open means the string is unfingered and plucked.
     //  • Fingered means the string is fingered on a fret and plucked to create a sounded note
-    //  • Deadedened means the string is fingered on a fret and plucked, but without sounding a note
+    //  • Deadened means the string is fingered on a fret and plucked, but without sounding a note
     //
     //The frets of a shape are numbered relative to a variable 'root fret', which is the lowest fret of a Shape's
     //fingered or deadened string actions, or 1 if a shape has no fingered or deadened string actions.
