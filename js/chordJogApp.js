@@ -1,3 +1,4 @@
+//Todo - get rid of hardcoded ShapeInput height
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -1559,6 +1560,7 @@ const ChordJogApp = (() => {
                             function() { return this.activeFinger; });
                         return mouseTraps; }};}};
         return {
+            Style: {height: 225.25},
             Builder: Module.of(() => {
                 const buildStep = (shapeChart) => {
                     const previewMeatContainer = SVG.Builder.G()
@@ -1742,6 +1744,15 @@ const ChordJogApp = (() => {
                         RangeMarkers.minAndMax = [RangeMarkers.min, RangeMarkers.max];
                         RangeMarkers.all = [RangeMarkers.preview,   //preview goes first so it is behind others
                             RangeMarkers.min, RangeMarkers.max, RangeMarkers.pivot];
+                        const displayForRange = () => {
+                            RangeMarkers.minAndMax.forEach(marker =>
+                                marker.show());
+                            RangeMarkers.pivot.hide();
+                            activeBaseline.show();};
+                        const displayForPivot = () => {
+                            RangeMarkers.pivot.show();
+                            RangeMarkers.minAndMax.forEach(marker => marker.hide());
+                            activeBaseline.hide();};
                         const rootFretRangeMouseTrap = SVG.Builder.MouseTrap
                             .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
                             .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
@@ -1754,11 +1765,13 @@ const ChordJogApp = (() => {
                                 value = [min, max];
                                 Functions.ifThenElse(min !== max,
                                     () => {
+                                        displayForRange();
                                         rangeLabel.withRange(min, max);
                                         activeBaseline.withRange(min, max);
                                         RangeMarkers.min.atRootFret(min);
                                         RangeMarkers.max.atRootFret(max);},
                                     () => {
+                                        displayForPivot();
                                         rangeLabel.withValue(min);
                                         RangeMarkers.pivot.atRootFret(min);});}}));
                         //Set up sequence of event handlers
@@ -1770,15 +1783,6 @@ const ChordJogApp = (() => {
                                 maxDragging: {},
                                 pivot: {},
                                 pivotInactive: {}};
-                            const displayForRange = () => {
-                                RangeMarkers.minAndMax.forEach(marker =>
-                                    marker.show());
-                                RangeMarkers.pivot.hide();
-                                activeBaseline.show();};
-                            const displayForPivot = () => {
-                                RangeMarkers.pivot.show();
-                                RangeMarkers.minAndMax.forEach(marker => marker.hide());
-                                activeBaseline.hide();};
                             const emphasizeMarker = (marker) => marker.withAttribute("stroke-width",
                                 RootFretRangeStyle.rangeMarkerPreviewStrokeWidth);
                             const unemphasizeMarker = (marker) => marker.withAttribute(
@@ -1978,7 +1982,11 @@ const ChordJogApp = (() => {
                                 .withChildren(RangeMarkers.all))
                             .withGetter("range", () => Range.get())
                             .withMethod("withRange", function(min, max) {
-                                Range.set(min, max);
+                                Functions.ifThen(
+                                    min >= Frets.roots.first &&
+                                    max <= Frets.roots.last &&
+                                    min <= max,
+                                    () => Range.set(min, max));
                                 return this;})
                             .withRange(Frets.roots.first, Frets.roots.last)});
                     return SVG.Builder.G()
@@ -1989,6 +1997,12 @@ const ChordJogApp = (() => {
                         .withChild(mouseTrapsBuilder.fingerlessIndicators)
                         .withChild(fingerInput)
                         .withChild(rootFretRangeInput)
+                        .withGetterAndSetter("shape",
+                            () => shapeChart.shape,
+                            (shape) => shapeChart.shape = shape)
+                        .withGetterAndSetter("rootFretRange",
+                            () => rootFretRangeInput.range,
+                            (range) => rootFretRangeInput.withRange(range[0], range[1]))
                         .withMethods(Module.of(() => {  //focus() and unfocus()
                             const keyCommands = Module.of(() => {
                                 const command = (finger) => {
@@ -2013,6 +2027,23 @@ const ChordJogApp = (() => {
                 return {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
                     blank: () => buildStep(ShapeChart.Builder.blank().unfixed())}; })};});
+    const ShapeCreator = {
+        new: () => {
+            const shapeInput = ShapeInput.Builder.blank().focus();
+            return SVG.Builder.G()
+            .withClass("shape-creator")
+            .withChild(shapeInput)
+            .withChild(SVG.Builder.TextButton
+                .withX(0)
+                .withY(ShapeInput.Style.height + 10)
+                .withWidth(125)
+                .withText("Reset")
+                .withClickHandler(() => {
+                    shapeInput.shape = Shapes.Schema.toString(
+                        Shapes.Schema.allUnsounded);
+                    shapeInput.rootFretRange = [Frets.roots.first, Frets.roots.last];})
+                .withClass("shape-creator-reset-button"));
+    }};
     return {
         create: () => SVG.Builder.SVG
             .withWidth(400)
@@ -2024,12 +2055,5 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeInput.Builder
-                .forShape(Shapes.Schema.fromString(";;11;11;23;o"))
-                .focus())
-            .withChild(SVG.Builder.TextButton
-                .withX(0)
-                .withY(240)
-                .withWidth(150)
-                .withText("Save")
-                .withClickHandler(() => console.log("hi there")))};})();
+            .withChild(ShapeCreator.new())
+            .withChild()};})();
