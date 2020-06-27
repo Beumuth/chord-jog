@@ -2,7 +2,7 @@ const ChordJogApp = (() => {
     const Style = {
         stroke: {
             width: 1},
-        Colors: {
+        colors: {
             black: "#000000",
             superHeavy: "#202020",
             heavy: "#464646",
@@ -11,7 +11,7 @@ const ChordJogApp = (() => {
             superLight: "#F6F6F6",
             white: "#ffffff"}};
     Style.stroke.halfWidth = Style.stroke.width * .5;
-    Style.textColor = Style.Colors.heavy;
+    Style.textColor = Style.colors.heavy;
     Style.font = "Helvetica";
 
     /**
@@ -191,7 +191,7 @@ const ChordJogApp = (() => {
     Frets.Relative.last = Frets.Relative.all[Frets.Relative.count - 1];
     Frets.Range.full = Frets.Range.create(Frets.first, Frets.last);
 
-    const SVGBuilder = Module.of(() => {
+    const SVG = Module.of(() => {
         const dashifyAttributeName = (name) =>
             _.range(0, name.length)
                 .map(charIndex => ((curChar) =>
@@ -239,14 +239,18 @@ const ChordJogApp = (() => {
                         return this; },
                     withEventListener: function(eventType, handler) {
                         eventType = eventType.toLowerCase();
-                        this.eventListeners[eventType] = handler.bind(this);
-                        this.addEventListener(eventType, this.eventListeners[eventType]);
+                        handler = handler.bind(this);
+                        const modifiedHandler = ["mousedown", "mouseup"].includes(eventType) ?
+                            function(e) {if(e.button === 0) handler(e);}:
+                            handler;
+                        this.eventListeners[eventType] = modifiedHandler;
+                        this.addEventListener(eventType, modifiedHandler);
                         return this; },
                     withEventListeners: function(eventListeners) {
                         Object.keys(eventListeners).forEach(eventType =>
                             this.withEventListener(eventType, eventListeners[eventType]));
                         return this; },
-                    withoutEventListener: function(eventType, handler) {
+                    withoutEventListener: function(eventType) {
                         eventType = eventType.toLowerCase();
                         this.removeEventListener(eventType, this.eventListeners[eventType]);
                         delete this.eventListeners[eventType];
@@ -333,7 +337,7 @@ const ChordJogApp = (() => {
                 .withField("eventListeners", {});};
         const svgBuilder = {
             element: createElement,
-            g: () => createElement("g"),
+            G: () => createElement("g"),
             Circle: ({
                 withCenter: (c) => ({
                     withRadius: (radius) =>
@@ -408,11 +412,72 @@ const ChordJogApp = (() => {
                         fontFamily: Style.font})) => ({
                 withTextContent: (textContent) => createText().withTextContent(textContent),
                 withoutTextContent: () => createText()}))};
-        svgBuilder.Rect.copy = (svgRect) => SVGBuilder.Rect
+        svgBuilder.Rect.copy = (svgRect) => SVG.Builder.Rect
             .withX(svgRect.x)
             .withY(svgRect.y)
             .withWidth(svgRect.width)
             .withHeight(svgRect.height);
+        svgBuilder.TextButton = Module.of(() => {
+            let rect = null,
+                label = null;
+            const padding = 5,
+                height=30,
+                preview = () => rect.withAttribute("stroke-width", 1.5),
+                normal = () => rect.withAttribute("stroke-width", 1),
+                active = () => rect.withAttribute("stroke-width", 2);
+            return {
+                withX: (x) => ({
+                    withY: (y) => ({
+                        withWidth: (width) => ({
+                            withText: (text) => ({
+                                withClickHandler: (clickHandler) => {
+                                    rect = SVG.Builder.Rect
+                                        .withX(0).withY(0)
+                                        .withWidth(width).withHeight(height)
+                                        .withClass("text-button-outline")
+                                        .withAttributes({
+                                            pointerEvents: "all",
+                                            cursor: "pointer"})
+                                        .withEventListeners(Module.of(() => {
+                                            let isMouseOver = false,
+                                                isMouseDown = false,
+                                                mouseUpHandler = null;
+                                            mouseUpHandler = function () {
+                                                isMouseDown = false;
+                                                window.removeEventListener("mouseup", mouseUpHandler);
+                                                Functions.ifThenElse(isMouseOver,
+                                                    () => {
+                                                        preview();
+                                                        clickHandler();},
+                                                    normal);};
+                                            return {
+                                                mouseEnter: () => {
+                                                    isMouseOver = true;
+                                                    Functions.ifThenElse(isMouseDown, active, preview);},
+                                                mouseDown: (e) => Functions.ifThen(
+                                                    e.button === 0,
+                                                    () => {
+                                                        isMouseDown = true;
+                                                        window.addEventListener("mouseup", mouseUpHandler);
+                                                        active();}),
+                                                mouseLeave: () => {
+                                                    isMouseOver = false;
+                                                    normal();}};}));
+                                    label = SVG.Builder.Text
+                                        .withTextContent(text)
+                                        .moveTo(.5 * width, .5 * height)
+                                        .withClass("text-button-label")
+                                        .withAttributes({
+                                            textAnchor: "middle",
+                                            dominantBaseline: "central",
+                                            textLength: width - (2 * padding)})
+                                        .disableTextSelection();
+                                    return SVG.Builder.G()
+                                        .withClass("text-button")
+                                        .moveTo(x, y)
+                                        .withChild(label)
+                                        .withChild(rect);}})})})})};
+        });
         svgBuilder.MouseTrap = {
             withX: (x) => ({
                 withY: (y) => ({
@@ -428,7 +493,7 @@ const ChordJogApp = (() => {
                                     cursor: "pointer",
                                     fill: "none",
                                     stroke: "none"})})})})};
-        return svgBuilder;});
+        return {Builder: svgBuilder};});
 
     //A shape defines the sounding of a guitar as an array of six string actions called its schema.
     //
@@ -532,7 +597,7 @@ const ChordJogApp = (() => {
                 isValid: (state) => Regions.States.all.includes(state)  },
             FingerLabel: {
                 Text: {
-                    createForRegion: (region) => SVGBuilder.Text
+                    createForRegion: (region) => SVG.Builder.Text
                         .withTextContent(region.finger.label)
                         .withAttributes({
                             x: region.initialPosition[0],
@@ -542,12 +607,12 @@ const ChordJogApp = (() => {
                             dx: -10.5 + region.initialOffset[0],
                             dy: 10.5 + region.initialOffset[1]})},
                 Outline: {
-                    createForRegion: (region) => SVGBuilder.Circle
+                    createForRegion: (region) => SVG.Builder.Circle
                         .withCenter(region.initialPosition)
                         .withRadius(18)
                         .withClass("finger-label-outline")},
-                instantiate: (region) => SVGBuilder
-                    .g()
+                instantiate: (region) => SVG.Builder
+                    .G()
                     .withClass("finger-label")
                     .withDataAttribute("for", region.finger.name)
                     .withChildren([
@@ -555,7 +620,7 @@ const ChordJogApp = (() => {
                         Regions.FingerLabel.Outline.createForRegion(region)])},
             Joint: {
                 instantiate: Module.of(() => {
-                    const pointToJoint = (p) => SVGBuilder.Circle
+                    const pointToJoint = (p) => SVG.Builder.Circle
                         .withCenter(p)
                         .withRadius(1)
                         .withClass("finger-input-region-joint")
@@ -625,7 +690,7 @@ const ChordJogApp = (() => {
                                 (p) => Geometry.distance2(p,
                                     Geometry.projectPointOnLineSegment(p,
                                         joints.map(jointToPoint)))}),
-                        element: SVGBuilder.g()
+                        element: SVG.Builder.G()
                             .withClass("finger-input-region")
                             .withDataAttribute("finger", staticRegion.finger.label)
                             .withGetter("finger", () => staticRegion.finger)
@@ -687,15 +752,15 @@ const ChordJogApp = (() => {
                             closestRegion.distance2 <= currentRegion.distance2 ?
                                 closestRegion : currentRegion)
                         .finger;
-                return SVGBuilder
-                    .g()
+                return SVG.Builder
+                    .G()
                     .withAttributes({
                         cursor: "pointer",
                         pointerEvents: "fill",
                         width: 233,
                         height: 291 })
                     .withClass("finger-input")
-                    .withChild(SVGBuilder.Path
+                    .withChild(SVG.Builder.Path
                         .withD(
                             `M
                                 90.24086,	287.90208
@@ -1022,7 +1087,7 @@ const ChordJogApp = (() => {
         FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
         FingerlessIndicator.Builder = Module.of(() => {
             const DeadStringBuilder = {
-                withCenter: (center) => SVGBuilder.Path
+                withCenter: (center) => SVG.Builder.Path
                     .withD(
                         `M
                             ${center[0] - FingerlessIndicator.Style.radius * halfRoot2},
@@ -1038,7 +1103,7 @@ const ChordJogApp = (() => {
                             ${FingerlessIndicator.Style.diameter * halfRoot2}`)
                     .withClass("dead-string-indicator")};
             const OpenStringBuilder = {
-                withCenter: (center) => SVGBuilder.Circle
+                withCenter: (center) => SVG.Builder.Circle
                     .withCenter(center)
                     .withRadius(FingerlessIndicator.Style.radius)
                     .withClass("open-string-indicator")};
@@ -1060,11 +1125,11 @@ const ChordJogApp = (() => {
                                         (relativeFret === undefined ? 0 : relativeFret) + .5) +
                                         FingerlessIndicator.Style.radius + FingerlessIndicator.Style.margin];
                                 return {
-                                    dead: () => SVGBuilder.g()
+                                    dead: () => SVG.Builder.G()
                                         .withClass("dead-string-indicators")
                                         .withChild(DeadStringBuilder.withCenter(centerTop))
                                         .withChild(DeadStringBuilder.withCenter(centerBottom)),
-                                    open: () => SVGBuilder.g()
+                                    open: () => SVG.Builder.G()
                                         .withClass("open-string-indicators")
                                         .withChild(OpenStringBuilder.withCenter(centerTop))
                                         .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};});
@@ -1104,7 +1169,7 @@ const ChordJogApp = (() => {
             Fretboard.fretToYCoordinate(fret)];
         Fretboard.StringLineBuilder =  {
             forString: (string) => ({
-                toFret: (fret) => SVGBuilder.Line
+                toFret: (fret) => SVG.Builder.Line
                     .withEndpoints(
                         Fretboard.stringFretToXY(string, Frets.Relative.first - .5),
                         Fretboard.stringFretToXY(string, fret + .5))
@@ -1113,7 +1178,7 @@ const ChordJogApp = (() => {
         Fretboard.FretDividerBuilder = {
             belowFret: (belowFret = Frets.Relative.last + 1) => ({
                 fromString: (fromString) => ({
-                    toString: (toString) => SVGBuilder.Line
+                    toString: (toString) => SVG.Builder.Line
                         .withEndpoints(
                             Fretboard.stringFretToXY(fromString, belowFret - .5),
                             Fretboard.stringFretToXY(toString, belowFret - .5))
@@ -1121,16 +1186,16 @@ const ChordJogApp = (() => {
                         .withDataAttribute("aboveFret", belowFret - 1)
                         .withDataAttribute("belowFret", belowFret)})})};
         FingerIndicator.Builder = {
-            forFingerAction: (fingerAction) => SVGBuilder
-                .g()
+            forFingerAction: (fingerAction) => SVG.Builder
+                .G()
                 .withClass("finger-indicator")
                 .withDataAttributes({
                     finger: fingerAction.finger,
                     fret: fingerAction.fret,
                     minString: fingerAction.range.min,
                     maxString: fingerAction.range.max})
-                .withAttribute("stroke", Style.Colors.superHeavy)
-                .withChild(SVGBuilder.Rect
+                .withAttribute("stroke", Style.colors.superHeavy)
+                .withChild(SVG.Builder.Rect
                     .withX(Fretboard.stringToXCoordinate(fingerAction.range.min) - FingerIndicator.Style.radius)
                     .withY(Fretboard.fretToYCoordinate(fingerAction.fret) - FingerIndicator.Style.radius)
                     .withWidth(FingerIndicator.Style.diameter +
@@ -1138,8 +1203,8 @@ const ChordJogApp = (() => {
                     .withHeight(FingerIndicator.Style.diameter)
                     .withRadius(FingerIndicator.Style.radius)
                     .withClass("finger-indicator-outline")
-                    .withAttribute("fill", Style.Colors.superHeavy))
-                .withChild(SVGBuilder.Text
+                    .withAttribute("fill", Style.colors.superHeavy))
+                .withChild(SVG.Builder.Text
                     .withTextContent(fingerAction.finger)
                     .withAttributes({
                         x: Module.of(() => {
@@ -1149,7 +1214,7 @@ const ChordJogApp = (() => {
                         dominantBaseline: "central",
                         textAnchor: "middle",
                         stroke: "none",
-                        fill: Style.Colors.superLight,
+                        fill: Style.colors.superLight,
                         fontSize: 17}))};
         const RootFretLabel = {
             Style: {
@@ -1157,7 +1222,7 @@ const ChordJogApp = (() => {
                 fontFamily: "monospace" }};
         RootFretLabel.Builder = Module.of(() => {
             const forText = (text) => {
-                const label = SVGBuilder.Text
+                const label = SVG.Builder.Text
                     .withTextContent(text)
                     .withClass("r-label")
                     .withAttributes({
@@ -1176,12 +1241,12 @@ const ChordJogApp = (() => {
 
         //The 'skeleton' consists of the passive portion of the ShapeFilterView -
         //fretboard and finger indicator placeholders.
-        const skeletonBuilder = () => SVGBuilder
-            .g()
+        const skeletonBuilder = () => SVG.Builder
+            .G()
             .withClass("shape-chart-skeleton")
-            .withAttribute("stroke", Style.Colors.light)
-            .withChild(SVGBuilder
-                .g()
+            .withAttribute("stroke", Style.colors.light)
+            .withChild(SVG.Builder
+                .G()
                 .withClass("fingerless-indicators")
                 .withChildren(Strings.all
                     .map((string) => FingerlessIndicator.Builder.forString(string).topOnly)
@@ -1189,8 +1254,8 @@ const ChordJogApp = (() => {
                         fingerIndicatorBuilder.open(),
                         fingerIndicatorBuilder.dead()])
                     .flat()))
-            .withChild(SVGBuilder
-                .g()
+            .withChild(SVG.Builder
+                .G()
                 .withClass("fretboard")
                 .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                     .forString(string)
@@ -1215,9 +1280,9 @@ const ChordJogApp = (() => {
                             string: index + 1,
                             action: action}))
                         .filter(stringAction => stringAction.action !== Shapes.StringAction.unsounded);
-                    const meat = SVGBuilder
-                        .g()
-                        .withAttribute("stroke", Style.Colors.heavy)
+                    const meat = SVG.Builder
+                        .G()
+                        .withAttribute("stroke", Style.colors.heavy)
                         .withClass("shape-chart-meat");
                     if(maxFret !== undefined) {meat
                         //Active strings
@@ -1242,7 +1307,7 @@ const ChordJogApp = (() => {
                                 .topAndBottom
                                 .withMaxActiveRelativeFret(maxFret)
                                 .open()
-                                .withAttribute("stroke", Style.Colors.black)))
+                                .withAttribute("stroke", Style.colors.black)))
                         //Dead strings indicators
                         .withChildren(activeStringActions
                             .filter(stringAction => Shapes.StringAction.isDeadened(stringAction.action))
@@ -1252,7 +1317,7 @@ const ChordJogApp = (() => {
                                 .topAndBottom
                                 .withMaxActiveRelativeFret(maxFret)
                                 .dead()
-                                .withAttribute("stroke", Style.Colors.black)))
+                                .withAttribute("stroke", Style.colors.black)))
                         //Finger indicators
                         .withChildren(activeStringActions
                             //Filter out open strings
@@ -1277,8 +1342,8 @@ const ChordJogApp = (() => {
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forShape(Shapes.Schema.allUnsounded);
-        const containerBuilder = () => SVGBuilder
-            .g()
+        const containerBuilder = () => SVG.Builder
+            .G()
             .withClass("shape-chart")
             .disableTextSelection()
             .withChild(skeletonBuilder())
@@ -1448,7 +1513,7 @@ const ChordJogApp = (() => {
                                     return {
                                         change: previewShape[previewString - 1],
                                         shape: Shapes.Schema.toString(previewShape)};};
-                                return SVGBuilder.MouseTrap
+                                return SVG.Builder.MouseTrap
                                     .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
                                     .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
                                     .withWidth(ShapeChart.Fretboard.Style.width + 2 * FretboardMouseTrap.Style.padding)
@@ -1461,7 +1526,7 @@ const ChordJogApp = (() => {
                                         if(currentTarget === mouseTraps.fretboard && ! dragActive()) {
                                             shapeChart.preview = mousePositionToShapeFunction(previousMousePosition)
                                                 .shape;}});}),
-                            fingerlessIndicators: SVGBuilder.MouseTrap
+                            fingerlessIndicators: SVG.Builder.MouseTrap
                                 .withX(ShapeChart.FingerlessIndicator.Style.startX  -
                                     FingerlessIndicatorMouseTrap.Style.padding.horizontal)
                                 .withY(ShapeChart.FingerlessIndicator.Style.startY -
@@ -1496,7 +1561,7 @@ const ChordJogApp = (() => {
         return {
             Builder: Module.of(() => {
                 const buildStep = (shapeChart) => {
-                    const previewMeatContainer = SVGBuilder.g()
+                    const previewMeatContainer = SVG.Builder.G()
                         .withClass("preview-meat-container")
                         .withAttributes({
                             display: "none",
@@ -1584,13 +1649,13 @@ const ChordJogApp = (() => {
                                         binarySearchEven(candidates, x),
                                     x) :
                                 candidates[0].rootFret) => (x) => binarySearch(rootFretXCoordinates, x));
-                            const baseline = SVGBuilder.Line
+                            const baseline = SVG.Builder.Line
                                 .withEndpoints(
                                     [0, 0],
                                     [RootFretRangeStyle.width, 0])
                                 .withClass("root-fret-range-input-baseline")
                                 .withAttribute("stroke-width", RootFretRangeStyle.baselineStrokeWidth);
-                            let activeBaseline = SVGBuilder.Line
+                            let activeBaseline = SVG.Builder.Line
                                 .withoutEndpoints()
                                 .withClass("root-fret-range-input-active-baseline")
                                 .withAttribute("stroke-width", RootFretRangeStyle.activeBaselineStrokeWidth)
@@ -1602,21 +1667,21 @@ const ChordJogApp = (() => {
                                                 [rootFretToXCoordinate(max), 0])
                                             .show() :
                                         this.hide();});
-                            const skeleton = SVGBuilder.g()
+                            const skeleton = SVG.Builder.G()
                                 .withClass("root-fret-range-skeleton")
                                 .withChild(baseline)
                                 .withChild(activeBaseline)
-                                .withChild(SVGBuilder.g()
+                                .withChild(SVG.Builder.G()
                                     .withClass("root-fret-range-ticks")
                                     .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth)
-                                    .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVGBuilder.Line
+                                    .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVG.Builder.Line
                                         .withEndpoints(
                                             [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
                                             [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
                                         .withClass("root-fret-range-tick")
                                         .withDataAttribute("value", rootFretXCoordinate.rootFret))));
                         const rangeLabel = Module.of((
-                            createText=() => SVGBuilder.Text
+                            createText=() => SVG.Builder.Text
                                 .withoutTextContent()
                                 .withAttributes({
                                     fontFamily: RootFretRangeStyle.rangeLabelFont,
@@ -1631,7 +1696,7 @@ const ChordJogApp = (() => {
                             maxText=createText()
                                 .withClass("root-fret-range-input-label-max")
                                 .move(RootFretRangeStyle.rangeLabelTextSpacing, 0)) =>
-                            SVGBuilder.g()
+                            SVG.Builder.G()
                                 .withClass("root-fret-range-input-label")
                                 .withChildren([minText, expressionText, maxText])
                                 .disableTextSelection()
@@ -1646,7 +1711,7 @@ const ChordJogApp = (() => {
                                         return this.withRange(rootFret, rootFret);}}));
                         const RangeMarkers = Module.of((
                             rootFretToCenter=(rootFret)=>[rootFretToXCoordinate(rootFret), 0],
-                            withMarkerType = (markerType) => SVGBuilder.Circle
+                            withMarkerType = (markerType) => SVG.Builder.Circle
                                 .withCenter([0,0])
                                 .withRadius(RootFretRangeStyle.rangeMarkerRadius)
                                 .withClass("root-fret-range-marker")
@@ -1677,7 +1742,7 @@ const ChordJogApp = (() => {
                         RangeMarkers.minAndMax = [RangeMarkers.min, RangeMarkers.max];
                         RangeMarkers.all = [RangeMarkers.preview,   //preview goes first so it is behind others
                             RangeMarkers.min, RangeMarkers.max, RangeMarkers.pivot];
-                        const rootFretRangeMouseTrap = SVGBuilder.MouseTrap
+                        const rootFretRangeMouseTrap = SVG.Builder.MouseTrap
                             .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
                             .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
                             .withWidth(RootFretRangeStyle.mouseTrapWidth)
@@ -1902,13 +1967,13 @@ const ChordJogApp = (() => {
                                         RangeMarkers.pivot.withEventListeners(pivotMouseEvents);}};}));
                             States.extremaInactive.activate();});
 
-                        return SVGBuilder.g()
+                        return SVG.Builder.G()
                             .withClass("root-fret-range-input")
                             .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
                             .withChild(skeleton)
                             .withChild(rangeLabel)
                             .withChild(rootFretRangeMouseTrap)
-                            .withChild(SVGBuilder.g()
+                            .withChild(SVG.Builder.G()
                                 .withClass("root-fret-range-markers")
                                 .withChildren(RangeMarkers.all))
                             .withGetter("range", () => Range.get())
@@ -1916,7 +1981,7 @@ const ChordJogApp = (() => {
                                 Range.set(min, max);
                                 return this;})
                             .withRange(Frets.roots.first, Frets.roots.last)});
-                    return SVGBuilder.g()
+                    return SVG.Builder.G()
                         .withClass("shape-input")
                         .withChild(shapeChart)
                         .withChild(previewMeatContainer)
@@ -1949,16 +2014,22 @@ const ChordJogApp = (() => {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
                     blank: () => buildStep(ShapeChart.Builder.blank().unfixed())}; })};});
     return {
-        create: () => SVGBuilder.SVG
+        create: () => SVG.Builder.SVG
             .withWidth(400)
             .withHeight(400)
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
-                stroke: Style.Colors.heavy,
+                stroke: Style.colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             // .withChild(FingerSelect.Builder.build())
             .withChild(ShapeInput.Builder
                 .forShape(Shapes.Schema.fromString(";;11;11;23;o"))
-                .focus())};})();
+                .focus())
+            .withChild(SVG.Builder.TextButton
+                .withX(0)
+                .withY(240)
+                .withWidth(150)
+                .withText("Save")
+                .withClickHandler(() => console.log("hi there")))};})();
