@@ -1,4 +1,4 @@
-//Todo - get rid of hardcoded ShapeInput height
+//Todo - refactor elements with affine coordinates
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -1232,9 +1232,10 @@ const ChordJogApp = (() => {
                 const label = SVG.Builder.Text
                     .withTextContent(text)
                     .withClass("r-label")
+                    .moveTo(
+                        Fretboard.stringToXCoordinate(1) - FingerIndicator.Style.radius - 2,
+                        Fretboard.fretToYCoordinate(Frets.Relative.first))
                     .withAttributes({
-                        x: Fretboard.stringToXCoordinate(1) - FingerIndicator.Style.radius - 2,
-                        y: Fretboard.fretToYCoordinate(Frets.Relative.first),
                         dominantBaseline: "central",
                         textAnchor: "end",
                         fontFamily: "Courier New",
@@ -1587,6 +1588,7 @@ const ChordJogApp = (() => {
                 tickRadius: tickRadius,
                 rangeLabelFontSize: 13,
                 rangeLabelFont: "Courier New",
+                rangeLabelHalfHeight: 9,
                 rangeLabelMarginTop: 16,
                 rangeLabelTextSpacing: 40,
                 mouseTrapHorizontalPadding: mouseTrapHorizontalPadding,
@@ -1980,11 +1982,17 @@ const ChordJogApp = (() => {
                         .withRange(Frets.roots.first, Frets.roots.last);});
             return {
                 Style: {
-                    width: RootFretRangeStyle.width,
-                    height: RootFretRangeStyle.height},
+                    x: RootFretRangeStyle.startX - RootFretRangeStyle.rangeMarkerRadius,
+                    y: RootFretRangeStyle.y - RootFretRangeStyle.rangeMarkerRadius,
+                    width: RootFretRangeStyle.width + 2 * RootFretRangeStyle.rangeMarkerRadius,
+                    height: 2 * RootFretRangeStyle.height +
+                        RootFretRangeStyle.rangeLabelMarginTop +
+                        RootFretRangeStyle.rangeLabelHalfHeight},
                 Builder: RootFretRangeInputBuilders.RootFretRangeInput};});
         return {
-            Style: { height: 225.25 },
+            Style: {
+                width: RootFretRangeInput.Style.x + RootFretRangeInput.Style.width,
+                height: RootFretRangeInput.Style.y + RootFretRangeInput.Style.height},
             Builder: Module.of(() => {
                 const buildStep = (shapeChart) => {
                     const previewMeatContainer = SVG.Builder.G()
@@ -2063,6 +2071,7 @@ const ChordJogApp = (() => {
                 return {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
                     blank: () => buildStep(ShapeChart.Builder.blank().unfixed())}; })};});
+    console.log(ShapeInput.Style);
     const ShapeCreator = {
         new: () => {
             const shapeInput = ShapeInput.Builder.blank().focus();
