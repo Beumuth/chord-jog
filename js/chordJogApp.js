@@ -21,8 +21,14 @@ const ChordJogApp = (() => {
     const Module = {of: (f, ...args) => f.apply(undefined, args)};
 
     const Functions = {
-        ifThen: (condition, f) => condition === true ? f() : undefined,
-        ifThenElse: (condition, fIf, fElse) => condition === true ? fIf() : fElse()};
+        ifThen: (condition, then) => condition === true ? then() : undefined,
+        ifThenFinal: (condition, then, final) => {
+            if(condition) then();
+            return final(); },
+        ifThenElse: (condition, then, fElse) => condition === true ? then() : fElse(),
+        ifThenElseFinal: (condition, then, fElse, final) => {
+            condition === true ? then() : fElse();
+            return final();}};
 
     const Objects = Module.of(() => {
         const helpers = {
@@ -1575,10 +1581,10 @@ const ChordJogApp = (() => {
                 y: ShapeChart.Style.height + marginTop,
                 width: width,
                 height: 2 * tickRadius,
-                baselineStrokeWidth: 1,
-                activeBaselineStrokeWidth: 2.5,
+                normalStrokeWidth: 1,
+                emphasisStrokeWidth: 1.5,
+                activeStrokeWidth: 2,
                 tickRadius: tickRadius,
-                tickStrokeWidth: 1,
                 rangeLabelFontSize: 13,
                 rangeLabelFont: "Courier New",
                 rangeLabelMarginTop: 16,
@@ -1587,9 +1593,7 @@ const ChordJogApp = (() => {
                 mouseTrapWidth: width + 2 * mouseTrapHorizontalPadding,
                 mouseTrapHeight: 2 * rangeMarkerRadius,
                 tickSpacing: width / (Frets.roots.length - 1),
-                rangeMarkerRadius: rangeMarkerRadius,
-                rangeMarkerStrokeWidth: 1,
-                rangeMarkerPreviewStrokeWidth: 1.5}));
+                rangeMarkerRadius: rangeMarkerRadius}));
             const rootFretToXCoordinate = (rootFret) => (rootFret-1) * RootFretRangeStyle.tickSpacing;
             const rootFretXCoordinates = Frets.roots.map(rootFret => ({
                 rootFret: rootFret,
@@ -1616,11 +1620,11 @@ const ChordJogApp = (() => {
                         [0, 0],
                         [RootFretRangeStyle.width, 0])
                     .withClass("root-fret-range-input-baseline")
-                    .withAttribute("stroke-width", RootFretRangeStyle.baselineStrokeWidth),
+                    .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth),
                 ActiveBaseline: () => SVG.Builder.Line
                     .withoutEndpoints()
                     .withClass("root-fret-range-input-active-baseline")
-                    .withAttribute("stroke-width", RootFretRangeStyle.activeBaselineStrokeWidth)
+                    .withAttribute("stroke-width", RootFretRangeStyle.activeStrokeWidth)
                     .withMethod("withRange", function(min, max) {
                         return min !== max ?
                             this
@@ -1630,19 +1634,39 @@ const ChordJogApp = (() => {
                                 .show() :
                             this.hide();}),
                 Skeleton: {
-                    withBaselines: (baseline, activeBaseline) => SVG.Builder.G()
-                        .withClass("root-fret-range-skeleton")
-                        .withChild(baseline)
-                        .withChild(activeBaseline)
-                        .withChild(SVG.Builder.G()
-                            .withClass("root-fret-range-ticks")
-                            .withAttribute("stroke-width", RootFretRangeStyle.tickStrokeWidth)
-                            .withChildren(rootFretXCoordinates.map(rootFretXCoordinate => SVG.Builder.Line
-                                .withEndpoints(
-                                    [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
-                                    [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
-                                .withClass("root-fret-range-tick")
-                                .withDataAttribute("value", rootFretXCoordinate.rootFret))))},
+                    withBaselines: (baseline, activeBaseline,
+                        rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
+                            .withEndpoints(
+                                [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                                [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                            .withClass("root-fret-range-tick")
+                            .withDataAttribute("value", rootFretXCoordinate.rootFret),
+                        rootFretTicks=rootFretXCoordinates.reduce(
+                            (tickMap, rootFretXCoordinate) => {
+                                tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
+                                return tickMap;},
+                            {})) => SVG.Builder.G()
+                                .withClass("root-fret-range-skeleton")
+                                .withChild(baseline)
+                                .withChild(activeBaseline)
+                                .withChild(SVG.Builder.G()
+                                    .withClass("root-fret-range-ticks")
+                                    .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
+                                    .withChildren(Object.values(rootFretTicks)))
+                                .withMethods(
+                                    Module.of((
+                                        activeRootFrets=[],
+                                        setNewActives=(actives) => {
+                                            activeRootFrets.forEach(rootFret =>
+                                                rootFretTicks[rootFret].withAttribute(
+                                                    "stroke-width", RootFretRangeStyle.normalStrokeWidth));
+                                            activeRootFrets = actives;
+                                            activeRootFrets.forEach((rootFret) =>
+                                                rootFretTicks[rootFret].withAttribute(
+                                                    "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
+                                    ) => ({
+                                        activateMinAndMax: (min, max) => setNewActives([min, max]),
+                                        activatePivot: (pivot) => setNewActives([pivot])})))},
                 RangeLabel: Module.of((
                     createText=() => SVG.Builder.Text
                         .withoutTextContent()
@@ -1681,7 +1705,7 @@ const ChordJogApp = (() => {
                         .withAttributes({
                             cursor: "pointer",
                             pointerEvents: "all",
-                            strokeWidth: RootFretRangeStyle.rangeMarkerStrokeWidth,
+                            strokeWidth: RootFretRangeStyle.normalStrokeWidth,
                             fill: "none"})
                         .withDataAttribute("markerType", markerType)
                         .withDataAttribute("rootFret", null)
@@ -1716,11 +1740,12 @@ const ChordJogApp = (() => {
                 .withClass("root-fret-range-mouse-trap")};
             RootFretRangeInputBuilders.RootFretRangeInput = Module.of((
                 setupEventHandlers = (rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range) => {
-                    const emphasizeMarker = (marker) => marker.withAttribute("stroke-width",
-                        RootFretRangeStyle.rangeMarkerPreviewStrokeWidth);
+                    const activateMarker = (marker) => marker.withAttribute(
+                        "stroke-width", RootFretRangeStyle.activeStrokeWidth)
+                    const emphasizeMarker = (marker) => marker.withAttribute(
+                        "stroke-width", RootFretRangeStyle.emphasisStrokeWidth);
                     const unemphasizeMarker = (marker) => marker.withAttribute(
-                        "stroke-width",
-                        RootFretRangeStyle.rangeMarkerStrokeWidth);
+                        "stroke-width", RootFretRangeStyle.normalStrokeWidth);
                     const States = {
                         extremaInactive: {},
                         extremumDragging: {},
@@ -1830,7 +1855,7 @@ const ChordJogApp = (() => {
                             window.removeEventListener("mousemove", mouseMoveHandler);
                             window.removeEventListener("mouseup", mouseUpHandler);};
                         const activateExtremum = (activeRangeMarker, inactiveRangeMarker, polarity) => {
-                            emphasizeMarker(activeRangeMarker);
+                            activateMarker(activeRangeMarker);
                             unemphasizeMarker(inactiveRangeMarker);
                             const activeRootFret = activeRangeMarker.rootFret;
                             const inactiveRootFret = inactiveRangeMarker.rootFret;
@@ -1875,7 +1900,7 @@ const ChordJogApp = (() => {
                         return {
                             activate: () => {
                                 pivotFret = rangeMarkers.pivot.rootFret;
-                                emphasizeMarker(rangeMarkers.pivot);
+                                activateMarker(rangeMarkers.pivot);
                                 rangeMarkers.minAndMax.forEach(rangeMarker =>
                                     rangeMarker.atRootFret(pivotFret));
                                 rangeMarkers.preview.hide();
@@ -1917,18 +1942,20 @@ const ChordJogApp = (() => {
                                 set: (min, max=min) => {
                                     value = [min, max];
                                     Functions.ifThenElse(min !== max,
-                                        () => {
+                                        () => { //min and max
                                             rangeMarkers.minAndMax.forEach(marker =>
                                                 marker.show());
                                             rangeMarkers.pivot.hide();
+                                            skeleton.activateMinAndMax(min, max);
                                             activeBaseline.show();
                                             rangeLabel.withRange(min, max);
                                             activeBaseline.withRange(min, max);
                                             rangeMarkers.min.atRootFret(min);
                                             rangeMarkers.max.atRootFret(max);},
-                                        () => {
+                                        () => { //pivot
                                             rangeMarkers.pivot.show();
                                             rangeMarkers.minAndMax.forEach(marker => marker.hide());
+                                            skeleton.activatePivot(min);
                                             activeBaseline.hide();
                                             rangeLabel.withValue(min);
                                             rangeMarkers.pivot.atRootFret(min);});}}))
