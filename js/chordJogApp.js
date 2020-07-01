@@ -74,9 +74,22 @@ const ChordJogApp = (() => {
                     this[key] = methods[key].bind(this));
                 return this; }};
         const objects = {
+            isNil: Module.of((nils = [null, undefined]) =>
+                (object) => nils.includes(object)),
             using: (object) => helpers.withMethods.bind(object)(helpers)};
         objects.new = () => objects.using({});
         return objects;});
+    const Numbers = {
+        goldenRatio: (1+Math.sqrt(5))/2,
+        range: (fromInclusive, toExclusive) => {
+            let range = [];
+            for(let i = fromInclusive; i < toExclusive; ++i) {
+                range.push(i);}
+            return range;},
+        clamp: (value, fromInclusive, toInclusive) =>
+            value < fromInclusive ? fromInclusive :
+            value > toInclusive ? toInclusive :
+            value};
     const Arrays = {
         updateItem: (array, index, modification) => {
             modification(array[index]);
@@ -108,7 +121,7 @@ const ChordJogApp = (() => {
                 py = p[1] - segment[0][1],
                 ux = segment[1][0] - segment[0][0],
                 uy = segment[1][1] - segment[0][1],
-                k = _.clamp((px*ux + py*uy) / (ux*ux + uy*uy), 0, 1)
+                k = Numbers.clamp((px*ux + py*uy) / (ux*ux + uy*uy), 0, 1)
             //proj(p, u) = k*u
             return [segment[0][0] + k * ux, segment[0][1] + k * uy]; }};
 
@@ -142,7 +155,7 @@ const ChordJogApp = (() => {
         range: (min, max) => ({
             min: min,
             max: max})};
-    Strings.all = _.range(1, Strings.count+1);
+    Strings.all = Numbers.range(1, Strings.count+1);
     Strings.first = Strings.all[0];
     Strings.last = Strings.all[Strings.count - 1];
 
@@ -182,14 +195,14 @@ const ChordJogApp = (() => {
             create: (min, max) => ({
                 min: min,
                 max: max })}};
-    Frets.fretted = _.range(Frets.first, Frets.last);
+    Frets.fretted = Numbers.range(Frets.first, Frets.last);
     Frets.roots = Frets.fretted.slice(0, Frets.maxRoot);
     Frets.roots.first = Frets.roots[0];
     Frets.roots.last = Frets.roots[Frets.roots.length - 1];
     Frets.all = [Frets.open].concat(Frets.fretted);
     Frets.isFretted = Frets.fretted.includes;
     Frets.isOpen = (fret) => ! Frets.isFretted(fret);
-    Frets.Relative.all = _.range(
+    Frets.Relative.all = Numbers.range(
         Frets.Relative.root,
         Frets.Relative.max+1);
     Frets.Relative.count = Frets.Relative.all.length;
@@ -199,7 +212,7 @@ const ChordJogApp = (() => {
 
     const SVG = Module.of(() => {
         const dashifyAttributeName = (name) =>
-            _.range(0, name.length)
+            Numbers.range(0, name.length)
                 .map(charIndex => ((curChar) =>
                     curChar === curChar.toLowerCase() ?
                         curChar : "-" + curChar.toLowerCase())(
@@ -426,67 +439,65 @@ const ChordJogApp = (() => {
             .withWidth(svgRect.width)
             .withHeight(svgRect.height);
         svgBuilder.TextButton = Module.of(() => {
-            let rect = null,
-                label = null;
             const padding = 5,
-                height=30,
-                preview = () => rect.withAttribute("stroke-width", 1.5),
-                normal = () => rect.withAttribute("stroke-width", 1),
-                active = () => rect.withAttribute("stroke-width", 2);
+                height=30;
             return {
-                withX: (x) => ({
-                    withY: (y) => ({
-                        withWidth: (width) => ({
-                            withText: (text) => ({
-                                withClickHandler: (clickHandler) => {
-                                    rect = SVG.Builder.Rect
-                                        .withX(0).withY(0)
-                                        .withWidth(width).withHeight(height)
-                                        .withClass("text-button-outline")
-                                        .withAttributes({
-                                            pointerEvents: "all",
-                                            cursor: "pointer"})
-                                        .withEventListeners(Module.of(() => {
-                                            let isMouseOver = false,
-                                                isMouseDown = false,
-                                                mouseUpHandler = null;
-                                            mouseUpHandler = function () {
-                                                isMouseDown = false;
-                                                window.removeEventListener("mouseup", mouseUpHandler);
-                                                Functions.ifThenElse(isMouseOver,
-                                                    () => {
-                                                        preview();
-                                                        clickHandler();},
-                                                    normal);};
-                                            return {
-                                                mouseEnter: () => {
-                                                    isMouseOver = true;
-                                                    Functions.ifThenElse(isMouseDown, active, preview);},
-                                                mouseDown: (e) => Functions.ifThen(
-                                                    e.button === 0,
-                                                    () => {
-                                                        isMouseDown = true;
-                                                        window.addEventListener("mouseup", mouseUpHandler);
-                                                        active();}),
-                                                mouseLeave: () => {
-                                                    isMouseOver = false;
-                                                    normal();}};}));
-                                    label = SVG.Builder.Text
-                                        .withTextContent(text)
-                                        .moveTo(.5 * width, .5 * height)
-                                        .withClass("text-button-label")
-                                        .withAttributes({
-                                            textAnchor: "middle",
-                                            dominantBaseline: "central",
-                                            fontSize: 17,
-                                            fontFamily: "Courier New"})
-                                        .disableTextSelection();
-                                    return SVG.Builder.G()
-                                        .withClass("text-button")
-                                        .moveTo(x, y)
-                                        .withChild(label)
-                                        .withChild(rect);}})})})})};
-        });
+                withDimensions: (x, y, width, height) => ({
+                    withText: (text) => ({
+                        withClickHandler: (clickHandler) => {
+                            let rect = null;
+                            const
+                                preview = () => rect.withAttribute("stroke-width", 1.5),
+                                normal = () => rect.withAttribute("stroke-width", 1),
+                                active = () => rect.withAttribute("stroke-width", 2);
+                            rect = SVG.Builder.Rect
+                                .withX(0).withY(0)
+                                .withWidth(width).withHeight(height)
+                                .withClass("text-button-outline")
+                                .withAttributes({
+                                    pointerEvents: "all",
+                                    cursor: "pointer"})
+                                .withEventListeners(Module.of(() => {
+                                    let isMouseOver = false,
+                                        isMouseDown = false,
+                                        mouseUpHandler = undefined;
+                                    mouseUpHandler = function () {
+                                        isMouseDown = false;
+                                        window.removeEventListener("mouseup", mouseUpHandler);
+                                        Functions.ifThenElse(isMouseOver,
+                                            () => {
+                                                preview();
+                                                clickHandler();},
+                                            () => normal());};
+                                    return {
+                                        mouseEnter: () => {
+                                            isMouseOver = true;
+                                            Functions.ifThenElse(isMouseDown,
+                                                active,
+                                                preview);},
+                                        mouseDown: (e) => Functions.ifThen(
+                                            e.button === 0,
+                                            () => {
+                                                isMouseDown = true;
+                                                window.addEventListener("mouseup", mouseUpHandler);
+                                                active();}),
+                                        mouseLeave: () => {
+                                            isMouseOver = false;
+                                            normal();}};}));
+                            return SVG.Builder.G()
+                                .withClass("text-button")
+                                .moveTo(x, y)
+                                .withChild(SVG.Builder.Text
+                                    .withTextContent(text)
+                                    .moveTo(.5 * width, .5 * height)
+                                    .withClass("text-button-label")
+                                    .withAttributes({
+                                        textAnchor: "middle",
+                                        dominantBaseline: "central",
+                                        fontSize: 17,
+                                        fontFamily: "Courier New"})
+                                    .disableTextSelection())
+                                .withChild(rect);}})})};});
         svgBuilder.MouseTrap = {
             withX: (x) => ({
                 withY: (y) => ({
@@ -681,7 +692,7 @@ const ChordJogApp = (() => {
                 .withOffset([-1.75, -1])
                 .withLineSegmentModel([[219, 63], [217, 158]])];
         Regions.staticWithFinger = (finger) => Regions.static.find(region => region.finger === finger)
-        Regions.Builder.Dynamic = {
+        Regions.Builder.Instance = {
             withRegionChangeObserver: (regionChangeObserver) => Regions.static.map((staticRegion) => {
                 //The 'joints' is either a single or a pair of points used for
                 //calculating the closest finger to the mouse.
@@ -751,7 +762,7 @@ const ChordJogApp = (() => {
                 width: 237},
             Builder: {
                 withRegionChangeObserver: (observer) => {
-                    const regions = Regions.Builder.Dynamic.withRegionChangeObserver(observer);
+                    const regions = Regions.Builder.Instance.withRegionChangeObserver(observer);
                     const regionWithFinger = (finger) => regions.find(region => region.finger === finger);
                     const mouseEventToClosestFinger = (e) => regions
                         .map(region => ({
@@ -1010,11 +1021,11 @@ const ChordJogApp = (() => {
                             return this;},
                         unpreview: function() {
                             const previewFinger = this.preview;
-                            if(! _.isNil(previewFinger)) {
+                            if(! Objects.isNil(previewFinger)) {
                                 this.setFingerState(previewFinger, "unselected"); } },
                         unselect: function() {
                             const selectedFinger = this.selected;
-                            if(! _.isNil(selectedFinger)) {
+                            if(! Objects.isNil(selectedFinger)) {
                                 this.setFingerState(selectedFinger, "unselected"); } },
                         getFingerState: function(finger) { return regionWithFinger(finger).state; },
                         setFingerState: function(finger, state) { regionWithFinger(finger).state = state; },
@@ -1047,7 +1058,7 @@ const ChordJogApp = (() => {
                             get: function() { return this.getFingerWithExclusiveState("selected"); },
                             set: function(finger) {
                                 //Unselect if null or undefined
-                                if(_.isNil(finger)) {
+                                if(Objects.isNil(finger)) {
                                     return this.unselect(); }
 
                                 //Get the newly selected region state
@@ -1072,7 +1083,7 @@ const ChordJogApp = (() => {
                                 return this.getFingerWithExclusiveState("preview");},
                             set: function(finger) {
                                 //Unpreview if null or undefined
-                                if(_.isNil(finger)) {return this.unpreview(); }
+                                if(Objects.isNil(finger)) {return this.unpreview(); }
                                 //Get the current preview region (possibly undefined)
                                 const existingPreviewFinger = this.preview;
                                 //Does one exist, and if so does it differ from
@@ -1277,7 +1288,7 @@ const ChordJogApp = (() => {
                 .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                     .forString(string)
                     .toFret(Frets.Relative.last)))
-                .withChildren(_.range(Frets.Relative.first, Frets.Relative.last + 2)
+                .withChildren(Numbers.range(Frets.Relative.first, Frets.Relative.last + 2)
                     .map(belowFret => Fretboard.FretDividerBuilder
                         .belowFret(belowFret)
                         .fromString(Strings.first)
@@ -1309,7 +1320,7 @@ const ChordJogApp = (() => {
                                 .toFret(maxFret)
                                 .withAttribute("strokeWidth", 1.5)))
                         //Active frets dividers
-                        .withChildren(_.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
+                        .withChildren(Numbers.range(Frets.Relative.first, maxFret + 2).map(belowFret =>
                             Fretboard.FretDividerBuilder
                                 .belowFret(belowFret)
                                 .fromString(activeStringActions[0].string)
@@ -1380,7 +1391,7 @@ const ChordJogApp = (() => {
                     attributeExtractor: function() {return this.shape;}},
                 "data-r": {
                     listener: Module.of(() => {
-                        const isValidR = (r) => _.range(Frets.first, Frets.maxRoot + 1)
+                        const isValidR = (r) => Numbers.range(Frets.first, Frets.maxRoot + 1)
                             .map(fret => `${fret}`)
                             .includes(r);
                         return function(e) {
@@ -2080,29 +2091,43 @@ const ChordJogApp = (() => {
                 return {
                     forShape: (shape) => buildStep(ShapeChart.Builder.forShape(shape).unfixed()),
                     blank: () => buildStep(ShapeChart.Builder.blank().unfixed())}; })};});
-    console.log(ShapeInput.Style);
     const ShapeCreator = {
         new: () => {
             const shapeInput = ShapeInput.Builder.blank().focus();
+            const ShapeCreatorStyle = {
+                buttonMarginTop: 10,
+                buttonWidth: ShapeInput.Style.width / (2 + 3 / Numbers.goldenRatio)};
+            ShapeCreatorStyle.buttonY = ShapeInput.Style.height + ShapeCreatorStyle.buttonMarginTop;
+            ShapeCreatorStyle.buttonHeight = ShapeCreatorStyle.buttonWidth / Numbers.goldenRatio;
+            ShapeCreatorStyle.buttonSpacing = ShapeCreatorStyle.buttonWidth / Numbers.goldenRatio;
             return SVG.Builder.G()
-            .withClass("shape-creator")
-            .withChild(shapeInput)
-            .withChild(SVG.Builder.TextButton
-                .withX(0)
-                .withY(ShapeInput.Style.height + 10)
-                .withWidth(125)
-                .withText("Reset")
-                .withClickHandler(() => {
-                    shapeInput.shape = Shapes.Schema.toString(
-                        Shapes.Schema.allUnsounded);
-                    shapeInput.rootFretRange = [Frets.roots.first, Frets.roots.last];})
-                .withClass("shape-creator-reset-button"));
+                .withClass("shape-creator")
+                .withChild(shapeInput)
+                .withChild(SVG.Builder.TextButton
+                    .withDimensions(
+                        ShapeCreatorStyle.buttonHeight,
+                        ShapeCreatorStyle.buttonY,
+                        ShapeCreatorStyle.buttonWidth,
+                        ShapeCreatorStyle.buttonHeight)
+                    .withText("Reset")
+                    .withClickHandler(() => {
+                        shapeInput.shape = Shapes.Schema.toString(
+                            Shapes.Schema.allUnsounded);
+                        shapeInput.rootFretRange = [Frets.roots.first, Frets.roots.last];})
+                    .withClass("shape-creator-reset-button"))
+                .withChild(SVG.Builder.TextButton
+                    .withDimensions(
+                        2 * ShapeCreatorStyle.buttonHeight + ShapeCreatorStyle.buttonWidth,
+                        ShapeCreatorStyle.buttonY,
+                        ShapeCreatorStyle.buttonWidth,
+                        ShapeCreatorStyle.buttonHeight)
+                    .withText("Save")
+                    .withClickHandler(() => {}));
     }};
     return {
         create: () => SVG.Builder.SVG
             .withWidth(400)
             .withHeight(400)
-            .moveTo(3, 3)
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
