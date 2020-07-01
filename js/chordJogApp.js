@@ -1,4 +1,3 @@
-//Todo - refactor elements with affine coordinates
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -407,7 +406,9 @@ const ChordJogApp = (() => {
                         withTextContent: function(textContent) {
                             this.textContent = textContent;
                             return this;},
-                        withTextLength: function(value) { this.setAttribute("textLength", value); return this; },
+                        withTextLength: function(value) {
+                            this.setAttribute("textLength", value);
+                            return this; },
                         withLengthAdjustSpacing: function() {
                             this.setAttribute("lengthAdjust", "spacing");
                             return this; },
@@ -477,7 +478,8 @@ const ChordJogApp = (() => {
                                         .withAttributes({
                                             textAnchor: "middle",
                                             dominantBaseline: "central",
-                                            textLength: width - (2 * padding)})
+                                            fontSize: 17,
+                                            fontFamily: "Courier New"})
                                         .disableTextSelection();
                                     return SVG.Builder.G()
                                         .withClass("text-button")
@@ -1140,10 +1142,23 @@ const ChordJogApp = (() => {
                                         .withClass("open-string-indicators")
                                         .withChild(OpenStringBuilder.withCenter(centerTop))
                                         .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};});
+        const RootFretLabel = {
+            Style: {
+                paddingRight: 5,
+                textLength: 18, //hardcoded
+                fontSize: 15,
+                fontFamily: "monospace" }};
+        const FingerIndicator = {
+            Style: { radius: 11 } };
         const ShapeChartStyle = {
             padding: {
-                x: 30,
+                x: RootFretLabel.Style.textLength +
+                    RootFretLabel.Style.paddingRight +
+                    FingerIndicator.Style.radius,
                 y: Style.stroke.halfWidth + FingerlessIndicator.Style.radius } };
+        FingerlessIndicator.Style.startX = ShapeChartStyle.padding.x;
+        FingerlessIndicator.Style.startY = ShapeChartStyle.padding.y;
+        FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
         const FingerActions = {
             Builder: {
                 withFinger: (finger) => ({
@@ -1154,11 +1169,6 @@ const ChordJogApp = (() => {
                                 fret: fret,
                                 range: Strings.range(fromString, toString)})})})})},
             sameFingerAndFret: (a, b) => a.finger === b.finger && a.fret === b.fret};
-        FingerlessIndicator.Style.startX = ShapeChartStyle.padding.x;
-        FingerlessIndicator.Style.startY = ShapeChartStyle.padding.y;
-        const FingerIndicator = {
-            Style: { radius: 11 } };
-        FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
         const Fretboard = {
             Style: {
                 stringSpacing: 25,
@@ -1223,24 +1233,23 @@ const ChordJogApp = (() => {
                         stroke: "none",
                         fill: Style.colors.superLight,
                         fontSize: 17}))};
-        const RootFretLabel = {
-            Style: {
-                fontSize: 15,
-                fontFamily: "monospace" }};
         RootFretLabel.Builder = Module.of(() => {
             const forText = (text) => {
                 const label = SVG.Builder.Text
                     .withTextContent(text)
                     .withClass("r-label")
                     .moveTo(
-                        Fretboard.stringToXCoordinate(1) - FingerIndicator.Style.radius - 2,
+                        Fretboard.stringToXCoordinate(1) -
+                            FingerIndicator.Style.radius -
+                            RootFretLabel.Style.paddingRight,
                         Fretboard.fretToYCoordinate(Frets.Relative.first))
                     .withAttributes({
                         dominantBaseline: "central",
                         textAnchor: "end",
-                        fontFamily: "Courier New",
-                        fontSize: 15})
-                    .withLengthAdjustSpacingAndGlyphs()
+                        fontFamily: RootFretLabel.Style.fontFamily,
+                        fontSize: RootFretLabel.Style.fontSize})
+                    .withTextLength(RootFretLabel.Style.textLength)
+                    .withLengthAdjustSpacing();
                 return text.length <= 1 ? label : label
                     .withTextLength(17); };
             return {
@@ -2093,6 +2102,7 @@ const ChordJogApp = (() => {
         create: () => SVG.Builder.SVG
             .withWidth(400)
             .withHeight(400)
+            .moveTo(3, 3)
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
