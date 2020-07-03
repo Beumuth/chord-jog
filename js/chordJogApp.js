@@ -1526,17 +1526,23 @@ const ChordJogApp = (() => {
                                 let previousMousePosition = [0,0];
                                 const mousePositionToShapeFunction = (p) => {
                                     previousMousePosition = p;
-                                    const previewShape = Shapes.Schema.fromString(shapeChart.shape).slice();
+                                    let previewShape = Shapes.Schema.fromString(shapeChart.shape);
                                     const previewString = FretboardMouseTrap.xCoordinateToString(p[0]);
                                     const previewFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
                                     const previewFinger = shapeChart.activeFinger.label;
+                                    previewShape = previewShape.map(stringAction => Functions.ifThenElse(
+                                        Shapes.StringAction.isFingered(stringAction) &&
+                                            stringAction.finger === previewFinger &&
+                                            stringAction.fret !== previewFret,
+                                        () => Shapes.StringAction.unsounded,
+                                        () => stringAction));
                                     const currentAction = previewShape[previewString - 1];
                                     previewShape[previewString - 1] = dragActive() ? (
-                                            Shapes.StringAction.isFingerless(dragAction) ?
-                                                dragAction :
-                                                dragAction.sounded === true ?
-                                                    Shapes.StringAction.fingered(previewFret, previewFinger) :
-                                                    Shapes.StringAction.deadened(previewFret, previewFinger)) :
+                                        Shapes.StringAction.isFingerless(dragAction) ?
+                                            dragAction :
+                                            dragAction.sounded === true ?
+                                                Shapes.StringAction.fingered(previewFret, previewFinger) :
+                                                Shapes.StringAction.deadened(previewFret, previewFinger)) :
                                         Shapes.StringAction.isFingerless(currentAction) ||
                                         currentAction.finger !== previewFinger ||
                                         currentAction.fret !== previewFret ?
