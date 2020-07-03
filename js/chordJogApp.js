@@ -93,7 +93,12 @@ const ChordJogApp = (() => {
     const Arrays = {
         updateItem: (array, index, modification) => {
             modification(array[index]);
-            return array;}};
+            return array;},
+        lastIndexOf: (array, predicate) => {
+            for(let i = array.length - 1; i >= 0; --i) {
+                if(predicate(array[i])) {
+                    return i;}}
+            return undefined; }};
 
     const KeyboardCommands = Module.of(() => {
         const keyCommands = {};
@@ -439,8 +444,6 @@ const ChordJogApp = (() => {
             .withWidth(svgRect.width)
             .withHeight(svgRect.height);
         svgBuilder.TextButton = Module.of(() => {
-            const padding = 5,
-                height=30;
             return {
                 withDimensions: (x, y, width, height) => ({
                     withText: (text) => ({
@@ -1178,8 +1181,7 @@ const ChordJogApp = (() => {
                             toString: (toString) => ({
                                 finger: finger,
                                 fret: fret,
-                                range: Strings.range(fromString, toString)})})})})},
-            sameFingerAndFret: (a, b) => a.finger === b.finger && a.fret === b.fret};
+                                range: Strings.range(fromString, toString)})})})})}};
         const Fretboard = {
             Style: {
                 stringSpacing: 25,
@@ -1351,7 +1353,7 @@ const ChordJogApp = (() => {
                             //Filter out open strings
                             .filter(stringAction => stringAction.action !== Shapes.StringAction.open)
                             //Convert to finger actions, merging ones with the same finger and fret
-                            .reduce(
+                            .reduce(Module.of(
                                 ((stringActionToFingerAction = (stringAction) => FingerActions.Builder
                                     .withFinger(stringAction.action.finger)
                                     .atRootFret(stringAction.action.fret)
@@ -1359,14 +1361,18 @@ const ChordJogApp = (() => {
                                     .toString(stringAction.string)
                                 ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
                                     [stringActionToFingerAction(stringAction)] :
-                                    ((indexMatchingFingerAction=fingerActions.findIndex(fingerAction =>
-                                        FingerActions.sameFingerAndFret(fingerAction, stringAction.action))) =>
-                                        indexMatchingFingerAction === -1 ?
+                                    Module.of(
+                                        (indexPreviousFingerActionOnFret=Arrays.lastIndexOf(fingerActions,
+                                            fingerAction => fingerAction.fret === stringAction.action.fret)
+                                        ) =>
+                                            indexPreviousFingerActionOnFret === undefined ||
+                                                fingerActions[indexPreviousFingerActionOnFret].finger !==
+                                                    stringAction.action.finger ?
                                             fingerActions.concat(stringActionToFingerAction(stringAction)) :
                                             Arrays.updateItem(
                                                 fingerActions,
-                                                indexMatchingFingerAction,
-                                                (fingerAction) => fingerAction.range.max = stringAction.string))())(),
+                                                indexPreviousFingerActionOnFret,
+                                                (fingerAction) => fingerAction.range.max = stringAction.string)))),
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forShape(Shapes.Schema.allUnsounded);
