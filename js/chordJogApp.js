@@ -1263,6 +1263,8 @@ const ChordJogApp = (() => {
                             FingerIndicator.Style.radius -
                             RootFretLabel.Style.paddingRight,
                         Fretboard.fretToYCoordinate(Frets.Relative.first))
+                    .withSetter("rootFret", function(rootFret) {
+                        this.withTextContent(rootFret === null ? "r" : rootFret);})
                     .withAttributes({
                         dominantBaseline: "central",
                         textAnchor: "end",
@@ -1383,35 +1385,6 @@ const ChordJogApp = (() => {
                                 [])
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
         Meat.Builder.blank = () => Meat.Builder.forSchema(Shapes.Schema.allUnsounded);
-        const Schema = Module.of((value) => ({
-            get: () => value,
-            set: (schema) => {
-                value = schema;
-                this.querySelector(".shape-chart-meat")
-                    .replaceWith(Meat.Builder.forSchema(value)); }}));
-        const RootFret = Module.of((value) => ({
-            get: () => value,
-            set: (rootFret) => {
-                value = rootFret;
-                const rootLabel = this.querySelector(".r-label");
-                if(value === null) {
-                    rootLabel.textContent = "r"; }
-                else {
-                    rootLabel.textContent = value;}}}));
-        const containerBuilder = () => SVG.Builder
-            .G()
-            .withClass("shape-chart")
-            .disableTextSelection()
-            .withChild(skeletonBuilder())
-            .withGetterAndSetter("schema",
-                Schema.get,
-                (value) => Schema.set(value))
-            .withGetterAndSetter("r",
-                RootFret.get,
-                (value) => RootFret.set(value))
-            .withMethod("withSchema", function(schema) {
-                this.schema = schema;
-                return this; });
         return {
             Style: {
                 width: Fretboard.Style.startX +
@@ -1431,21 +1404,50 @@ const ChordJogApp = (() => {
                 Style: FingerIndicator.Style},
             FingerlessIndicator: {
                 Style: FingerlessIndicator.Style},
-            Builder: Module.of(() => {
-                const fixednessStep = (shapeChart) => ({
-                    fixed: (fret) => shapeChart
-                        .withChild(RootFretLabel.Builder.fixed(fret))
-                        .withDataAttribute("r", fret),
-                    unfixed: () => shapeChart
-                        .withChild(RootFretLabel.Builder.unfixed())
-                        .withDataAttribute("r", null)});
-                const forSchema = (schema) => fixednessStep(
-                    containerBuilder()
-                        .withChild(Meat.Builder.forSchema(schema))
-                        .withSchema(schema));
-                return {
-                    blank: () => forSchema(Shapes.Schema.allUnsounded),
-                    forSchema: forSchema };})};});
+            Builder: Module.of((
+                withSchemaAndRootFret = (schema, rootFret) => Module.of((
+                    shapeChartMeat = Meat.Builder.forSchema(schema),
+                    rootFretLabel = rootFret === null ?
+                        RootFretLabel.Builder.unfixed() :
+                        RootFretLabel.Builder.fixed(rootFret),
+                    Schema = Module.of((value) => ({
+                        get: () => value,
+                        set: (schema) => {
+                            value = schema;
+                            const newMeat = Meat.Builder.forSchema(value);
+                            shapeChartMeat.replaceWith(newMeat);
+                            shapeChartMeat = newMeat; }})),
+                    RootFret = Module.of((value) => ({
+                        get: () => value,
+                        set: (rootFret) => {
+                            value = rootFret;
+                            rootFretLabel.rootFret = value;}}))
+                ) => SVG.Builder.G()
+                    .withClass("shape-chart")
+                    .disableTextSelection()
+                    .withChild(skeletonBuilder())
+                    .withChild(shapeChartMeat)
+                    .withChild(rootFretLabel)
+                    .withGetterAndSetter("schema",
+                        Schema.get,
+                        (value) => Schema.set(value))
+                    .withMethod("withSchema", function(schema) {
+                        this.schema = schema;
+                        return this; })
+                    .withSchema(schema)
+                    .withGetterAndSetter("rootFret",
+                        RootFret.get,
+                        (value) => RootFret.set(value))
+                    .withMethod("withRootFret", function(rootFret) {
+                        this.rootFret = rootFret;
+                        return this;})
+                    .withRootFret(rootFret)),
+                withSchema = (schema) => ({
+                    fixed: (rootFret) => withSchemaAndRootFret(schema, rootFret),
+                    unfixed: () => withSchemaAndRootFret(schema, null)})
+            ) => ({
+                blank: () => withSchema(Shapes.Schema.allUnsounded),
+                forSchema: (schema) => withSchema(schema)}))};});
     const ShapeInput = Module.of(() => {
         const shapeChartMarginRight = 2;
         const fingerInputScale = .5;
@@ -1612,7 +1614,7 @@ const ChordJogApp = (() => {
                                     .withMethod("updatePreview", function() {
                                         if(currentTarget === mouseTraps.fretboard && ! dragActive()) {
                                             shapeChart.preview = mousePositionToSchemaChange(previousMousePosition)
-                                                .shape;}});}),
+                                                .schema;}});}),
                             fingerlessIndicators: SVG.Builder.MouseTrap
                                 .withX(ShapeChart.FingerlessIndicator.Style.startX  -
                                     FingerlessIndicatorMouseTrap.Style.padding.horizontal)
