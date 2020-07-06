@@ -230,6 +230,23 @@ const ChordJogApp = (() => {
                     name.charAt(charIndex)))
                 .join("");
         const createElement = function(tagName) {
+            const ModifiedEventListeners = Module.of((value = {
+                mousedown: {},
+                mouseup: {}}
+            ) => ({
+                appliesToEventType: eventType => Object.keys(value).includes(eventType),
+                registerEventListener: (eventType, listener, thisReference) => {
+                    const boundListener = listener.bind(thisReference);
+                    const modifiedListener = function(e) {
+                        //Left mouse button only
+                        if(e.button === 0) {
+                            boundListener(e);}};
+                    value[eventType][listener] = modifiedListener;
+                    return modifiedListener; },
+                unregisterEventListener: (eventType, listener) => {
+                    const modified = value[eventType][listener];
+                    delete value[eventType][listener];
+                    return modified; }}));
             return Objects
                 .using(document.createElementNS("http://www.w3.org/2000/svg", tagName))
                 .withMethods({
@@ -267,31 +284,28 @@ const ChordJogApp = (() => {
                     withChildren: function(children) {
                         children.forEach(child => this.appendChild(child));
                         return this; },
-                    withEventListener: function(eventType, handler) {
+                    withEventListener: function(eventType, listener) {
                         eventType = eventType.toLowerCase();
-                        handler = handler.bind(this);
-                        const modifiedHandler = ["mousedown", "mouseup"].includes(eventType) ?
-                            function(e) {if(e.button === 0) handler(e);}:
-                            handler;
-                        this.eventListeners[eventType] = modifiedHandler;
-                        this.addEventListener(eventType, modifiedHandler);
+                        this.addEventListener(eventType,
+                            ModifiedEventListeners.appliesToEventType(eventType) ?
+                                ModifiedEventListeners.registerEventListener(eventType, listener, this) :
+                                listener);
                         return this; },
                     withEventListeners: function(eventListeners) {
                         Object.keys(eventListeners).forEach(eventType =>
                             this.withEventListener(eventType, eventListeners[eventType]));
                         return this; },
-                    withoutEventListener: function(eventType) {
+                    withoutEventListener: function(eventType, listener) {
                         eventType = eventType.toLowerCase();
-                        this.removeEventListener(eventType, this.eventListeners[eventType]);
-                        delete this.eventListeners[eventType];
+                        this.removeEventListener(eventType,
+                            ModifiedEventListeners.appliesToEventType(eventType) ?
+                                ModifiedEventListeners.unregisterEventListener(eventType, listener) :
+                                listener);
                         return this;},
                     withoutEventListeners: function(eventListeners) {
                         Object.keys(eventListeners).forEach(eventType =>
-                            this.withoutEventListener(eventType));
+                            this.withoutEventListener(eventType, eventListeners[eventType]));
                         return this;},
-                    withMutationObserver: function(mutationObserver, configuration={}) {
-                        mutationObserver.observe(this, configuration);
-                        return this; },
                     withAttributeChangeListener: function(
                         attributeName,
                         listener,
@@ -430,6 +444,9 @@ const ChordJogApp = (() => {
                         withTextContent: function(textContent) {
                             this.textContent = textContent;
                             return this;},
+                        withoutTextcontent: function() {
+                            this.textContent = null;
+                            return this;},
                         withTextLength: function(value) {
                             this.setAttribute("textLength", value);
                             return this; },
@@ -455,58 +472,84 @@ const ChordJogApp = (() => {
                     withText: (text) => ({
                         withClickHandler: (clickHandler) => {
                             let rect = null;
-                            const
-                                preview = () => rect.withAttribute("stroke-width", 1.5),
-                                normal = () => rect.withAttribute("stroke-width", 1),
-                                active = () => rect.withAttribute("stroke-width", 2);
+                            const label = SVG.Builder.Text
+                                .withTextContent(text)
+                                .moveTo(.5 * width, .5 * height)
+                                .withClass("text-button-label")
+                                .withAttributes({
+                                    textAnchor: "middle",
+                                    dominantBaseline: "central",
+                                    fontSize: 17,
+                                    fontFamily: "Courier New"})
+                                .disableTextSelection();
+                            const preview = () => rect.withAttribute("stroke-width", 1.5);
+                            const normal = () => rect.withAttribute("stroke-width", 1);
+                            const active = () => rect.withAttribute("stroke-width", 2);
+                            const eventListeners = Module.of(() => {
+                                let isMouseOver = false,
+                                    isMouseDown = false,
+                                    mouseUpHandler = undefined;
+                                mouseUpHandler = function () {
+                                    isMouseDown = false;
+                                    window.removeEventListener("mouseup", mouseUpHandler);
+                                    Functions.ifThenElse(isMouseOver,
+                                        () => {
+                                            preview();
+                                            clickHandler();},
+                                        () => normal());};
+                                return {
+                                    mouseEnter: () => {
+                                        isMouseOver = true;
+                                        Functions.ifThenElse(isMouseDown,
+                                            active,
+                                            preview);},
+                                    mouseDown: (e) => Functions.ifThen(
+                                        e.button === 0,
+                                        () => {
+                                            isMouseDown = true;
+                                            window.addEventListener("mouseup", mouseUpHandler);
+                                            active();}),
+                                    mouseLeave: () => {
+                                        isMouseOver = false;
+                                        normal();}};});
                             rect = SVG.Builder.Rect
                                 .withX(0).withY(0)
                                 .withWidth(width).withHeight(height)
                                 .withClass("text-button-outline")
-                                .withAttributes({
-                                    pointerEvents: "all",
-                                    cursor: "pointer"})
-                                .withEventListeners(Module.of(() => {
-                                    let isMouseOver = false,
-                                        isMouseDown = false,
-                                        mouseUpHandler = undefined;
-                                    mouseUpHandler = function () {
-                                        isMouseDown = false;
-                                        window.removeEventListener("mouseup", mouseUpHandler);
-                                        Functions.ifThenElse(isMouseOver,
-                                            () => {
-                                                preview();
-                                                clickHandler();},
-                                            () => normal());};
-                                    return {
-                                        mouseEnter: () => {
-                                            isMouseOver = true;
-                                            Functions.ifThenElse(isMouseDown,
-                                                active,
-                                                preview);},
-                                        mouseDown: (e) => Functions.ifThen(
-                                            e.button === 0,
-                                            () => {
-                                                isMouseDown = true;
-                                                window.addEventListener("mouseup", mouseUpHandler);
-                                                active();}),
-                                        mouseLeave: () => {
-                                            isMouseOver = false;
-                                            normal();}};}));
+                                .withAttributes({});
                             return SVG.Builder.G()
                                 .withClass("text-button")
                                 .moveTo(x, y)
-                                .withChild(SVG.Builder.Text
-                                    .withTextContent(text)
-                                    .moveTo(.5 * width, .5 * height)
-                                    .withClass("text-button-label")
-                                    .withAttributes({
-                                        textAnchor: "middle",
-                                        dominantBaseline: "central",
-                                        fontSize: 17,
-                                        fontFamily: "Courier New"})
-                                    .disableTextSelection())
-                                .withChild(rect);}})})};});
+                                .withChild(label)
+                                .withChild(rect)
+                                .withGetter("label", () => label)
+                                .withGetter("rect", () => rect)
+                                .withMethods(Module.of((enabled=false) => ({
+                                    enable: function() {
+                                        if(enabled === true) {
+                                            return;}
+                                        enabled = true;
+                                        this.withAttributes({
+                                            pointerEvents: "all",
+                                            cursor: "pointer"
+                                        });
+                                        label.withoutAttribute("text-decoration");
+                                        this.withEventListeners(eventListeners);},
+                                    enabled: function() {
+                                        this.enable();
+                                        return this;},
+                                    disable: function() {
+                                        if(enabled === false) {
+                                            return;}
+                                        enabled = false;
+                                        this.withAttributes({
+                                            cursor: "not-allowed"});
+                                        label.withAttribute("text-decoration", "line-through");
+                                        this.withoutEventListeners(eventListeners); },
+                                    disabled: function() {
+                                        this.disable();
+                                        return this;}})))
+                                .enabled();}})})};});
         svgBuilder.MouseTrap = {
             withX: (x) => ({
                 withY: (y) => ({
@@ -577,45 +620,112 @@ const ChordJogApp = (() => {
                 StringAction.isFingered(stringAction) && ! stringAction.sounded;
             StringAction.equals = (a, b) => StringAction.toString(a) === StringAction.toString(b);
             return StringAction;});
+        const FingerAction = {
+            Builder: {
+                withFinger: (finger) => ({
+                    atRootFret: (fret) => ({
+                        fromString: (fromString) => ({
+                            toString: (toString) => ({
+                                finger: finger,
+                                fret: fret,
+                                range: Strings.range(fromString, toString)})})})})},
+            lacksRootFret: fingerActions => ! fingerActions.some(fingerAction =>
+                    fingerAction.fret === Frets.roots.first),
+            usesAFingerMoreThanOnce: fingerActions => Object.values(
+                fingerActions.reduce(
+                    (numPerFinger, fingerAction) => {
+                        undefined === numPerFinger[fingerAction.finger] ?
+                            numPerFinger[fingerAction.finger] = 1 :
+                            ++numPerFinger[fingerAction.finger];
+                        return numPerFinger;},
+                    {}))
+                .some(count => count > 1),
+            hasFingersCrossedOnAFret: (fingerActions) => Object
+                .values(fingerActions
+                    .map(fingerAction => ({
+                        fret: fingerAction.fret,
+                        fingerOrder: fingerAction.finger === Fingers.thumb.label ?
+                            0 : Number.parseInt(fingerAction.finger)}))
+                    .reduce(
+                        (fingersOnFret, fingerAction) => {
+                            undefined === fingersOnFret[fingerAction.fret] ?
+                                fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
+                                fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
+                            return fingersOnFret; },
+                        {}))
+                .some(fingersOnFret => {
+                    let previousFinger = undefined;
+                    return fingersOnFret.some(finger => {
+                        const outOfOrder = finger < previousFinger;
+                        previousFinger = finger;
+                        return outOfOrder;});})};
         const Schema = Module.of(() => {
             const Schema = {
-                fromString: (string) => string.split(";").map(StringAction.fromString),
-                toString: (shape) => shape.map(StringAction.toString).join(";")};
+                fromString: string => string.split(";").map(StringAction.fromString),
+                toString: schema => schema.map(StringAction.toString).join(";"),
+                getFingerActions: schema => schema
+                    .map((action, index) => ({
+                        string: index + 1,
+                        action: Shapes.StringAction.isFingered(action) ? action : null}))
+                    .filter(stringAction => stringAction.action !== null)
+                    .reduce(Module.of(
+                        ((stringActionToFingerAction = (stringAction) => FingerAction.Builder
+                            .withFinger(stringAction.action.finger)
+                            .atRootFret(stringAction.action.fret)
+                            .fromString(stringAction.string)
+                            .toString(stringAction.string)
+                        ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
+                            [stringActionToFingerAction(stringAction)] :
+                            Module.of(
+                                (indexPreviousFingerActionOnFret=Arrays.lastIndexOf(fingerActions,
+                                    fingerAction => fingerAction.fret === stringAction.action.fret)
+                                ) =>
+                                    indexPreviousFingerActionOnFret === undefined ||
+                                    fingerActions[indexPreviousFingerActionOnFret].finger !==
+                                    stringAction.action.finger ?
+                                        fingerActions.concat(stringActionToFingerAction(stringAction)) :
+                                        Arrays.updateItem(
+                                            fingerActions,
+                                            indexPreviousFingerActionOnFret,
+                                            (fingerAction) => fingerAction.range.max = stringAction.string)))),
+                        [])};
             Schema.allUnsounded = Schema.fromString(";;;;;");
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
             return Schema; });
-        return Module.of(() => {
-            const Shapes = {
-                StringAction: StringAction,
-                Schema: Schema,
-                all: [],
-                create: (schema, range) => ({
-                    schema: schema,
-                    range: range }),
-                equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
-                fromString: (string) => string.length === 0 ? [] :
-                    string.split(/\r?\n/).map((line) => {
-                        const lineProperties = line.split(";");
-                        return Shapes.create(
-                            Schema.fromString(lineProperties[0]),
-                            Frets.Range.create(
-                                Number.parseInt(lineProperties[1].charAt(0)),
-                                Number.parseInt(lineProperties[1].charAt(1)) ) ); }),
-                toString: (shapeFilters) => shapeFilters.length === 0 ? "" :
-                    shapeFilters
-                        .map(shapeFilter =>
-                            Schema.toString(shapeFilter.shape) + ";" +
-                            shapeFilter.range.min + "," + shapeFilter.range.max)
-                        .join("\r\n"),
-                    localStorageKey: "chord-jog-shapes",
-                loadFromLocalStorage: () => {
-                        const shapeFilterString = localStorage.getItem(Shapes.localStorageKey);
-                        Shapes.all = shapeFilterString === null || shapeFilterString.length === 0 ?
-                            [] : Shapes.all = Shapes.fromString(shapeFilterString);}};
-            Shapes.saveToLocalStorage = () => localStorage.setItem(
-                    Shapes.localStorageKey,
-                    Shapes.toString(Shapes.all));
-            return Shapes; });});
+        const Shapes = {
+            StringAction: StringAction,
+            FingerAction: FingerAction,
+            Schema: Schema,
+            all: [],
+            create: (schema, range) => ({
+                schema: schema,
+                range: range }),
+            equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
+            fromString: (string) => string.length === 0 ? [] :
+                string.split(/\r?\n/).map((line) => {
+                    const lineProperties = line.split(";");
+                    return Shapes.create(
+                        Schema.fromString(lineProperties[0]),
+                        Frets.Range.create(
+                            Number.parseInt(lineProperties[1].charAt(0)),
+                            Number.parseInt(lineProperties[1].charAt(1)) ) ); }),
+            toString: (shapeFilters) => shapeFilters.length === 0 ? "" :
+                shapeFilters
+                    .map(shapeFilter =>
+                        Schema.toString(shapeFilter.shape) + ";" +
+                        shapeFilter.range.min + "," + shapeFilter.range.max)
+                    .join("\r\n"),
+                localStorageKey: "chord-jog-shapes",
+            loadFromLocalStorage: () => {
+                    const shapeFilterString = localStorage.getItem(Shapes.localStorageKey);
+                    Shapes.all = shapeFilterString === null || shapeFilterString.length === 0 ?
+                        [] : Shapes.all = Shapes.fromString(shapeFilterString);}};
+        Shapes.saveToLocalStorage = () => localStorage.setItem(
+                Shapes.localStorageKey,
+                Shapes.toString(Shapes.all));
+        Shapes.existsWithSchema = (schema) => Shapes.all.some(shape =>
+            Shapes.Schema.equals(shape.schema, schema));
+        return Shapes; });
     const FingerInput = Module.of(() => {
         const Regions = {
             States: {
@@ -1052,7 +1162,8 @@ const ChordJogApp = (() => {
                                     "auto" : "pointer");
                             //Set the preview
                             this.preview = previewFinger;},
-                        mouseDown: function(e) {this.selected = mouseEventToClosestFinger(e);},
+                        mouseDown: function(e) {
+                            this.selected = mouseEventToClosestFinger(e);},
                         mouseLeave: function() {this.unpreview();}})
                     //Add a `${region.finger.name}` getter and setter per region to get its state
                     .withGettersAndSetters(regions.map(region => ({
@@ -1180,15 +1291,6 @@ const ChordJogApp = (() => {
         FingerlessIndicator.Style.startX = ShapeChartStyle.padding.x;
         FingerlessIndicator.Style.startY = ShapeChartStyle.padding.y;
         FingerIndicator.Style.diameter = 2 * FingerIndicator.Style.radius;
-        const FingerActions = {
-            Builder: {
-                withFinger: (finger) => ({
-                    atRootFret: (fret) => ({
-                        fromString: (fromString) => ({
-                            toString: (toString) => ({
-                                finger: finger,
-                                fret: fret,
-                                range: Strings.range(fromString, toString)})})})})}};
         const Fretboard = {
             Style: {
                 stringSpacing: 25,
@@ -1358,32 +1460,8 @@ const ChordJogApp = (() => {
                                 .dead()
                                 .withAttribute("stroke", Style.colors.black)))
                         //Finger indicators
-                        .withChildren(activeStringActions
-                            //Filter out open strings
-                            .filter(stringAction => stringAction.action !== Shapes.StringAction.open)
-                            //Convert to finger actions, merging ones with the same finger and fret
-                            .reduce(Module.of(
-                                ((stringActionToFingerAction = (stringAction) => FingerActions.Builder
-                                    .withFinger(stringAction.action.finger)
-                                    .atRootFret(stringAction.action.fret)
-                                    .fromString(stringAction.string)
-                                    .toString(stringAction.string)
-                                ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
-                                    [stringActionToFingerAction(stringAction)] :
-                                    Module.of(
-                                        (indexPreviousFingerActionOnFret=Arrays.lastIndexOf(fingerActions,
-                                            fingerAction => fingerAction.fret === stringAction.action.fret)
-                                        ) =>
-                                            indexPreviousFingerActionOnFret === undefined ||
-                                                fingerActions[indexPreviousFingerActionOnFret].finger !==
-                                                    stringAction.action.finger ?
-                                            fingerActions.concat(stringActionToFingerAction(stringAction)) :
-                                            Arrays.updateItem(
-                                                fingerActions,
-                                                indexPreviousFingerActionOnFret,
-                                                (fingerAction) => fingerAction.range.max = stringAction.string)))),
-                                [])
-                            .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)) )}}};
+                        .withChildren(Shapes.Schema.getFingerActions(schema)
+                            .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)))}}};
         Meat.Builder.blank = () => Meat.Builder.forSchema(Shapes.Schema.allUnsounded);
         return {
             Style: {
@@ -2081,7 +2159,10 @@ const ChordJogApp = (() => {
         return {
             Style: {
                 width: RootFretRangeInput.Style.x + RootFretRangeInput.Style.width,
-                height: RootFretRangeInput.Style.y + RootFretRangeInput.Style.height},
+                height: RootFretRangeInput.Style.y + RootFretRangeInput.Style.height,
+                RootFretRange: {
+                    x: RootFretRangeInput.Style.x,
+                    width: RootFretRangeInput.Style.width},},
             Builder: Module.of(() => {
                 const buildStep = (shape) => {
                     const shapeChart = ShapeChart.Builder
@@ -2144,8 +2225,8 @@ const ChordJogApp = (() => {
                         .withGetterAndSetter("rootFretRange",
                             () => rootFretRangeInput.range,
                             (range) => rootFretRangeInput.withRange(range.min, range.max))
-                        .withMethod("withShapeChangeHandler", function(schemaChangeHandler) {
-                            Shape.setShapeListener(schemaChangeHandler);
+                        .withMethod("withShapeListener", function(shapeListener) {
+                            Shape.setShapeListener(shapeListener);
                             return this;})
                         .withMethods(Module.of(() => {  //focus() and unfocus()
                             const keyCommands = Module.of(() => {
@@ -2171,42 +2252,103 @@ const ChordJogApp = (() => {
                 return {
                     forShape: (shape) => buildStep(shape),
                     blank: () => buildStep(Shapes.create(Shapes.Schema.allUnsounded, Frets.Range.roots))}; })};});
-    const ShapeCreator = {
-        new: () => {
-            const shapeInput = ShapeInput.Builder
+    const ShapeCreator = Module.of(
+        (ShapeCreatorStyle = Module.of((
+            buttonsMarginTop = 10,
+            buttonsWidth = ShapeInput.Style.RootFretRange.width / (2 + 3 / Numbers.goldenRatio),
+            buttonsHeight = buttonsWidth / Numbers.goldenRatio,
+            buttonsStartX = ShapeInput.Style.RootFretRange.x,
+            buttonsY = ShapeInput.Style.height + buttonsMarginTop,
+            errorMessageMarginTop = 6
+        ) => ({
+            Buttons: {
+                marginTop: buttonsMarginTop,
+                width: buttonsWidth,
+                startX: buttonsStartX,
+                y: buttonsY,
+                height: buttonsHeight,
+                spacing: buttonsWidth / Numbers.goldenRatio},
+            ErrorMessage: {
+                x: ShapeInput.Style.RootFretRange.x + .5 * ShapeInput.Style.RootFretRange.width,
+                y: buttonsY + buttonsHeight + errorMessageMarginTop,
+                marginTop: errorMessageMarginTop,
+                fontSize: 11,
+                fontFamily: "monospace"}}))
+    ) => ({
+        new: () => Module.of((
+            saveButton = SVG.Builder.TextButton
+                .withDimensions(
+                    ShapeCreatorStyle.Buttons.startX +
+                        2 * ShapeCreatorStyle.Buttons.height +
+                        ShapeCreatorStyle.Buttons.width,
+                    ShapeCreatorStyle.Buttons.y,
+                    ShapeCreatorStyle.Buttons.width,
+                    ShapeCreatorStyle.Buttons.height)
+                .withText("Save")
+                .withClickHandler(() => {}),
+            errorMessage = SVG.Builder.Text
+                .withoutTextContent()
+                .moveTo(ShapeCreatorStyle.ErrorMessage.x, ShapeCreatorStyle.ErrorMessage.y)
+                .withAttributes({
+                    fontSize: ShapeCreatorStyle.ErrorMessage.fontSize,
+                    fontFamily: ShapeCreatorStyle.ErrorMessage.fontFamily,
+                    textAnchor: "middle",
+                    dominantBaseline: "hanging"})
+                .disableTextSelection(),
+            shapeInput = ShapeInput.Builder
                 .blank()
                 .focus()
-                .withShapeChangeHandler(shape => {});
-            const ShapeCreatorStyle = {
-                buttonMarginTop: 10,
-                buttonWidth: ShapeInput.Style.width / (2 + 3 / Numbers.goldenRatio)};
-            ShapeCreatorStyle.buttonY = ShapeInput.Style.height + ShapeCreatorStyle.buttonMarginTop;
-            ShapeCreatorStyle.buttonHeight = ShapeCreatorStyle.buttonWidth / Numbers.goldenRatio;
-            ShapeCreatorStyle.buttonSpacing = ShapeCreatorStyle.buttonWidth / Numbers.goldenRatio;
-            return SVG.Builder.G()
-                .withClass("shape-creator")
-                .withChild(shapeInput)
-                .withChild(SVG.Builder.TextButton
-                    .withDimensions(
-                        ShapeCreatorStyle.buttonHeight,
-                        ShapeCreatorStyle.buttonY,
-                        ShapeCreatorStyle.buttonWidth,
-                        ShapeCreatorStyle.buttonHeight)
-                    .withText("Reset")
-                    .withClickHandler(() => {
-                        shapeInput.shape = Shapes.create(
-                            Shapes.Schema.allUnsounded,
-                            Frets.Range.roots);})
-                    .withClass("shape-creator-reset-button"))
-                .withChild(SVG.Builder.TextButton
-                    .withDimensions(
-                        2 * ShapeCreatorStyle.buttonHeight + ShapeCreatorStyle.buttonWidth,
-                        ShapeCreatorStyle.buttonY,
-                        ShapeCreatorStyle.buttonWidth,
-                        ShapeCreatorStyle.buttonHeight)
-                    .withText("Save")
-                    .withClickHandler(() => {}));
-    }};
+                .withShapeListener(Module.of((
+                    schema,
+                    invalidSaveButtonEventListeners = {
+                        mouseEnter: function() {
+                            errorMessage.withAttribute("text-decoration", "underline"); },
+                        mouseLeave: function() {
+                            errorMessage.withoutAttribute("text-decoration"); }},
+                    validate = () => {
+                        errorMessage.textContent = null;
+                        saveButton.withoutEventListeners(invalidSaveButtonEventListeners);
+                        saveButton.enable();},
+                    invalidate = (reason) => {
+                        errorMessage.textContent = reason;
+                        saveButton.withEventListeners(invalidSaveButtonEventListeners);
+                        saveButton.disable();}
+                ) => (shape) => {
+                    if(schema !== undefined && Shapes.Schema.equals(schema, shape.schema)) {
+                        return;}
+                    schema = shape.schema;
+                    const fingerActions = Shapes.Schema.getFingerActions(schema);
+                    //Validate the schema
+                    if(Shapes.existsWithSchema(schema)) {
+                        invalidate("A matching shape already exists");}
+                    else if(fingerActions.length > 0) {
+                        if(Shapes.FingerAction.usesAFingerMoreThanOnce(fingerActions)) {
+                            invalidate("A finger is used multiple times on a fret");}
+                        else if(Shapes.FingerAction.lacksRootFret(fingerActions)) {
+                            invalidate("Fingers are used, but not on the root fret");}
+                        else if(Shapes.FingerAction.hasFingersCrossedOnAFret(fingerActions)) {
+                            invalidate("Fingers are impossibly arranged on a fret");}
+                        else {
+                            validate();}}
+                    else {
+                        validate();}}))
+        ) => SVG.Builder.G()
+            .withClass("shape-creator")
+            .withChild(shapeInput)
+            .withChild(SVG.Builder.TextButton
+                .withDimensions(
+                    ShapeCreatorStyle.Buttons.startX + ShapeCreatorStyle.Buttons.height,
+                    ShapeCreatorStyle.Buttons.y,
+                    ShapeCreatorStyle.Buttons.width,
+                    ShapeCreatorStyle.Buttons.height)
+                .withText("Reset")
+                .withClickHandler(() => {
+                    shapeInput.shape = Shapes.create(
+                        Shapes.Schema.allUnsounded,
+                        Frets.Range.roots);})
+                .withClass("shape-creator-reset-button"))
+            .withChild(saveButton)
+            .withChild(errorMessage))}));
     return {
         create: () => SVG.Builder.SVG
             .withWidth(400)
@@ -2217,6 +2359,4 @@ const ChordJogApp = (() => {
                 stroke: Style.colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
-            // .withChild(FingerSelect.Builder.build())
-            .withChild(ShapeCreator.new())
-            .withChild()};})();
+            .withChild(ShapeCreator.new())};})();
