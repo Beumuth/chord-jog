@@ -1361,17 +1361,21 @@ const ChordJogApp = (() => {
                         fill: Style.colors.superLight,
                         fontSize: 17}))};
         RootFretLabel.Builder = Module.of(() => {
-            const forText = (text) => {
+            const rootFretToLabel = (rootFret) =>
+                rootFret === undefined ? "" :
+                    rootFret === null ? "r" : rootFret;
+            const forRootFret = (rootFret) => {
+                const text = rootFretToLabel(rootFret);
                 const label = SVG.Builder.Text
-                    .withTextContent(text)
-                    .withClass("r-label")
+                    .withoutTextContent(text)
+                    .withClass("root-fret-label")
                     .moveTo(
                         Fretboard.stringToXCoordinate(1) -
                             FingerIndicator.Style.radius -
                             RootFretLabel.Style.paddingRight,
                         Fretboard.fretToYCoordinate(Frets.Relative.first))
                     .withSetter("rootFret", function(rootFret) {
-                        this.withTextContent(rootFret === null ? "r" : rootFret);})
+                        this.withTextContent(rootFretToLabel(rootFret));})
                     .withAttributes({
                         dominantBaseline: "central",
                         textAnchor: "end",
@@ -1382,8 +1386,8 @@ const ChordJogApp = (() => {
                 return text.length <= 1 ? label : label
                     .withTextLength(17); };
             return {
-                fixed: (fret) => forText(`${fret}`),
-                unfixed: () => forText("r") }; });
+                fixed: (fret) => forRootFret(fret),
+                unfixed: () => forRootFret(null)}; });
 
         //The 'skeleton' consists of the passive portion of the ShapeChart -
         //fretboard and finger indicator placeholders.
@@ -2360,43 +2364,50 @@ const ChordJogApp = (() => {
                     textAnchor: "middle",
                     dominantBaseline: "hanging"})
                 .disableTextSelection();
+            const shapeListener = Module.of((
+                schema,
+                invalidSaveButtonEventListeners = {
+                    mouseEnter: function() {
+                        errorMessage.withAttribute("text-decoration", "underline"); },
+                    mouseLeave: function() {
+                        errorMessage.withoutAttribute("text-decoration"); }},
+                validate = () => {
+                    errorMessage.textContent = null;
+                    saveButton.withoutEventListeners(invalidSaveButtonEventListeners);
+                    saveButton.enable();},
+                invalidate = (reason) => {
+                    errorMessage.textContent = reason;
+                    saveButton.withEventListeners(invalidSaveButtonEventListeners);
+                    saveButton.disable();}
+            ) => (shape) => {
+                if(schema !== undefined && Shapes.Schema.equals(schema, shape.schema)) {
+                    return;}
+                schema = shape.schema;
+                const fingerActions = Shapes.Schema.getFingerActions(schema);
+                //Validate the schema
+                console.log(schema);
+                if(Shapes.Schema.equals(schema, Shapes.Schema.allUnsounded)) {
+                    invalidate("Enter a shape");}
+                else if(false === schema.some(Shapes.StringAction.isFingered)) {
+                    invalidate("A shape must use at least one finger");}
+                else if(Shapes.existsWithSchema(schema)) {
+                    invalidate("A matching shape already exists");}
+                else if(fingerActions.length > 0) {
+                    if(Shapes.FingerAction.Validations.usesAFingerMoreThanOnce(fingerActions)) {
+                        invalidate("A finger is used multiple times on a fret");}
+                    else if(Shapes.FingerAction.Validations.lacksRootFret(fingerActions)) {
+                        invalidate("Fingers are used, but not on the root fret");}
+                    else if(Shapes.FingerAction.Validations.hasFingersCrossedOnAFret(fingerActions)) {
+                        invalidate("Fingers are impractically arranged on a fret");}
+                    else {
+                        validate();}}
+                else {
+                    validate();}});
             shapeInput = ShapeInput.Builder
                 .blank()
                 .focus()
-                .withShapeListener(Module.of((
-                    schema,
-                    invalidSaveButtonEventListeners = {
-                        mouseEnter: function() {
-                            errorMessage.withAttribute("text-decoration", "underline"); },
-                        mouseLeave: function() {
-                            errorMessage.withoutAttribute("text-decoration"); }},
-                    validate = () => {
-                        errorMessage.textContent = null;
-                        saveButton.withoutEventListeners(invalidSaveButtonEventListeners);
-                        saveButton.enable();},
-                    invalidate = (reason) => {
-                        errorMessage.textContent = reason;
-                        saveButton.withEventListeners(invalidSaveButtonEventListeners);
-                        saveButton.disable();}
-                ) => (shape) => {
-                    if(schema !== undefined && Shapes.Schema.equals(schema, shape.schema)) {
-                        return;}
-                    schema = shape.schema;
-                    const fingerActions = Shapes.Schema.getFingerActions(schema);
-                    //Validate the schema
-                    if(Shapes.existsWithSchema(schema)) {
-                        invalidate("A matching shape already exists");}
-                    else if(fingerActions.length > 0) {
-                        if(Shapes.FingerAction.Validations.usesAFingerMoreThanOnce(fingerActions)) {
-                            invalidate("A finger is used multiple times on a fret");}
-                        else if(Shapes.FingerAction.Validations.lacksRootFret(fingerActions)) {
-                            invalidate("Fingers are used, but not on the root fret");}
-                        else if(Shapes.FingerAction.Validations.hasFingersCrossedOnAFret(fingerActions)) {
-                            invalidate("Fingers are impractically arranged on a fret");}
-                        else {
-                            validate();}}
-                    else {
-                        validate();}}));
+                .withShapeListener(shapeListener);
+            shapeListener(shapeInput.shape);
             return SVG.Builder.G()
                 .withClass("shape-creator")
                 .withChild(shapeInput)
