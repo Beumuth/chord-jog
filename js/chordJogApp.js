@@ -718,7 +718,6 @@ const ChordJogApp = (() => {
                 const shapeString = localStorage.getItem(localStorageKey);
                 return shapeString === null || shapeString.length === 0 ?
                     [] : shapesFromString(shapeString);});
-            console.log(shapesToString(all));
             const saveToLocalStorage = () => localStorage.setItem(
                 localStorageKey,
                 shapesToString(all));
@@ -2385,7 +2384,6 @@ const ChordJogApp = (() => {
                 schema = shape.schema;
                 const fingerActions = Shapes.Schema.getFingerActions(schema);
                 //Validate the schema
-                console.log(schema);
                 if(Shapes.Schema.equals(schema, Shapes.Schema.allUnsounded)) {
                     invalidate("Enter a shape");}
                 else if(false === schema.some(Shapes.StringAction.isFingered)) {
