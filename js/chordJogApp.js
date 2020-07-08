@@ -94,6 +94,10 @@ const ChordJogApp = (() => {
         updateItem: (array, index, modification) => {
             modification(array[index]);
             return array;},
+        findLast: (array, predicate) => array[Numbers
+            .range(0, array.length)
+            .reverse()
+            .find(i => predicate(array[i]))],
         lastIndexOf: (array, predicate) => {
             for(let i = array.length - 1; i >= 0; --i) {
                 if(predicate(array[i])) {
@@ -672,18 +676,20 @@ const ChordJogApp = (() => {
                             .toString(stringAction.string)
                         ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
                             [stringActionToFingerAction(stringAction)] :
-                            Module.of(
-                                (indexPreviousFingerActionOnFret=Arrays.lastIndexOf(fingerActions,
-                                    fingerAction => fingerAction.fret === stringAction.action.fret)
-                                ) =>
-                                    indexPreviousFingerActionOnFret === undefined ||
-                                    fingerActions[indexPreviousFingerActionOnFret].finger !==
-                                    stringAction.action.finger ?
-                                        fingerActions.concat(stringActionToFingerAction(stringAction)) :
-                                        Arrays.updateItem(
-                                            fingerActions,
-                                            indexPreviousFingerActionOnFret,
-                                            (fingerAction) => fingerAction.range.max = stringAction.string)))),
+                            Module.of((lastRelevantStringAction = Arrays.findLast(
+                                schema.slice(0, stringAction.string - 1),
+                                candidate => Shapes.StringAction.isFingerless(candidate) ||
+                                    candidate.fret === stringAction.action.fret)) =>
+                                lastRelevantStringAction === undefined ||
+                                    Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
+                                    lastRelevantStringAction.finger !== stringAction.action.finger
+                                ?
+                                    fingerActions.concat(stringActionToFingerAction(stringAction)) :
+                                    Arrays.updateItem(
+                                        fingerActions,
+                                        Arrays.lastIndexOf(fingerActions,
+                                            (fingerAction) => fingerAction.finger === stringAction.action.finger),
+                                        (fingerAction) => fingerAction.range.max = stringAction.string)))),
                         [])};
             Schema.allUnsounded = Schema.fromString(";;;;;");
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
