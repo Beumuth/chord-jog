@@ -658,8 +658,8 @@ const ChordJogApp = (() => {
                             return outOfOrder;});})}};
         const Schema = Module.of(() => {
             const Schema = {
-                fromString: string => string.split(";").map(StringAction.fromString),
-                toString: schema => schema.map(StringAction.toString).join(";"),
+                fromString: string => string.split(",").map(StringAction.fromString),
+                toString: schema => schema.map(StringAction.toString).join(","),
                 getFingerActions: schema => schema
                     .map((action, index) => ({
                         string: index + 1,
@@ -688,43 +688,54 @@ const ChordJogApp = (() => {
                                             (fingerAction) => fingerAction.finger === stringAction.action.finger),
                                         (fingerAction) => fingerAction.range.max = stringAction.string)))),
                         [])};
-            Schema.allUnsounded = Schema.fromString(";;;;;");
+            Schema.allUnsounded = Numbers.range(0, Strings.count).map(() => "");
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
             return Schema; });
-        const Shapes = {
-            StringAction: StringAction,
-            FingerAction: FingerAction,
-            Schema: Schema,
-            all: [],
-            create: (schema, range) => ({
-                schema: schema,
-                range: range }),
-            equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
-            fromString: (string) => string.length === 0 ? [] :
+        return Module.of(() => {
+            const Builder = {
+                withSchema: (schema) => ({
+                    withRange: (range) => ({
+                        schema: schema,
+                        range: range})})};
+            const shapesFromString = (string) => string.length === 0 ? [] :
                 string.split(/\r?\n/).map((line) => {
                     const lineProperties = line.split(";");
-                    return Shapes.create(
-                        Schema.fromString(lineProperties[0]),
-                        Frets.Range.create(
-                            Number.parseInt(lineProperties[1].charAt(0)),
-                            Number.parseInt(lineProperties[1].charAt(1)) ) ); }),
-            toString: (shapeFilters) => shapeFilters.length === 0 ? "" :
-                shapeFilters
-                    .map(shapeFilter =>
-                        Schema.toString(shapeFilter.shape) + ";" +
-                        shapeFilter.range.min + "," + shapeFilter.range.max)
-                    .join("\r\n"),
-                localStorageKey: "chord-jog-shapes",
-            loadFromLocalStorage: () => {
-                    const shapeFilterString = localStorage.getItem(Shapes.localStorageKey);
-                    Shapes.all = shapeFilterString === null || shapeFilterString.length === 0 ?
-                        [] : Shapes.all = Shapes.fromString(shapeFilterString);}};
-        Shapes.saveToLocalStorage = () => localStorage.setItem(
-                Shapes.localStorageKey,
-                Shapes.toString(Shapes.all));
-        Shapes.existsWithSchema = (schema) => Shapes.all.some(shape =>
-            Shapes.Schema.equals(shape.schema, schema));
-        return Shapes; });
+                    return Builder
+                        .withSchema(Schema.fromString(lineProperties[0]))
+                        .withRange(Module.of(() => {
+                            const rangeComponents = lineProperties[1].split(",");
+                            return Frets.Range.create(
+                                Number.parseInt(rangeComponents[0]),
+                                Number.parseInt(rangeComponents[1]));})); });
+            const shapesToString = (shapes) => shapes.length === 0 ? "" :
+                shapes
+                    .map(shape =>
+                        Schema.toString(shape.schema) + ";" +
+                        shape.range.min + "," + shape.range.max)
+                    .join("\r\n");
+            const localStorageKey = "chord-jog-shapes";
+            const all = Module.of(() => {
+                const shapeString = localStorage.getItem(localStorageKey);
+                return shapeString === null || shapeString.length === 0 ?
+                    [] : shapesFromString(shapeString);});
+            console.log(shapesToString(all));
+            const saveToLocalStorage = () => localStorage.setItem(
+                localStorageKey,
+                shapesToString(all));
+            return {
+                StringAction: StringAction,
+                FingerAction: FingerAction,
+                Schema: Schema,
+                Builder: Builder,
+                equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
+                existsWithSchema: (schema) => all.some(shape =>
+                    Schema.equals(shape.schema, schema)),
+                add: (shape) => {
+                    all.push(shape);
+                    saveToLocalStorage();},
+                fromString: shapesFromString,
+                toString: shapesToString,
+                    localStorageKey: localStorageKey};});});
     const FingerInput = Module.of(() => {
         const Regions = {
             States: {
@@ -1374,7 +1385,7 @@ const ChordJogApp = (() => {
                 fixed: (fret) => forText(`${fret}`),
                 unfixed: () => forText("r") }; });
 
-        //The 'skeleton' consists of the passive portion of the ShapeFilterView -
+        //The 'skeleton' consists of the passive portion of the ShapeChart -
         //fretboard and finger indicator placeholders.
         const skeletonBuilder = () => SVG.Builder
             .G()
@@ -1401,7 +1412,7 @@ const ChordJogApp = (() => {
                         .fromString(Strings.first)
                         .toString(Strings.last))));
 
-        //The 'meat' consists of the active portion of the ShapeFilterView -
+        //The 'meat' consists of the active portion of the ShapeChart -
         // darkened fretboard strings and finger indicators.
         const Meat = {
             Builder: {
@@ -2297,7 +2308,9 @@ const ChordJogApp = (() => {
                                     return this;}};}))}
                 return {
                     forShape: (shape) => buildStep(shape),
-                    blank: () => buildStep(Shapes.create(Shapes.Schema.allUnsounded, Frets.Range.roots))}; })};});
+                    blank: () => buildStep(Shapes.Builder
+                        .withSchema(Shapes.Schema.allUnsounded)
+                        .withRange(Frets.Range.roots))}; })};});
     const ShapeCreator = Module.of(
         (ShapeCreatorStyle = Module.of((
             buttonsMarginTop = 10,
@@ -2321,8 +2334,12 @@ const ChordJogApp = (() => {
                 fontSize: 11,
                 fontFamily: "monospace"}}))
     ) => ({
-        new: () => Module.of((
-            saveButton = SVG.Builder.TextButton
+        new: () => {
+            let shapeInput;
+            const reset = () => shapeInput.shape = Shapes.Builder
+                .withSchema(Shapes.Schema.allUnsounded)
+                .withRange(Frets.Range.roots);
+            const saveButton = SVG.Builder.TextButton
                 .withDimensions(
                     ShapeCreatorStyle.Buttons.startX +
                         2 * ShapeCreatorStyle.Buttons.height +
@@ -2331,8 +2348,10 @@ const ChordJogApp = (() => {
                     ShapeCreatorStyle.Buttons.width,
                     ShapeCreatorStyle.Buttons.height)
                 .withText("Save")
-                .withClickHandler(() => {}),
-            errorMessage = SVG.Builder.Text
+                .withClickHandler(() => {
+                    Shapes.add(shapeInput.shape);
+                    reset();});
+            const errorMessage = SVG.Builder.Text
                 .withoutTextContent()
                 .moveTo(ShapeCreatorStyle.ErrorMessage.x, ShapeCreatorStyle.ErrorMessage.y)
                 .withAttributes({
@@ -2340,7 +2359,7 @@ const ChordJogApp = (() => {
                     fontFamily: ShapeCreatorStyle.ErrorMessage.fontFamily,
                     textAnchor: "middle",
                     dominantBaseline: "hanging"})
-                .disableTextSelection(),
+                .disableTextSelection();
             shapeInput = ShapeInput.Builder
                 .blank()
                 .focus()
@@ -2377,24 +2396,21 @@ const ChordJogApp = (() => {
                         else {
                             validate();}}
                     else {
-                        validate();}}))
-        ) => SVG.Builder.G()
-            .withClass("shape-creator")
-            .withChild(shapeInput)
-            .withChild(SVG.Builder.TextButton
-                .withDimensions(
-                    ShapeCreatorStyle.Buttons.startX + ShapeCreatorStyle.Buttons.height,
-                    ShapeCreatorStyle.Buttons.y,
-                    ShapeCreatorStyle.Buttons.width,
-                    ShapeCreatorStyle.Buttons.height)
-                .withText("Reset")
-                .withClickHandler(() => {
-                    shapeInput.shape = Shapes.create(
-                        Shapes.Schema.allUnsounded,
-                        Frets.Range.roots);})
-                .withClass("shape-creator-reset-button"))
-            .withChild(saveButton)
-            .withChild(errorMessage))}));
+                        validate();}}));
+            return SVG.Builder.G()
+                .withClass("shape-creator")
+                .withChild(shapeInput)
+                .withChild(SVG.Builder.TextButton
+                    .withDimensions(
+                        ShapeCreatorStyle.Buttons.startX + ShapeCreatorStyle.Buttons.height,
+                        ShapeCreatorStyle.Buttons.y,
+                        ShapeCreatorStyle.Buttons.width,
+                        ShapeCreatorStyle.Buttons.height)
+                    .withText("Reset")
+                    .withClickHandler(reset)
+                    .withClass("shape-creator-reset-button"))
+                .withChild(saveButton)
+                .withChild(errorMessage)}}));
     return {
         create: () => SVG.Builder.SVG
             .withWidth(400)
