@@ -1,3 +1,8 @@
+/**
+ * TODO:
+ * -shape-creator save functionality
+ * -shape-search
+ */
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -170,21 +175,11 @@ const ChordJogApp = (() => {
     Strings.last = Strings.all[Strings.count - 1];
 
     const Fingers = {
-        thumb: {
-            name: "thumb",
-                label: "T" },
-        index: {
-            name: "index",
-                label: "1" },
-        middle: {
-            name: "middle",
-                label: "2" },
-        ring: {
-            name: "ring",
-                label: "3" },
-        pinky: {
-            name: "pinky",
-                label: "4" }};
+        thumb: "T",
+        index: "1",
+        middle: "2",
+        ring: "3",
+        pinky: "4"};
     Fingers.all = [
         Fingers.thumb,
         Fingers.index,
@@ -646,7 +641,7 @@ const ChordJogApp = (() => {
                     .values(fingerActions
                         .map(fingerAction => ({
                             fret: fingerAction.fret,
-                            fingerOrder: fingerAction.finger === Fingers.thumb.label ?
+                            fingerOrder: fingerAction.finger === Fingers.thumb ?
                                 0 : Number.parseInt(fingerAction.finger)}))
                         .reduce(
                             (fingersOnFret, fingerAction) => {
@@ -742,7 +737,7 @@ const ChordJogApp = (() => {
             FingerLabel: {
                 Text: {
                     createForRegion: (region) => SVG.Builder.Text
-                        .withTextContent(region.finger.label)
+                        .withTextContent(region.finger)
                         .withAttributes({
                             x: region.initialPosition[0],
                             y: region.initialPosition[1],
@@ -758,7 +753,7 @@ const ChordJogApp = (() => {
                 instantiate: (region) => SVG.Builder
                     .G()
                     .withClass("finger-label")
-                    .withDataAttribute("for", region.finger.name)
+                    .withDataAttribute("for", region.finger)
                     .withChildren([
                         Regions.FingerLabel.Text.createForRegion(region),
                         Regions.FingerLabel.Outline.createForRegion(region)])},
@@ -836,7 +831,7 @@ const ChordJogApp = (() => {
                                         joints.map(jointToPoint)))}),
                         element: SVG.Builder.G()
                             .withClass("finger-input-region")
-                            .withDataAttribute("finger", staticRegion.finger.label)
+                            .withDataAttribute("finger", staticRegion.finger)
                             .withGetter("finger", () => staticRegion.finger)
                             .withGetterAndSetter("state",
                                 function() { return this.dataset.state; },
@@ -1169,11 +1164,6 @@ const ChordJogApp = (() => {
                         mouseDown: function(e) {
                             this.selected = mouseEventToClosestFinger(e);},
                         mouseLeave: function() {this.unpreview();}})
-                    //Add a `${region.finger.name}` getter and setter per region to get its state
-                    .withGettersAndSetters(regions.map(region => ({
-                        key: region.finger.name,
-                        get: () => region.state,
-                        set: (state) => region.state = state})))
                     .withProperties({
                         regions: {
                             get: () => regions.map(region => ({
@@ -1602,10 +1592,10 @@ const ChordJogApp = (() => {
         const MouseTrapsBuilder = {
             withShapeChart: (shapeChart) => {
                 shapeChart
-                    .withDataAttribute("activeFinger", initialActiveFinger.label)
+                    .withDataAttribute("activeFinger", initialActiveFinger)
                     .withGetterAndSetter("activeFinger",
-                        function() {return Fingers.all.find(finger => finger.label === this.dataset.activeFinger);},
-                        function(activeFinger) {this.dataset.activeFinger = activeFinger.label;});
+                        function() {return Fingers.all.find(finger => finger === this.dataset.activeFinger);},
+                        function(activeFinger) {this.dataset.activeFinger = activeFinger;});
                 return {
                     withPreviewMeatContainer: (previewMeatContainer) => {
                         let dragAction = null;
@@ -1661,7 +1651,7 @@ const ChordJogApp = (() => {
                                     //Get target fingered string action
                                     const targetString = FretboardMouseTrap.xCoordinateToString(p[0]);
                                     const targetFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
-                                    const targetFinger = shapeChart.activeFinger.label;
+                                    const targetFinger = shapeChart.activeFinger;
 
                                     let schema = shapeChart.schema
                                         //Convert same-fingered but different-fret string actions to unsounded
@@ -2383,7 +2373,7 @@ const ChordJogApp = (() => {
                         else if(Shapes.FingerAction.Validations.lacksRootFret(fingerActions)) {
                             invalidate("Fingers are used, but not on the root fret");}
                         else if(Shapes.FingerAction.Validations.hasFingersCrossedOnAFret(fingerActions)) {
-                            invalidate("Fingers are impossibly arranged on a fret");}
+                            invalidate("Fingers are impractically arranged on a fret");}
                         else {
                             validate();}}
                     else {
