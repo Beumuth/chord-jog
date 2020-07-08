@@ -614,7 +614,8 @@ const ChordJogApp = (() => {
                         StringAction.open : stringAction.sounded ?
                         `${stringAction.fret}${stringAction.finger}` :
                         `x${stringAction.fret}${stringAction.finger}`;
-            StringAction.isFingerless = (stringAction) => [StringAction.unsounded, StringAction.open].includes(stringAction);
+            StringAction.isFingerless = (stringAction) =>
+                [StringAction.unsounded, StringAction.open].includes(stringAction);
             StringAction.isFingered = (stringAction) => ! StringAction.isFingerless(stringAction);
             StringAction.isDeadened = (stringAction) =>
                 StringAction.isFingered(stringAction) && ! stringAction.sounded;
@@ -629,36 +630,37 @@ const ChordJogApp = (() => {
                                 finger: finger,
                                 fret: fret,
                                 range: Strings.range(fromString, toString)})})})})},
-            lacksRootFret: fingerActions => ! fingerActions.some(fingerAction =>
-                    fingerAction.fret === Frets.roots.first),
-            usesAFingerMoreThanOnce: fingerActions => Object.values(
-                fingerActions.reduce(
-                    (numPerFinger, fingerAction) => {
-                        undefined === numPerFinger[fingerAction.finger] ?
-                            numPerFinger[fingerAction.finger] = 1 :
-                            ++numPerFinger[fingerAction.finger];
-                        return numPerFinger;},
-                    {}))
-                .some(count => count > 1),
-            hasFingersCrossedOnAFret: (fingerActions) => Object
-                .values(fingerActions
-                    .map(fingerAction => ({
-                        fret: fingerAction.fret,
-                        fingerOrder: fingerAction.finger === Fingers.thumb.label ?
-                            0 : Number.parseInt(fingerAction.finger)}))
-                    .reduce(
-                        (fingersOnFret, fingerAction) => {
-                            undefined === fingersOnFret[fingerAction.fret] ?
-                                fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
-                                fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
-                            return fingersOnFret; },
+            Validations: {
+                lacksRootFret: fingerActions => ! fingerActions.some(fingerAction =>
+                        fingerAction.fret === Frets.roots.first),
+                usesAFingerMoreThanOnce: fingerActions => Object.values(
+                    fingerActions.reduce(
+                        (numPerFinger, fingerAction) => {
+                            undefined === numPerFinger[fingerAction.finger] ?
+                                numPerFinger[fingerAction.finger] = 1 :
+                                ++numPerFinger[fingerAction.finger];
+                            return numPerFinger;},
                         {}))
-                .some(fingersOnFret => {
-                    let previousFinger = undefined;
-                    return fingersOnFret.some(finger => {
-                        const outOfOrder = finger < previousFinger;
-                        previousFinger = finger;
-                        return outOfOrder;});})};
+                    .some(count => count > 1),
+                hasFingersCrossedOnAFret: (fingerActions) => Object
+                    .values(fingerActions
+                        .map(fingerAction => ({
+                            fret: fingerAction.fret,
+                            fingerOrder: fingerAction.finger === Fingers.thumb.label ?
+                                0 : Number.parseInt(fingerAction.finger)}))
+                        .reduce(
+                            (fingersOnFret, fingerAction) => {
+                                undefined === fingersOnFret[fingerAction.fret] ?
+                                    fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
+                                    fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
+                                return fingersOnFret; },
+                            {}))
+                    .some(fingersOnFret => {
+                        let previousFinger = undefined;
+                        return fingersOnFret.some(finger => {
+                            const outOfOrder = finger < previousFinger;
+                            previousFinger = finger;
+                            return outOfOrder;});})}};
         const Schema = Module.of(() => {
             const Schema = {
                 fromString: string => string.split(";").map(StringAction.fromString),
@@ -679,7 +681,7 @@ const ChordJogApp = (() => {
                             Module.of((lastRelevantStringAction = Arrays.findLast(
                                 schema.slice(0, stringAction.string - 1),
                                 candidate => Shapes.StringAction.isFingerless(candidate) ||
-                                    candidate.fret === stringAction.action.fret)) =>
+                                    candidate.fret <= stringAction.action.fret)) =>
                                 lastRelevantStringAction === undefined ||
                                     Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
                                     lastRelevantStringAction.finger !== stringAction.action.finger
@@ -1610,17 +1612,17 @@ const ChordJogApp = (() => {
                         const dragActive = () => dragAction !== null;
                         let currentTarget = null;
                         const isInside = () => currentTarget !== null;
-                        let schemaChangeListener = null;
                         const mouseTrapEventListeners = {
                             withMousePositionToSchemaChange: (mousePositionToSchemaChange) => {
                                 let mouseUpEventHandler = undefined;
                                 mouseUpEventHandler = function(e) {
                                     dragAction = null;
-                                    const schema = mousePositionToSchemaChange(
-                                        [e.offsetX, e.offsetY]
-                                    ).schema;
+                                    const schema = shapeChart.schema;
                                     shapeChart.preview = schema;
-                                    if(isInside()) previewMeatContainer.show(); else previewMeatContainer.hide();
+                                    if(isInside()) {
+                                        previewMeatContainer.show();}
+                                    else {
+                                        previewMeatContainer.hide()};
                                     Shape.setSchema(schema);
                                     window.removeEventListener("mouseup", mouseUpEventHandler);};
                                 return {
@@ -1661,10 +1663,6 @@ const ChordJogApp = (() => {
                                     const targetFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
                                     const targetFinger = shapeChart.activeFinger.label;
 
-                                    //If there is an existing finger action with targetFinger,
-                                    //either that finger action is replaced with the target action
-                                    //(if they're on different frets or there is a separating finger action)
-                                    //or converted into unsounded string actions.
                                     let schema = shapeChart.schema
                                         //Convert same-fingered but different-fret string actions to unsounded
                                         .map(stringAction => Functions.ifThenElse(
@@ -1692,18 +1690,23 @@ const ChordJogApp = (() => {
                                         Module.of((currentAction = schema[targetString - 1]) =>
                                             Shapes.StringAction.isFingerless(currentAction) ||
                                             currentAction.finger !== targetFinger ||
-                                            currentAction.fret !== targetFret ?
-                                                //The target action is not over an identical string action
-                                                Shapes.StringAction.fingered(targetFret, targetFinger) : (
-                                                    //The target action is over an identical string action
-                                                    currentAction.sounded === true ?
-                                                        //And that action is sounded
-                                                        Shapes.StringAction.deadened(targetFret, targetFinger) :
-                                                        //And that action is deadened
-                                                        Shapes.StringAction.unsounded));
+                                            currentAction.fret !== targetFret
+                                        ?
+                                            //The target action is not over an identical string action
+                                            Shapes.StringAction.fingered(targetFret, targetFinger) : (
+                                                //The target action is over an identical string action
+                                                currentAction.sounded === true ?
+                                                    //And that action is sounded
+                                                    Shapes.StringAction.deadened(targetFret, targetFinger) :
+                                                    //And that action is deadened
+                                                    Shapes.StringAction.unsounded));
 
-                                    //Is the substitute action fingered?
-                                    if(Shapes.StringAction.isFingered(substituteStringAction)) {
+                                    //A finger action may be created or extended if the substitute string action is
+                                    //not a deadened version of its sounded substitutee.
+                                    if(Shapes.StringAction.isFingered(substituteStringAction) && (
+                                        substituteStringAction.sounded === true ||
+                                        Shapes.StringAction.isFingerless(schema[targetString - 1]) ||
+                                        schema[targetString - 1].finger !== targetFinger)) {
                                         //Yes. A finger may may have to be created or extended.
                                         //Get the string actions with targetFret and targetFinger
                                         const targetFingerAndFretActions = schema
@@ -2375,11 +2378,11 @@ const ChordJogApp = (() => {
                     if(Shapes.existsWithSchema(schema)) {
                         invalidate("A matching shape already exists");}
                     else if(fingerActions.length > 0) {
-                        if(Shapes.FingerAction.usesAFingerMoreThanOnce(fingerActions)) {
+                        if(Shapes.FingerAction.Validations.usesAFingerMoreThanOnce(fingerActions)) {
                             invalidate("A finger is used multiple times on a fret");}
-                        else if(Shapes.FingerAction.lacksRootFret(fingerActions)) {
+                        else if(Shapes.FingerAction.Validations.lacksRootFret(fingerActions)) {
                             invalidate("Fingers are used, but not on the root fret");}
-                        else if(Shapes.FingerAction.hasFingersCrossedOnAFret(fingerActions)) {
+                        else if(Shapes.FingerAction.Validations.hasFingersCrossedOnAFret(fingerActions)) {
                             invalidate("Fingers are impossibly arranged on a fret");}
                         else {
                             validate();}}
