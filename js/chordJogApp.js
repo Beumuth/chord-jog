@@ -1,8 +1,3 @@
-/**
- * TODO
- * -fix shape/schema misnomers
- * -shape-chart should accept/return a schema rather than string
- */
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -103,7 +98,8 @@ const ChordJogApp = (() => {
             for(let i = array.length - 1; i >= 0; --i) {
                 if(predicate(array[i])) {
                     return i;}}
-            return undefined; }};
+            return undefined; },
+        last: (array) => array[array.length - 1]};
 
     const KeyboardCommands = Module.of(() => {
         const keyCommands = {};
@@ -1653,33 +1649,84 @@ const ChordJogApp = (() => {
                                 let previousMousePosition = [0,0];
                                 const mousePositionToSchemaChange = (p) => {
                                     previousMousePosition = p;
-                                    let previewSchema = shapeChart.schema;
-                                    const previewString = FretboardMouseTrap.xCoordinateToString(p[0]);
-                                    const previewFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
-                                    const previewFinger = shapeChart.activeFinger.label;
-                                    previewSchema = previewSchema.map(stringAction => Functions.ifThenElse(
-                                        Shapes.StringAction.isFingered(stringAction) &&
-                                            stringAction.finger === previewFinger &&
-                                            stringAction.fret !== previewFret,
-                                        () => Shapes.StringAction.unsounded,
-                                        () => stringAction));
-                                    const currentAction = previewSchema[previewString - 1];
-                                    previewSchema[previewString - 1] = dragActive() ? (
+
+                                    //Get target fingered string action
+                                    const targetString = FretboardMouseTrap.xCoordinateToString(p[0]);
+                                    const targetFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
+                                    const targetFinger = shapeChart.activeFinger.label;
+
+                                    //If there is an existing finger action with targetFinger,
+                                    //either that finger action is replaced with the target action
+                                    //(if they're on different frets or there is a separating finger action)
+                                    //or converted into unsounded string actions.
+                                    let schema = shapeChart.schema
+                                        //Convert same-fingered but different-fret string actions to unsounded
+                                        .map(stringAction => Functions.ifThenElse(
+                                            Shapes.StringAction.isFingered(stringAction) &&
+                                                stringAction.finger === targetFinger &&
+                                                stringAction.fret !== targetFret,
+                                            () => Shapes.StringAction.unsounded,
+                                            () => stringAction));
+
+                                    //Determine which stringAction will be used to substitute others.
+                                    //This depends on whether the mouse is being dragged and its drag action,
+                                    //or whether or not the existing string action on the target string
+                                    //is fingered and has a matching fret and finger
+                                    const substituteStringAction = dragActive() ? (
+                                        //The mouse is being dragged
                                         Shapes.StringAction.isFingerless(dragAction) ?
+                                            //The drag action is fingerless
                                             dragAction :
                                             dragAction.sounded === true ?
-                                                Shapes.StringAction.fingered(previewFret, previewFinger) :
-                                                Shapes.StringAction.deadened(previewFret, previewFinger)) :
-                                        Shapes.StringAction.isFingerless(currentAction) ||
-                                        currentAction.finger !== previewFinger ||
-                                        currentAction.fret !== previewFret ?
-                                            Shapes.StringAction.fingered(previewFret, previewFinger) : (
-                                                currentAction.sounded === true ?
-                                                    Shapes.StringAction.deadened(previewFret, previewFinger) :
-                                                    Shapes.StringAction.unsounded);
+                                                //The drag action is fingered and sounded
+                                                Shapes.StringAction.fingered(targetFret, targetFinger) :
+                                                //The drag action is deadened
+                                                Shapes.StringAction.deadened(targetFret, targetFinger)) :
+                                        //The mouse is not being dragged
+                                        Module.of((currentAction = schema[targetString - 1]) =>
+                                            Shapes.StringAction.isFingerless(currentAction) ||
+                                            currentAction.finger !== targetFinger ||
+                                            currentAction.fret !== targetFret ?
+                                                //The target action is not over an identical string action
+                                                Shapes.StringAction.fingered(targetFret, targetFinger) : (
+                                                    //The target action is over an identical string action
+                                                    currentAction.sounded === true ?
+                                                        //And that action is sounded
+                                                        Shapes.StringAction.deadened(targetFret, targetFinger) :
+                                                        //And that action is deadened
+                                                        Shapes.StringAction.unsounded));
+
+                                    //Is the substitute action fingered?
+                                    if(Shapes.StringAction.isFingered(substituteStringAction)) {
+                                        //Yes. A finger may may have to be created or extended.
+                                        //Get the string actions with targetFret and targetFinger
+                                        const targetFingerAndFretActions = schema
+                                            .map((stringAction, i) => ({
+                                                string: i+1,
+                                                action: stringAction}))
+                                            .filter(stringAction =>
+                                                stringAction.string !== targetString &&
+                                                Shapes.StringAction.isFingered(stringAction) &&
+                                                stringAction.action.fret === targetFret &&
+                                                stringAction.action.finger === targetFinger);
+                                        //Is there an existing finger action with the same finger and fret?
+                                        if(targetFingerAndFretActions.length > 0) {
+                                            //Yes. Fill the gap with the substitute action.
+                                            Numbers
+                                                .range(
+                                                    1 + (
+                                                        targetString < targetFingerAndFretActions[0].string ?
+                                                            targetString :
+                                                            Arrays.last(targetFingerAndFretActions).string),
+                                                    targetString > Arrays.last(targetFingerAndFretActions).string ?
+                                                        targetString :
+                                                        targetFingerAndFretActions[0].string)
+                                                .forEach(string => schema[string - 1] = substituteStringAction);}}
+                                    //Finally, substitute for the targetString itself.
+                                    schema[targetString - 1] = substituteStringAction;
                                     return {
-                                        change: previewSchema[previewString - 1],
-                                        schema: previewSchema};};
+                                        change: substituteStringAction,
+                                        schema: schema};};
                                 return SVG.Builder.MouseTrap
                                     .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
                                     .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
