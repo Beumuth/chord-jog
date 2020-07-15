@@ -37,21 +37,27 @@ const ChordJogApp = (() => {
     const Objects = Module.of(() => {
         const helpers = {
             withGetter: function(key, getter) {
-                Object.defineProperty(this, key, {get: getter});
+                Object.defineProperty(this, key, {
+                    get: getter,
+                    configurable: true});
                 return this; },
             withSetter: function(key, setter) {
-                Object.defineProperty(this, key, {set: setter});
+                Object.defineProperty(this, key, {
+                    set: setter,
+                    configurable: true});
                 return this; },
             withGetterAndSetter: function(key, getter, setter) {
                 Object.defineProperty(this, key, {
                     get: getter,
-                    set: setter});
+                    set: setter,
+                    configurable: true});
                 return this; },
             withGettersAndSetters: function(gettersAndSetters) {
                 gettersAndSetters.forEach(property =>
                     Object.defineProperty(this, property.key, {
                         get: property.get,
-                        set: property.set}));
+                        set: property.set,
+                        configurable: true}));
                 return this;},
             withField(key, value=undefined) {
                 this[key] = value;
@@ -1225,59 +1231,61 @@ const ChordJogApp = (() => {
 
     const ShapeChart = Module.of(() => {
         const halfRoot2 = .5 * Math.SQRT2;
-        const FingerlessIndicator = {
-            Style: {
-                radius: 5,
-                margin: 2 }};
-        FingerlessIndicator.Style.diameter = 2 * FingerlessIndicator.Style.radius;
-        FingerlessIndicator.Builder = Module.of(() => {
-            const DeadStringBuilder = {
-                withCenter: (center) => SVG.Builder.Path
-                    .withD(
-                        `M
-                            ${center[0] - FingerlessIndicator.Style.radius * halfRoot2},
-                            ${center[1] - FingerlessIndicator.Style.radius * halfRoot2}
+        const FingerlessIndicator = Module.of((
+            FingerlessIndicatorStyle = Module.of((radius=5, margin=2) => ({
+                radius: radius,
+                diameter: 2 * radius,
+                margin: margin}))
+            ) => ({
+                Style: FingerlessIndicatorStyle,
+                Builder: Module.of((
+                    DeadStringBuilder = {
+                        withCenter: (center) => SVG.Builder.Path
+                            .withD(
+                                `M
+                            ${center[0] - FingerlessIndicatorStyle.radius * halfRoot2},
+                            ${center[1] - FingerlessIndicatorStyle.radius * halfRoot2}
                         l
-                            ${FingerlessIndicator.Style.diameter * halfRoot2},
-                            ${FingerlessIndicator.Style.diameter * halfRoot2}
+                            ${FingerlessIndicatorStyle.diameter * halfRoot2},
+                            ${FingerlessIndicatorStyle.diameter * halfRoot2}
                         m
                             0,
-                            ${-FingerlessIndicator.Style.diameter * halfRoot2}
+                            ${-FingerlessIndicatorStyle.diameter * halfRoot2}
                         l
-                            ${-FingerlessIndicator.Style.diameter * halfRoot2},
-                            ${FingerlessIndicator.Style.diameter * halfRoot2}`)
-                    .withClass("dead-string-indicator")};
-            const OpenStringBuilder = {
-                withCenter: (center) => SVG.Builder.Circle
-                    .withCenter(center)
-                    .withRadius(FingerlessIndicator.Style.radius)
-                    .withClass("open-string-indicator")};
-            return {
-                forString: (string) => {
-                    const centerX = FingerlessIndicator.Style.startX + ((string - 1) * Fretboard.Style.stringSpacing);
-                    const centerTop = [
-                        centerX,
-                        FingerlessIndicator.Style.startY + FingerlessIndicator.Style.radius];
-                    return {
+                            ${-FingerlessIndicatorStyle.diameter * halfRoot2},
+                            ${FingerlessIndicatorStyle.diameter * halfRoot2}`)
+                            .withClass("dead-string-indicator")},
+                    OpenStringBuilder = {
+                        withCenter: (center) => SVG.Builder.Circle
+                            .withCenter(center)
+                            .withRadius(FingerlessIndicatorStyle.radius)
+                            .withClass("open-string-indicator")}
+                ) => ({
+                    forString: (string) => Module.of((
+                        centerX = FingerlessIndicatorStyle.startX + ((string - 1) * Fretboard.Style.stringSpacing),
+                        centerTop = [
+                            centerX,
+                            FingerlessIndicatorStyle.startY + FingerlessIndicatorStyle.radius]
+                    ) => ({
                         topOnly: {
                             dead: () => DeadStringBuilder.withCenter(centerTop),
                             open: () => OpenStringBuilder.withCenter(centerTop)},
                         topAndBottom: ({
-                            withMaxActiveRelativeFret: (relativeFret) => {
-                                const centerBottom = [
+                            withMaxActiveRelativeFret: (relativeFret) => Module.of((
+                                centerBottom = [
                                     centerX,
                                     Fretboard.fretToYCoordinate(
                                         (relativeFret === undefined ? 0 : relativeFret) + .5) +
-                                        FingerlessIndicator.Style.radius + FingerlessIndicator.Style.margin];
-                                return {
-                                    dead: () => SVG.Builder.G()
-                                        .withClass("dead-string-indicators")
-                                        .withChild(DeadStringBuilder.withCenter(centerTop))
-                                        .withChild(DeadStringBuilder.withCenter(centerBottom)),
-                                    open: () => SVG.Builder.G()
-                                        .withClass("open-string-indicators")
-                                        .withChild(OpenStringBuilder.withCenter(centerTop))
-                                        .withChild(OpenStringBuilder.withCenter(centerBottom))};}})};}};});
+                                    FingerlessIndicatorStyle.radius + FingerlessIndicatorStyle.margin]
+                            ) => ({
+                                dead: () => SVG.Builder.G()
+                                    .withClass("dead-string-indicators")
+                                    .withChild(DeadStringBuilder.withCenter(centerTop))
+                                    .withChild(DeadStringBuilder.withCenter(centerBottom)),
+                                open: () => SVG.Builder.G()
+                                    .withClass("open-string-indicators")
+                                    .withChild(OpenStringBuilder.withCenter(centerTop))
+                                    .withChild(OpenStringBuilder.withCenter(centerBottom))}))})}))}))}));
         const RootFretLabel = {
             Style: {
                 paddingRight: 5,
@@ -1470,7 +1478,6 @@ const ChordJogApp = (() => {
                         //Finger indicators
                         .withChildren(Shapes.Schema.getFingerActions(schema)
                             .map(fingerAction => FingerIndicator.Builder.forFingerAction(fingerAction)))}}};
-        Meat.Builder.blank = () => Meat.Builder.forSchema(Shapes.Schema.allUnsounded);
         return {
             Style: {
                 width: Fretboard.Style.startX +
@@ -1540,39 +1547,6 @@ const ChordJogApp = (() => {
         const initialActiveFinger = Fingers.index;
         const FretboardMouseTrap = {
             Style: {padding: ShapeChart.FingerIndicator.Style.radius}};
-        const Shape = Module.of((
-            value=undefined,
-            schemaListener=undefined,
-            rangeListener=undefined,
-            shapeListener=null) => ({
-                setSchemaListener: (listener) => schemaListener = listener,
-                setRangeListener: (listener) => rangeListener = listener,
-                setShapeListener: (listener) => shapeListener = listener,
-                get: () => value,
-                set: (shape) => {
-                    if(value === undefined) {
-                        value = shape; }
-                    else if(! Shapes.equals(shape, value)) {
-                        const oldValue = value;
-                        value = shape;
-                        if(! Shapes.Schema.equals(shape.schema, oldValue.schema)) {
-                            schemaListener(shape.schema);}
-                        if(! Frets.Range.equals(shape.range, oldValue.range)) {
-                            rangeListener(shape.range);}
-                        if(shapeListener !== null) {
-                            shapeListener(value, oldValue);}}},
-                setSchema: (schema) => {
-                    if(! Shapes.Schema.equals(schema, value.schema)) {
-                        const oldValue = value;
-                        value.schema = schema;
-                        if(shapeListener !== null) {
-                            shapeListener(value, oldValue);}}},
-                setRange: (range) => {
-                    if( ! Frets.Range.equals(range, value.range)) {
-                        const oldValue = value;
-                        value.range = range;
-                        if(shapeListener !== null) {
-                            shapeListener(value, oldValue);}}}}));
         FretboardMouseTrap.xCoordinateToString = (x) => Strings.all
             .map(string => ({
                 string: string,
@@ -1605,11 +1579,6 @@ const ChordJogApp = (() => {
             .string;
         const MouseTrapsBuilder = {
             withShapeChart: (shapeChart) => {
-                shapeChart
-                    .withDataAttribute("activeFinger", initialActiveFinger)
-                    .withGetterAndSetter("activeFinger",
-                        function() {return Fingers.all.find(finger => finger === this.dataset.activeFinger);},
-                        function(activeFinger) {this.dataset.activeFinger = activeFinger;});
                 return {
                     withPreviewMeatContainer: (previewMeatContainer) => {
                         let dragAction = null;
@@ -1619,15 +1588,13 @@ const ChordJogApp = (() => {
                         const mouseTrapEventListeners = {
                             withMousePositionToSchemaChange: (mousePositionToSchemaChange) => {
                                 let mouseUpEventHandler = undefined;
-                                mouseUpEventHandler = function(e) {
+                                mouseUpEventHandler = function() {
                                     dragAction = null;
-                                    const schema = shapeChart.schema;
-                                    shapeChart.preview = schema;
+                                    shapeChart.preview = shapeChart.schema;
                                     if(isInside()) {
                                         previewMeatContainer.show();}
                                     else {
-                                        previewMeatContainer.hide()};
-                                    Shape.setSchema(schema);
+                                        previewMeatContainer.hide();}
                                     window.removeEventListener("mouseup", mouseUpEventHandler);};
                                 return {
                                     mouseenter: (e) => {
@@ -1780,12 +1747,107 @@ const ChordJogApp = (() => {
                                         return {
                                             change: previewSchema[previewString - 1],
                                             schema: previewSchema};}))};
-                        shapeChart.withAttributeChangeListener("data-active-finger",
-                            function() {
-                                mouseTraps.fretboard.updatePreview();},
-                            function() { return this.activeFinger; });
                         return mouseTraps; }};}};
-        const RootFretRangeInput = Module.of(() => {
+        return {
+            Style: {
+                width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width * fingerInputScale,
+                height: ShapeChart.Style.height},
+            Builder: Module.of(() => {
+                const buildStep = (schema) => {
+                    const shapeChart = ShapeChart.Builder
+                        .forSchema(schema)
+                        .unfixed();
+                    const previewMeatContainer = SVG.Builder.G()
+                        .withClass("preview-meat-container")
+                        .withAttributes({
+                            display: "none",
+                            fillOpacity: .4,
+                            strokeOpacity: .5})
+                        .disableTextSelection()
+                        .withMethods({
+                            show: () => {
+                                previewMeatContainer.withoutAttribute("display");
+                                shapeChart.querySelector(".shape-chart-meat").withAttributes({
+                                    fillOpacity: .6,
+                                    strokeOpacity: .5})},
+                            hide:() => {
+                                previewMeatContainer.withAttribute("display", "none");
+                                shapeChart.querySelector(".shape-chart-meat").withoutAttributes(
+                                    ["fill-opacity", "stroke-opacity"]);}});
+                    const Preview = Module.of((value) => ({
+                        get: () => value,
+                        set: (preview) => {
+                            value = preview;
+                            previewMeatContainer.innerHTML = "";
+                            previewMeatContainer.withChild(
+                                ShapeChart.Meat.Builder
+                                    .forSchema(value));}}));
+                    shapeChart.withGetterAndSetter("preview",
+                        Preview.get,
+                        function(preview) { Preview.set(preview); });
+                    const Schema = Module.of((
+                        changeListener=undefined,
+                        shapeChartSchemaSetter = Object.getOwnPropertyDescriptor(shapeChart, "schema").set,
+                        schemaSetter = (schema) => {
+                            if(! Shapes.Schema.equals(schema, shapeChart.schema)) {
+                                shapeChartSchemaSetter(schema);
+                                if(changeListener !== undefined) {
+                                    changeListener(schema);}}}) => {
+                        shapeChart.withSetter("schema", schemaSetter);
+                        return {
+                            setChangeListener: (listener) => changeListener = listener,
+                            get: () => shapeChart.schema,
+                            set: schemaSetter};});
+                    const mouseTraps = MouseTrapsBuilder
+                        .withShapeChart(shapeChart)
+                        .withPreviewMeatContainer(previewMeatContainer);
+                    const fingerInput = FingerInput.Builder
+                        .withRegionChangeObserver((region) => shapeChart.activeFinger = region)
+                        .withFinger(initialActiveFinger)
+                        .withAttribute("stroke-width", 2)
+                        .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
+                        .scale(fingerInputScale);
+                    Schema.setChangeListener((schema) => shapeChart.schema = schema);
+                    Schema.set(schema);
+                    return SVG.Builder.G()
+                        .withClass("shape-input")
+                        .withChild(shapeChart)
+                        .withChild(previewMeatContainer)
+                        .withChild(mouseTraps.fretboard)
+                        .withChild(mouseTraps.fingerlessIndicators)
+                        .withChild(fingerInput)
+                        .withGetterAndSetter("schema",
+                            () => Schema.get(),
+                            (schema) => Schema.set(schema))
+                        .withMethod("withChangeListener", function(changeListener) {
+                            Schema.setChangeListener(changeListener);
+                            return this;})
+                        .withMethods(Module.of(() => {  //focus() and unfocus()
+                            const keyCommands = Module.of(() => {
+                                const command = (finger) => {
+                                    shapeChart.activeFinger = finger;
+                                    fingerInput.selected = finger;};
+                                const keyCommands = {
+                                    1: Fingers.index,
+                                    2: Fingers.middle,
+                                    3: Fingers.ring,
+                                    4: Fingers.pinky,
+                                    t: Fingers.thumb };
+                                Object.entries(keyCommands).forEach(keyFinger =>
+                                    keyCommands[keyFinger[0]] = () => command(keyFinger[1]));
+                                return keyCommands;});
+                            return {
+                                focus: function() {
+                                    KeyboardCommands.setAll(keyCommands);
+                                    return this;},
+                                unfocus: function() {
+                                    KeyboardCommands.removeAll(Object.keys(keyCommands));
+                                    return this;}};}))}
+                return {
+                    forSchema: (schema) => buildStep(schema),
+                    blank: () => buildStep(Shapes.Schema.allUnsounded)};})};});
+    const ShapeCreator = Module.of((
+        RootFretRangeInput = Module.of(() => {
             const RootFretRangeStyle = Module.of((
                 marginTop = 29,
                 startX = ShapeChart.Fretboard.Style.x,
@@ -1856,38 +1918,38 @@ const ChordJogApp = (() => {
                             this.hide();}),
                 Skeleton: {
                     withBaselines: (baseline, activeBaseline,
-                        rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
-                            .withEndpoints(
-                                [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
-                                [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
-                            .withClass("root-fret-range-tick")
-                            .withDataAttribute("value", rootFretXCoordinate.rootFret),
-                        rootFretTicks=rootFretXCoordinates.reduce(
-                            (tickMap, rootFretXCoordinate) => {
-                                tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
-                                return tickMap;},
-                            {})) => SVG.Builder.G()
-                                .withClass("root-fret-range-skeleton")
-                                .withChild(baseline)
-                                .withChild(activeBaseline)
-                                .withChild(SVG.Builder.G()
-                                    .withClass("root-fret-range-ticks")
-                                    .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
-                                    .withChildren(Object.values(rootFretTicks)))
-                                .withMethods(
-                                    Module.of((
-                                        activeRootFrets=[],
-                                        setNewActives=(actives) => {
-                                            activeRootFrets.forEach(rootFret =>
-                                                rootFretTicks[rootFret].withAttribute(
-                                                    "stroke-width", RootFretRangeStyle.normalStrokeWidth));
-                                            activeRootFrets = actives;
-                                            activeRootFrets.forEach((rootFret) =>
-                                                rootFretTicks[rootFret].withAttribute(
-                                                    "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
-                                    ) => ({
-                                        activateMinAndMax: (min, max) => setNewActives([min, max]),
-                                        activatePivot: (pivot) => setNewActives([pivot])})))},
+                                    rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
+                                        .withEndpoints(
+                                            [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                                            [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                                        .withClass("root-fret-range-tick")
+                                        .withDataAttribute("value", rootFretXCoordinate.rootFret),
+                                    rootFretTicks=rootFretXCoordinates.reduce(
+                                        (tickMap, rootFretXCoordinate) => {
+                                            tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
+                                            return tickMap;},
+                                        {})) => SVG.Builder.G()
+                        .withClass("root-fret-range-skeleton")
+                        .withChild(baseline)
+                        .withChild(activeBaseline)
+                        .withChild(SVG.Builder.G()
+                            .withClass("root-fret-range-ticks")
+                            .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
+                            .withChildren(Object.values(rootFretTicks)))
+                        .withMethods(
+                            Module.of((
+                                activeRootFrets=[],
+                                setNewActives=(actives) => {
+                                    activeRootFrets.forEach(rootFret =>
+                                        rootFretTicks[rootFret].withAttribute(
+                                            "stroke-width", RootFretRangeStyle.normalStrokeWidth));
+                                    activeRootFrets = actives;
+                                    activeRootFrets.forEach((rootFret) =>
+                                        rootFretTicks[rootFret].withAttribute(
+                                            "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
+                            ) => ({
+                                activateMinAndMax: (min, max) => setNewActives([min, max]),
+                                activatePivot: (pivot) => setNewActives([pivot])})))},
                 RangeLabel: Module.of((
                     createText=() => SVG.Builder.Text
                         .withoutTextContent()
@@ -1953,12 +2015,12 @@ const ChordJogApp = (() => {
                     markers.all = [markers.preview,   //preview goes first so it is behind others
                         markers.min, markers.max, markers.pivot];
                     return markers;}),
-            MouseTrap: () => SVG.Builder.MouseTrap
-                .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
-                .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
-                .withWidth(RootFretRangeStyle.mouseTrapWidth)
-                .withHeight(RootFretRangeStyle.mouseTrapHeight)
-                .withClass("root-fret-range-mouse-trap")};
+                MouseTrap: () => SVG.Builder.MouseTrap
+                    .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
+                    .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
+                    .withWidth(RootFretRangeStyle.mouseTrapWidth)
+                    .withHeight(RootFretRangeStyle.mouseTrapHeight)
+                    .withClass("root-fret-range-mouse-trap")};
             RootFretRangeInputBuilders.RootFretRangeInput = Module.of((
                 setupEventHandlers = (rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range) => {
                     const activateMarker = (marker) => marker.withAttribute(
@@ -1976,7 +2038,7 @@ const ChordJogApp = (() => {
                     const mouseEventToRootFret = (e) => xCoordinateToRootFret(
                         MouseEvents.relativeMousePosition(e, baseline)[0]);
                     const emphasizeMarkerIfMouseOnRootFret = (marker, mouseEvent,
-                        relativeMousePosition=MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)
+                                                              relativeMousePosition=MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)
                     ) => Functions.ifThenElse(
                         mouseEventToRootFret(mouseEvent) !== marker.rootFret ||
                         relativeMousePosition[0] < 0 ||
@@ -1990,7 +2052,7 @@ const ChordJogApp = (() => {
                         previewRootFret = rootFret;
                         rangeMarkers.preview.atRootFret(rootFret);};
                     const inactivateRangeMouseMove = (e, relevantMarkers,
-                        rootFret=mouseEventToRootFret(e)
+                                                      rootFret=mouseEventToRootFret(e)
                     ) => {
                         relevantMarkers.forEach(marker =>
                             emphasizeMarkerIfMouseOnRootFret(marker, e));
@@ -2153,60 +2215,60 @@ const ChordJogApp = (() => {
                                 rangeMarkers.pivot.withEventListeners(pivotMouseEvents);}};}));
                     States.extremaInactive.activate();
                 }) => ({
-                    withRange: (range) => {
-                        const baseline = RootFretRangeInputBuilders.Baseline(),
-                            activeBaseline = RootFretRangeInputBuilders.ActiveBaseline(),
-                            skeleton = RootFretRangeInputBuilders.Skeleton.withBaselines(baseline, activeBaseline),
-                            rangeLabel = RootFretRangeInputBuilders.RangeLabel(),
-                            rangeMarkers = RootFretRangeInputBuilders.RangeMarkers(),
-                            mouseTrap = RootFretRangeInputBuilders.MouseTrap(),
-                            Range = Module.of((value, changeListener=null) => ({
-                                setChangeListener: (listener) => changeListener = listener,
-                                get: () => Shape.get().range,
-                                set: (min, max=min) => {
-                                    const range = Frets.Range.create(min, max);
-                                    if(value !== undefined && Frets.Range.equals(value, range)) {
-                                        return;}
-                                    value = range;
-                                    if(changeListener) {
-                                        changeListener(value);}
-                                    if(value.min !== value.max) { //min and max
-                                        rangeMarkers.minAndMax.forEach(marker =>
-                                            marker.show());
-                                        rangeMarkers.pivot.hide();
-                                        skeleton.activateMinAndMax(value.min, value.max);
-                                        activeBaseline.show();
-                                        rangeLabel.withRange(value.min, value.max);
-                                        activeBaseline.withRange(value.min, value.max);
-                                        rangeMarkers.min.atRootFret(value.min);
-                                        rangeMarkers.max.atRootFret(value.max);}
-                                    else { //pivot
-                                        rangeMarkers.pivot.show();
-                                        rangeMarkers.minAndMax.forEach(marker => marker.hide());
-                                        skeleton.activatePivot(value.min);
-                                        activeBaseline.hide();
-                                        rangeLabel.withValue(value.min);
-                                        rangeMarkers.pivot.atRootFret(value.min);}}}));
-                        setupEventHandlers(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range);
-                        return SVG.Builder.G()
-                            .withClass("root-fret-range-input")
-                            .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
-                            .withChild(skeleton)
-                            .withChild(rangeLabel)
-                            .withChild(mouseTrap)
-                            .withChild(SVG.Builder.G()
-                                .withClass("root-fret-range-markers")
-                                .withChildren(rangeMarkers.all))
-                            .withGetterAndSetter("range",
-                                () => Range.get(),
-                                (range) => Range.set(range.min, range.max))
-                            .withMethod("withRange", function(range) {
-                                this.range = range;
-                                return this;})
-                            .withRange(range)
-                            .withMethod("withChangeListener", function(changeListener) {
-                                Range.setChangeListener(changeListener);
-                                return this;});}}));
+                withRange: (range) => {
+                    const baseline = RootFretRangeInputBuilders.Baseline(),
+                        activeBaseline = RootFretRangeInputBuilders.ActiveBaseline(),
+                        skeleton = RootFretRangeInputBuilders.Skeleton.withBaselines(baseline, activeBaseline),
+                        rangeLabel = RootFretRangeInputBuilders.RangeLabel(),
+                        rangeMarkers = RootFretRangeInputBuilders.RangeMarkers(),
+                        mouseTrap = RootFretRangeInputBuilders.MouseTrap(),
+                        Range = Module.of((value, changeListener=null) => ({
+                            setChangeListener: (listener) => changeListener = listener,
+                            get: () => Shape.get().range,
+                            set: (min, max=min) => {
+                                const range = Frets.Range.create(min, max);
+                                if(value !== undefined && Frets.Range.equals(value, range)) {
+                                    return;}
+                                value = range;
+                                if(changeListener) {
+                                    changeListener(value);}
+                                if(value.min !== value.max) { //min and max
+                                    rangeMarkers.minAndMax.forEach(marker =>
+                                        marker.show());
+                                    rangeMarkers.pivot.hide();
+                                    skeleton.activateMinAndMax(value.min, value.max);
+                                    activeBaseline.show();
+                                    rangeLabel.withRange(value.min, value.max);
+                                    activeBaseline.withRange(value.min, value.max);
+                                    rangeMarkers.min.atRootFret(value.min);
+                                    rangeMarkers.max.atRootFret(value.max);}
+                                else { //pivot
+                                    rangeMarkers.pivot.show();
+                                    rangeMarkers.minAndMax.forEach(marker => marker.hide());
+                                    skeleton.activatePivot(value.min);
+                                    activeBaseline.hide();
+                                    rangeLabel.withValue(value.min);
+                                    rangeMarkers.pivot.atRootFret(value.min);}}}));
+                    setupEventHandlers(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range);
+                    return SVG.Builder.G()
+                        .withClass("root-fret-range-input")
+                        .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
+                        .withChild(skeleton)
+                        .withChild(rangeLabel)
+                        .withChild(mouseTrap)
+                        .withChild(SVG.Builder.G()
+                            .withClass("root-fret-range-markers")
+                            .withChildren(rangeMarkers.all))
+                        .withGetterAndSetter("range",
+                            () => Range.get(),
+                            (range) => Range.set(range.min, range.max))
+                        .withMethod("withRange", function(range) {
+                            this.range = range;
+                            return this;})
+                        .withRange(range)
+                        .withMethod("withChangeListener", function(changeListener) {
+                            Range.setChangeListener(changeListener);
+                            return this;});}}));
             return {
                 Style: {
                     x: RootFretRangeStyle.startX - RootFretRangeStyle.rangeMarkerRadius,
@@ -2215,112 +2277,13 @@ const ChordJogApp = (() => {
                     height: 2 * RootFretRangeStyle.height +
                         RootFretRangeStyle.rangeLabelMarginTop +
                         RootFretRangeStyle.rangeLabelHalfHeight},
-                Builder: RootFretRangeInputBuilders.RootFretRangeInput};});
-        return {
-            Style: {
-                width: RootFretRangeInput.Style.x + RootFretRangeInput.Style.width,
-                height: RootFretRangeInput.Style.y + RootFretRangeInput.Style.height,
-                RootFretRange: {
-                    x: RootFretRangeInput.Style.x,
-                    width: RootFretRangeInput.Style.width},},
-            Builder: Module.of(() => {
-                const buildStep = (shape) => {
-                    const shapeChart = ShapeChart.Builder
-                        .forSchema(shape.schema)
-                        .unfixed();
-                    const previewMeatContainer = SVG.Builder.G()
-                        .withClass("preview-meat-container")
-                        .withAttributes({
-                            display: "none",
-                            fillOpacity: .4,
-                            strokeOpacity: .5})
-                        .disableTextSelection()
-                        .withMethods({
-                            show: () => {
-                                previewMeatContainer.withoutAttribute("display");
-                                shapeChart.querySelector(".shape-chart-meat").withAttributes({
-                                    fillOpacity: .6,
-                                    strokeOpacity: .5})},
-                            hide:() => {
-                                previewMeatContainer.withAttribute("display", "none");
-                                shapeChart.querySelector(".shape-chart-meat").withoutAttributes(
-                                    ["fill-opacity", "stroke-opacity"]);}});
-                    const Preview = Module.of((value) => ({
-                        get: () => value,
-                        set: (preview) => {
-                            value = preview;
-                            previewMeatContainer.innerHTML = "";
-                            previewMeatContainer.withChild(
-                                ShapeChart.Meat.Builder
-                                    .forSchema(value));}}));
-                    shapeChart.withGetterAndSetter("preview",
-                        Preview.get,
-                        function(preview) { Preview.set(preview); });
-                    const mouseTraps = MouseTrapsBuilder
-                        .withShapeChart(shapeChart)
-                        .withPreviewMeatContainer(previewMeatContainer);
-                    const fingerInput = FingerInput.Builder
-                        .withRegionChangeObserver((region) => shapeChart.activeFinger = region)
-                        .withFinger(initialActiveFinger)
-                        .withAttribute("stroke-width", 2)
-                        .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
-                        .scale(fingerInputScale);
-                    const rootFretRangeInput = RootFretRangeInput.Builder
-                        .withRange(shape.range)
-                        .withChangeListener((range) => Shape.setRange(range));
-                    Shape.setSchemaListener((schema) => shapeChart.schema = schema);
-                    Shape.setRangeListener((range) => rootFretRangeInput.range = range);
-                    Shape.set(shape);
-                    return SVG.Builder.G()
-                        .withClass("shape-input")
-                        .withChild(shapeChart)
-                        .withChild(previewMeatContainer)
-                        .withChild(mouseTraps.fretboard)
-                        .withChild(mouseTraps.fingerlessIndicators)
-                        .withChild(fingerInput)
-                        .withChild(rootFretRangeInput)
-                        .withGetterAndSetter("shape",
-                            () => Shape.get(),
-                            (shape) => Shape.set(shape))
-                        .withGetterAndSetter("rootFretRange",
-                            () => rootFretRangeInput.range,
-                            (range) => rootFretRangeInput.withRange(range.min, range.max))
-                        .withMethod("withShapeListener", function(shapeListener) {
-                            Shape.setShapeListener(shapeListener);
-                            return this;})
-                        .withMethods(Module.of(() => {  //focus() and unfocus()
-                            const keyCommands = Module.of(() => {
-                                const command = (finger) => {
-                                    shapeChart.activeFinger = finger;
-                                    fingerInput.selected = finger;};
-                                const keyCommands = {
-                                    1: Fingers.index,
-                                    2: Fingers.middle,
-                                    3: Fingers.ring,
-                                    4: Fingers.pinky,
-                                    t: Fingers.thumb };
-                                Object.entries(keyCommands).forEach(keyFinger =>
-                                    keyCommands[keyFinger[0]] = () => command(keyFinger[1]));
-                                return keyCommands;});
-                            return {
-                                focus: function() {
-                                    KeyboardCommands.setAll(keyCommands);
-                                    return this;},
-                                unfocus: function() {
-                                    KeyboardCommands.removeAll(Object.keys(keyCommands));
-                                    return this;}};}))}
-                return {
-                    forShape: (shape) => buildStep(shape),
-                    blank: () => buildStep(Shapes.Builder
-                        .withSchema(Shapes.Schema.allUnsounded)
-                        .withRange(Frets.Range.roots))}; })};});
-    const ShapeCreator = Module.of(
-        (ShapeCreatorStyle = Module.of((
+                Builder: RootFretRangeInputBuilders.RootFretRangeInput};}),
+        ShapeCreatorStyle = Module.of((
             buttonsMarginTop = 10,
-            buttonsWidth = ShapeInput.Style.RootFretRange.width / (2 + 3 / Numbers.goldenRatio),
+            buttonsWidth = RootFretRangeInput.Style.width / (2 + 3 / Numbers.goldenRatio),
             buttonsHeight = buttonsWidth / Numbers.goldenRatio,
-            buttonsStartX = ShapeInput.Style.RootFretRange.x,
-            buttonsY = ShapeInput.Style.height + buttonsMarginTop,
+            buttonsStartX = RootFretRangeInput.Style.x,
+            buttonsY = RootFretRangeInput.Style.y + RootFretRangeInput.Style.height + buttonsMarginTop,
             errorMessageMarginTop = 6
         ) => ({
             Buttons: {
@@ -2331,7 +2294,7 @@ const ChordJogApp = (() => {
                 height: buttonsHeight,
                 spacing: buttonsWidth / Numbers.goldenRatio},
             ErrorMessage: {
-                x: ShapeInput.Style.RootFretRange.x + .5 * ShapeInput.Style.RootFretRange.width,
+                x: RootFretRangeInput.Style.x + .5 * RootFretRangeInput.Style.width,
                 y: buttonsY + buttonsHeight + errorMessageMarginTop,
                 marginTop: errorMessageMarginTop,
                 fontSize: 11,
@@ -2339,9 +2302,11 @@ const ChordJogApp = (() => {
     ) => ({
         new: () => {
             let shapeInput;
-            const reset = () => shapeInput.shape = Shapes.Builder
-                .withSchema(Shapes.Schema.allUnsounded)
+            const rootFretRangeInput = RootFretRangeInput.Builder
                 .withRange(Frets.Range.roots);
+            const reset = () => {
+                shapeInput.schema = Shapes.Schema.allUnsounded;
+                rootFretRangeInput.range = Frets.Range.roots; };
             const saveButton = SVG.Builder.TextButton
                 .withDimensions(
                     ShapeCreatorStyle.Buttons.startX +
@@ -2363,7 +2328,7 @@ const ChordJogApp = (() => {
                     textAnchor: "middle",
                     dominantBaseline: "hanging"})
                 .disableTextSelection();
-            const shapeListener = Module.of((
+            const schemaChangeListener = Module.of((
                 schema,
                 invalidSaveButtonEventListeners = {
                     mouseEnter: function() {
@@ -2378,10 +2343,10 @@ const ChordJogApp = (() => {
                     errorMessage.textContent = reason;
                     saveButton.withEventListeners(invalidSaveButtonEventListeners);
                     saveButton.disable();}
-            ) => (shape) => {
-                if(schema !== undefined && Shapes.Schema.equals(schema, shape.schema)) {
+            ) => (newSchema) => {
+                if(schema !== undefined && Shapes.Schema.equals(schema, newSchema)) {
                     return;}
-                schema = shape.schema;
+                schema = newSchema;
                 const fingerActions = Shapes.Schema.getFingerActions(schema);
                 //Validate the schema
                 if(Shapes.Schema.equals(schema, Shapes.Schema.allUnsounded)) {
@@ -2404,11 +2369,12 @@ const ChordJogApp = (() => {
             shapeInput = ShapeInput.Builder
                 .blank()
                 .focus()
-                .withShapeListener(shapeListener);
-            shapeListener(shapeInput.shape);
+                .withChangeListener(schemaChangeListener);
+            schemaChangeListener(shapeInput.schema);
             return SVG.Builder.G()
                 .withClass("shape-creator")
                 .withChild(shapeInput)
+                .withChild(rootFretRangeInput)
                 .withChild(SVG.Builder.TextButton
                     .withDimensions(
                         ShapeCreatorStyle.Buttons.startX + ShapeCreatorStyle.Buttons.height,
