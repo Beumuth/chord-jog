@@ -185,7 +185,8 @@ const ChordJogApp = (() => {
         index: "1",
         middle: "2",
         ring: "3",
-        pinky: "4"};
+        pinky: "4",
+        any: "*"};
     Fingers.all = [
         Fingers.thumb,
         Fingers.index,
@@ -384,13 +385,47 @@ const ChordJogApp = (() => {
             element: createElement,
             G: () => createElement("g"),
             Circle: ({
-                withCenter: (c) => ({
-                    withRadius: (radius) =>
-                        createElement("circle")
-                            .withAttributes({
-                                cx: c[0],
-                                cy: c[1],
-                                r: radius }) }) }),
+                withCenter: (center) => ({
+                    withRadius: (radius) => createElement("circle")
+                        .withGetterAndSetter("centerX",
+                            function() {
+                                return this.getAttribute("cx");},
+                            function(centerX) {
+                                this.setAttribute("centerX", centerX);})
+                        .withMethod("withCenterX",
+                            function(centerX) {
+                                this.centerX = centerX;
+                                return this;})
+                        .withGetterAndSetter("centerY",
+                            function() {
+                                return this.getAttribute("cy");},
+                            function(centerY) {
+                                this.setAttribute("centerY", centerY);})
+                        .withMethod("withCenterY",
+                            function(centerY) {
+                                this.centerY = centerY;
+                                return this;})
+                        .withGetterAndSetter("center",
+                            function() {
+                            return [this.centerX, this.centerY]},
+                            function(center) {
+                                this.centerX = center[0];
+                                this.centerY = center[1];})
+                        .withMethod("withCenter",
+                            function(center) {
+                                this.center = center;
+                                return this;})
+                        .withGetterAndSetter("radius",
+                            function() {
+                                return this.getAttribute("r");},
+                            function(radius) {
+                                this.setAttribute("r", radius);})
+                        .withMethod("withRadius",
+                            function(radius) {
+                                this.radius = radius;
+                                return this;})
+                        .withCenter(center)
+                        .withRadius(radius)})}),
             Ellipse: ({
                 withCenter: (c) => ({
                     withRadius: (r) => createElement("ellipse")
@@ -741,493 +776,6 @@ const ChordJogApp = (() => {
                 fromString: shapesFromString,
                 toString: shapesToString,
                     localStorageKey: localStorageKey};});});
-    const FingerInput = Module.of(() => {
-        const Regions = {
-            States: {
-                all: [
-                    "unselected",
-                    "preview",
-                    "selected",
-                    "unselectable" ],
-                isValid: (state) => Regions.States.all.includes(state)  },
-            FingerLabel: {
-                Text: {
-                    createForRegion: (region) => SVG.Builder.Text
-                        .withTextContent(region.finger)
-                        .withAttributes({
-                            x: region.initialPosition[0],
-                            y: region.initialPosition[1],
-                            fontFamily: "Courier New",
-                            fontSize: 37,
-                            dx: -10.5 + region.initialOffset[0],
-                            dy: 10.5 + region.initialOffset[1]})},
-                Outline: {
-                    createForRegion: (region) => SVG.Builder.Circle
-                        .withCenter(region.initialPosition)
-                        .withRadius(18)
-                        .withClass("finger-label-outline")},
-                instantiate: (region) => SVG.Builder
-                    .G()
-                    .withClass("finger-label")
-                    .withDataAttribute("for", region.finger)
-                    .withChildren([
-                        Regions.FingerLabel.Text.createForRegion(region),
-                        Regions.FingerLabel.Outline.createForRegion(region)])},
-            Joint: {
-                instantiate: Module.of(() => {
-                    const pointToJoint = (p) => SVG.Builder.Circle
-                        .withCenter(p)
-                        .withRadius(1)
-                        .withClass("finger-input-region-joint")
-                        .withAttribute("strokeWidth", 0);
-                    return (staticRegion) => staticRegion.jointInfo.length === 1 ?
-                        [pointToJoint(staticRegion.jointInfo[0])] :
-                        staticRegion.jointInfo.map((region, index) =>
-                            pointToJoint(region).withDataAttribute("index", index));})},
-            Builder: {
-                Static: {
-                    withFinger: (finger) => ({
-                        withPosition: (p) => ({
-                            withOffset: (d) => {
-                                const region = {
-                                    finger: finger,
-                                    initialPosition: p,
-                                    initialOffset: d};
-                                return {
-                                    withPointModel: (p) => {
-                                        region.jointInfo = [p];
-                                        return region;},
-                                    withLineSegmentModel: (lineSegment) => {
-                                        region.jointInfo = lineSegment;
-                                        return region; } }; }}) }) }}};
-        Regions.static = [
-            Regions.Builder.Static
-                .withFinger(Fingers.thumb)
-                .withPosition([37.8, 188])
-                .withOffset([-.5, -.5])
-                .withLineSegmentModel([[11, 137],[48, 209]]),
-            Regions.Builder.Static
-                .withFinger(Fingers.index)
-                .withPosition([91, 110])
-                .withOffset([.5, -.5])
-                .withLineSegmentModel([[82, 25], [94, 141]]),
-            Regions.Builder.Static
-                .withFinger(Fingers.middle)
-                .withPosition([135.75, 94])
-                .withOffset([0, -.5])
-                .withLineSegmentModel([[131, 7], [139, 133]]),
-            Regions.Builder.Static
-                .withFinger(Fingers.ring)
-                .withPosition([177.5, 104])
-                .withOffset([-1, 0])
-                .withLineSegmentModel([[181, 29], [175, 141]]),
-            Regions.Builder.Static
-                .withFinger(Fingers.pinky)
-                .withPosition([217.3, 130])
-                .withOffset([-1.75, -1])
-                .withLineSegmentModel([[219, 63], [217, 158]])];
-        Regions.staticWithFinger = (finger) => Regions.static.find(region => region.finger === finger)
-        Regions.Builder.Instance = {
-            withRegionChangeObserver: (regionChangeObserver) => Regions.static.map((staticRegion) => {
-                //The 'joints' is either a single or a pair of points used for
-                //calculating the closest finger to the mouse.
-                //They are added as SVG elements instead of within the static Regions module
-                //to allow svg transformations to apply to the coordinates of these points.
-                const joints = Regions.Joint.instantiate(staticRegion);
-                return Objects.using({
-                        finger: staticRegion.finger,
-                        distance2Mapper: Module.of(() => {
-                            const jointToPoint = (joint) => {
-                                const boundingClientRect = joint.getBoundingClientRect();
-                                return [boundingClientRect.x, boundingClientRect.y]; };
-                            return joints.length === 1 ?
-                                (p) => Geometry.distance2(p, jointToPoint(joints[0])):
-                                (p) => Geometry.distance2(p,
-                                    Geometry.projectPointOnLineSegment(p,
-                                        joints.map(jointToPoint)))}),
-                        element: SVG.Builder.G()
-                            .withClass("finger-input-region")
-                            .withDataAttribute("finger", staticRegion.finger)
-                            .withGetter("finger", () => staticRegion.finger)
-                            .withGetterAndSetter("state",
-                                function() { return this.dataset.state; },
-                                function(state) {
-                                    if(Regions.States.isValid(state)) {
-                                        this.dataset.state = state;}})
-                            .withChild(Regions.FingerLabel.instantiate(staticRegion))
-                            .withChildren(joints)
-                            .withAttributeChangeListener("data-state",
-                                function(e) {
-                                    //Is the new state valid?
-                                    if (! Regions.States.isValid(e.value)) {
-                                        //No - reset to the old value and return
-                                        return e.region.state = e.oldValue; }
-                                    //Valid. Is this an exclusive state?
-                                    if (["preview", "selected"].includes(e.value)) {
-                                        //Yes. If there's another region with the exclusive state,
-                                        //switch it to 'unselected'.
-                                        this.parentElement.regions
-                                            .filter(region => region.state === e.value)
-                                            .filter(region => region.finger !== this.finger)
-                                            .forEach(region => region.state = "unselected");}
-                                    //Is it the selected state?
-                                    if("selected" === e.value) {
-                                        //Yes. Notify the regionChangeObservers.
-                                        regionChangeObserver(this.finger);}
-                                    //Style the region according to the new state.
-                                    const fingerLabel = this.querySelector(`.finger-label`);
-                                    const fingerLabelOutline = fingerLabel.querySelector("circle");
-                                    //Hide the label if 'unselectable'
-                                    fingerLabel.setAttribute("display",
-                                        "unselectable" === e.value ? "none" : "inline");
-                                    //Show the stroke if 'preview' or 'selected'
-                                    fingerLabelOutline.setAttribute("stroke",
-                                        ["preview", "selected"].includes(e.value) ? "black" : "none");
-                                    //Dash the stroke if 'preview'
-                                    fingerLabelOutline.setAttribute("stroke-dasharray",
-                                        "preview" === e.value ? "4 5" : null);},
-                                function() {return this.state;})
-                            .withDataAttribute("state",
-                                staticRegion.finger === Fingers.index ? "selected" : "unselected")})
-                    .withGetterAndSetter("state",
-                        function() { return this.element.state; },
-                        function(state) { this.element.state = state});})};
-        return {
-            Style: {
-                width: 237},
-            Builder: {
-                withRegionChangeObserver: (observer) => {
-                    const regions = Regions.Builder.Instance.withRegionChangeObserver(observer);
-                    const regionWithFinger = (finger) => regions.find(region => region.finger === finger);
-                    const mouseEventToClosestFinger = (e) => regions
-                        .map(region => ({
-                            finger: region.finger,
-                            distance2: region.distance2Mapper([e.clientX, e.clientY])}))
-                        .reduce((closestRegion, currentRegion) =>
-                            closestRegion.distance2 <= currentRegion.distance2 ?
-                                closestRegion : currentRegion)
-                        .finger;
-                return SVG.Builder
-                    .G()
-                    .withAttributes({
-                        cursor: "pointer",
-                        pointerEvents: "fill",
-                        width: 233,
-                        height: 291 })
-                    .withClass("finger-input")
-                    .withChild(SVG.Builder.Path
-                        .withD(
-                            `M
-                                90.24086,	287.90208
-                            C
-                                65.553543,	278.2203
-                                58.735661,	267.8963
-                                44.888627,	249.27999
-                        
-                                41.477532,	244.69408
-                                31.698887,	231.03142
-                                29.347764,	224.59326
-                        
-                                27.055052,	214.83116
-                                25.07621,	205.17052
-                                22.760006,	198.50736
-                        
-                                20.885747,	193.11564
-                                14.138771,	180.79899
-                                12.027004,	174.7266
-                        
-                                10.37836,	169.98589
-                                10.255809,	162.7399
-                                8.2089209,	155.89701
-                        
-                                6.8990141,	151.51793
-                                5.4228811,	145.45277
-                                1.4765024,	135.88287
-                            c
-                                -2.8811867,	-6.98685
-                                5.8594728,	-11.25498
-                                18.1170216,	-5.80672
-                        
-                                10.822529,	4.81044
-                                12.906949,	8.67208
-                                17.992632,	15.02954
-                        
-                                4.381971,	5.47776
-                                11.338612,	33.54161
-                                22.276197,	41.0769
-                        
-                                1.759648,	1.21229
-                                3.823847,	-0.1425
-                                3.823847,	-0.1425
-                        
-                                3.403311,	-9.60373
-                                12.928881,	-18.62113
-                                12.156321,	-50.01484
-                            C
-                                75.591525,		125.82638
-                                74.091922,		108.61179
-                                72.695207,		93.170149
-                        
-                                72.187304,		87.554666
-                                71.917408,		76.230509
-                                71.60716,		70.018286
-                        
-                                71.27307,		63.328224
-                                69.998647,		52.954412
-                                69.976007,		48.065245
-                            c
-                                -0.02475,		-5.335972
-                                -0.09676,		-15.052854
-                                1.293281,		-23.298712
-                        
-                                1.834863,		-10.884309
-                                17.963013,		-10.117052
-                                20.891868,		-2.365259
-                        
-                                2.804369,		11.617646
-                                3.238162,		18.094071
-                                4.170184,		23.550833
-                        
-                                1.18185,		6.919363
-                                2.16547,		15.427318
-                                3.194578,		20.506386
-                        
-                                1.032022,		5.093395
-                                3.237512,		14.515669
-                                5.231872,		24.123065
-                        
-                                2.63942,		8.691535
-                                3.12635,		31.588042
-                                8.42702,		39.301692
-                        
-                                2.45347,		3.57033
-                                3.94736,		4.93439
-                                8.42847,		5.23948
-                        
-                                -0.0251,		-6.38752
-                                0.44175,		-11.31791
-                                0.094,			-15.67938
-                        
-                                -0.82734,		-10.37706
-                                -2.74064,		-21.86338
-                                -3.65289,		-32.619099
-                        
-                                -0.59983,		-7.071971
-                                0.13363,		-19.033253
-                                0.0713,			-23.889905
-                        
-                                -0.0846,		-6.589073
-                                0.16482,		-16.634983
-                                0.0695,			-23.901209
-                        
-                                -0.11196,		-8.534288
-                                -0.15176,		-29.014407
-                                2.89996,		-33.7023676
-                        
-                                3.69537,		-5.67665103
-                                16.47153,		-6.09493802
-                                19.61992,		0.1074513
-                        
-                                3.77308,		7.4330203
-                                5.63591,		20.4218263
-                                6.52689,		33.2823953
-                        
-                                0.56858,		8.207304
-                                0.38486,		16.640813
-                                1.08551,		22.581808
-                        
-                                0.87318,		7.403734
-                                2.96756,		16.415731
-                                3.89178,		25.242315
-                        
-                                0.85051,		8.122744
-                                -0.31848,		21.581881
-                                0.40023,		31.949161
-                        
-                                0.46752,		6.74365
-                                0.33744,		9.3262
-                                2.05853,		12.70339
-                        
-                                1.07532,		2.10998
-                                5.85605,		4.02267
-                                5.85605,		4.02267
-                        
-                                1.38512,		-5.27093
-                                1.49689,		-9.3538
-                                1.69222,		-15.16177
-                        
-                                0.17522,		-5.20927
-                                -0.41491,		-12.58731
-                                0.0408,			-19.73849
-                        
-                                0.43058,		-6.75742
-                                2.63894,		-16.998145
-                                2.85092,		-21.671145
-                        
-                                0.25085,		-5.530013
-                                1.21975,		-16.805924
-                                1.43673,		-19.760198
-                        
-                                0.65026,		-8.853276
-                                2.14273,		-25.591214
-                                3.09617,		-29.71769
-                        
-                                2.25599,		-9.763798
-                                19.84553,		-7.945837
-                                21.60994,		0.380646
-                        
-                                2.21673,		10.461034
-                                1.49518,		22.851558
-                                1.05918,		29.488952
-                        
-                                -0.38092,		5.79885
-                                -0.31173,		15.701981
-                                -0.39707,		20.738562
-                        
-                                -0.11832,		6.982007
-                                0.78488,		17.232073
-                                1.09147,		23.202643
-                        
-                                0.26513,		5.16193
-                                -0.21878,		17.33488
-                                -0.9513,		23.07467
-                        
-                                -1.77582,		13.91514
-                                0.90096,		17.44691
-                                2.30454,		21.55484
-                        
-                                1.29837,		3.80005
-                                5.90152,		5.48296
-                                5.90152,		5.48296
-                        
-                                0.21924,		-9.03558
-                                3.21515,		-19.80753
-                                3.57848,		-23.48812
-                        
-                                0.44834,		-4.54146
-                                2.7986,			-12.15729
-                                3.5118,			-24.00093
-                        
-                                0.24811,		-4.12051
-                                0.41604,		-13.362853
-                                1.30283,		-21.530475
-                        
-                                0.71803,		-6.613163
-                                1.2482,			-12.945687
-                                1.95034,		-17.647274
-                        
-                                2.16975,		-14.528799
-                                16.81753,		-8.521086
-                                18.04217,		-2.46042
-                        
-                                0.88398,		4.374668
-                                2.01203,		17.711465
-                                2.18703,		22.654216
-                        
-                                0.19566,		5.525447
-                                0.74185,		21.419513
-                                0.63958,		23.648943
-                        
-                                -0.29334,		6.40311
-                                -0.59407,		20.81883
-                                -1.08627,		25.13753
-                        
-                                -0.70125,		6.15295
-                                0.64604,		18.26691
-                                0.72939,		31.73454
-                        
-                                0.0964,			15.58975
-                                -0.9936,		23.30861
-                                -2.21163,		33.73706
-                        
-                                -8.86788,		75.92491
-                                -30.6335,		85.50484
-                                -37.94763,		87.08853
-                        
-                                -8.97573,		1.94339
-                                -94.248694,		2.47411
-                                -100.724424,	-0.0632
-                            z`.replace(/\s+/g, " "))
-                        .withAttribute("class", "outline"))
-                    .withChildren(regions.map(region => region.element))
-                    .withMethods({
-                        withFinger: function(finger) {
-                            this.selected = finger;
-                            return this;},
-                        unpreview: function() {
-                            const previewFinger = this.preview;
-                            if(! Objects.isNil(previewFinger)) {
-                                this.setFingerState(previewFinger, "unselected"); } },
-                        unselect: function() {
-                            const selectedFinger = this.selected;
-                            if(! Objects.isNil(selectedFinger)) {
-                                this.setFingerState(selectedFinger, "unselected"); } },
-                        getFingerState: function(finger) { return regionWithFinger(finger).state; },
-                        setFingerState: function(finger, state) { regionWithFinger(finger).state = state; },
-                        getFingerWithExclusiveState: (state) => {
-                            const matchingRegion = regions.find(region => region.state === state);
-                            return matchingRegion === undefined ? null : matchingRegion.finger;}})
-                    .withEventListeners({
-                        mouseMove: function(e) {
-                            const previewFinger = mouseEventToClosestFinger(e);
-                            //Set the cursor to 'auto' if the preview region is 'unselectable',
-                            //otherwise 'pointer'.
-                            this.setAttribute("cursor",
-                                "unselectable" === this.getFingerState(previewFinger) ?
-                                    "auto" : "pointer");
-                            //Set the preview
-                            this.preview = previewFinger;},
-                        mouseDown: function(e) {
-                            this.selected = mouseEventToClosestFinger(e);},
-                        mouseLeave: function() {this.unpreview();}})
-                    .withProperties({
-                        regions: {
-                            get: () => regions.map(region => ({
-                                finger: region.finger,
-                                state: region.state}))},
-                        selected: {
-                            get: function() { return this.getFingerWithExclusiveState("selected"); },
-                            set: function(finger) {
-                                //Unselect if null or undefined
-                                if(Objects.isNil(finger)) {
-                                    return this.unselect(); }
-
-                                //Get the newly selected region state
-                                const selectedFingerCurState = this.getFingerState(finger);
-                                //Is it unselectable or already selected?
-                                if(["unselectable", "selected"].includes(selectedFingerCurState)) {
-                                    //Yes. Do nothing.
-                                    return; }
-
-                                //Get the previously selected region
-                                const previouslySelectedFinger = this.selected;
-                                //Does one exist?
-                                if(previouslySelectedFinger !== null) {
-                                    //Yes. Unselect it.
-                                    this.setFingerState(previouslySelectedFinger,
-                                        "unselected"); }
-
-                                //Select the new finger
-                                this.setFingerState(finger, "selected") } },
-                        preview: {
-                            get: function() {
-                                return this.getFingerWithExclusiveState("preview");},
-                            set: function(finger) {
-                                //Unpreview if null or undefined
-                                if(Objects.isNil(finger)) {return this.unpreview(); }
-                                //Get the current preview region (possibly undefined)
-                                const existingPreviewFinger = this.preview;
-                                //Does one exist, and if so does it differ from
-                                //the current preview finger?
-                                if(! [null, finger].includes(existingPreviewFinger)){
-                                    //Yes. Unselect it.
-                                    this.setFingerState(existingPreviewFinger, "unselected"); }
-                                //Is the new region unselected?
-                                if(this.getFingerState(finger) === "unselected") {
-                                    //Yes. Preview it.
-                                    //(only unselected regionInfo can be previewed)
-                                    this.setFingerState(finger, "preview"); } } } })
-                    .disableTextSelection();}}}; });
 
     const ShapeChart = Module.of(() => {
         const halfRoot2 = .5 * Math.SQRT2;
@@ -1541,10 +1089,444 @@ const ChordJogApp = (() => {
             ) => ({
                 blank: () => withSchema(Shapes.Schema.allUnsounded),
                 forSchema: (schema) => withSchema(schema)}))};});
+
+    const FingerInput = {
+        Style: {
+            width: 237 /*hardcoded*/,
+            height: undefined /*todo*/},
+        Builder: Module.of((
+            RegionsBuilder = Module.of((
+                StaticRegions = Module.of((
+                    StaticRegionBuilder= Module.of(() => ({
+                        withValue: (value) => ({
+                            withPosition: (position) => ({
+                                withTextOffset: (textOffset) => Module.of((region={
+                                    value: value,
+                                    position: position,
+                                    textOffset: textOffset}
+                                ) => ({
+                                    withPointModel: (p) => {
+                                        region.joints = [p];
+                                        return region;},
+                                    withLineSegmentModel: (lineSegment) => {
+                                        region.joints = lineSegment;
+                                        return region; }}))})})})),
+                    fingerRegions = [
+                        StaticRegionBuilder
+                            .withValue(Fingers.thumb)
+                            .withPosition([37.8, 188])
+                            .withTextOffset([-.5, -.5])
+                            .withLineSegmentModel([[11, 137],[48, 209]]),
+                        StaticRegionBuilder
+                            .withValue(Fingers.index)
+                            .withPosition([91, 110])
+                            .withTextOffset([.5, -.5])
+                            .withLineSegmentModel([[82, 25], [94, 141]]),
+                        StaticRegionBuilder
+                            .withValue(Fingers.middle)
+                            .withPosition([135.75, 94])
+                            .withTextOffset([0, -.5])
+                            .withLineSegmentModel([[131, 7], [139, 133]]),
+                        StaticRegionBuilder
+                            .withValue(Fingers.ring)
+                            .withPosition([177.5, 104])
+                            .withTextOffset([-1, 0])
+                            .withLineSegmentModel([[181, 29], [175, 141]]),
+                        StaticRegionBuilder
+                            .withValue(Fingers.pinky)
+                            .withPosition([217.3, 130])
+                            .withTextOffset([-1.75, -1])
+                            .withLineSegmentModel([[219, 63], [217, 158]])],
+                    anyFingerRegion=StaticRegionBuilder
+                        .withValue(Fingers.any)
+                        .withPosition([133, 200])
+                        .withTextOffset([0, 0])
+                        .withPointModel([133, 200]),
+                    allRegions=fingerRegions.concat(anyFingerRegion)
+                ) => ({
+                    fingers: fingerRegions,
+                    all: allRegions})),
+                RegionLabelBuilder = {
+                    forStaticRegion: (staticRegion) => SVG.Builder.Text
+                        .withTextContent(staticRegion.value)
+                        .withClass("finger-label")
+                        .withAttributes({
+                            x: staticRegion.position[0],
+                            y: staticRegion.position[1],
+                            fontFamily: "Courier New",
+                            fontSize: 37,
+                            dx: -10.5 + staticRegion.textOffset[0],
+                            dy: 10.5 + staticRegion.textOffset[1]})},
+                RegionJointsBuilder = Module.of((
+                    pointToJoint = (point) => SVG.Builder.Circle
+                        .withCenter(point)
+                        .withRadius(1)
+                        .withClass("finger-input-region-joint")
+                        .withGetter("position", () => point)
+                        .hide()
+                ) => ({
+                    forStaticRegion: (staticRegion) => SVG.Builder.G()
+                        .withClass("finger-region-joints")
+                        .withChildren(staticRegion.joints.map(pointToJoint))})),
+                RegionBuilder={
+                    forStaticRegion: staticRegion =>  Module.of((
+                        joints = RegionJointsBuilder.forStaticRegion(staticRegion)
+                    ) => SVG.Builder.G()
+                        .withClass("finger-region")
+                        .withChild(RegionLabelBuilder.forStaticRegion(staticRegion))
+                        .withChildren(joints)
+                        .withGetter("value", staticRegion.value)
+                        .withGetter("position", staticRegion.position)
+                        .withMethod("distance2", joints.length === 1 ?
+                            (p) => Geometry.distance2(p, joints[0].position) :
+                            (p) => Geometry.distance2(p,
+                                Geometry.projectPointOnLineSegment(p,
+                                    joints.map(joint => joint.position)))))},
+                RegionsBuilder = {
+                    forStaticRegions: staticRegions => staticRegions.map(staticRegion =>
+                        RegionBuilder.forStaticRegion)}
+            ) => ({
+                fingers: RegionsBuilder.forStaticRegions(StaticRegions.fingers),
+                all: RegionsBuilder.forStaticRegions(StaticRegions.all)})),
+            FingerInputBuilder = Module.of((
+                RegionIndicatorBuilder = Module.of((
+                    radius=18,
+                    previewStrokeDasharray="4 5",
+                    createIndicator = () => Module.of((region) => SVG.Builder.Circle
+                        .withCenter(null)
+                        .withRadius(radius)
+                        .withGetterAndSetter("region",
+                            () => region,
+                            function(newRegion) {
+                                if(newRegion !== region) {
+                                    region = newRegion;
+                                    this.center = region.position;}})
+                        .withMethod("forRegion", function(region) {
+                            this.region = region;
+                            return this;}))
+                ) => ({
+                    selected: {
+                        withInitialRegion: (initialRegion) => createIndicator()
+                            .forRegion(initialRegion)},
+                    preview: () => createIndicator()
+                        .withAttribute("stroke-dasharray", previewStrokeDasharray)
+                        .hide()})),
+            ) => ({
+                withRegions: (regions) => Module.of((
+                    regionByValue=(value) => regions.find(region => region.value === value),
+                    mouseEventToClosestRegionValue = (e) => regions
+                        .map(region => ({
+                            value: region.value,
+                            distance2: region.distance2([e.clientX, e.clientY])}))
+                        .reduce((closestRegion, currentRegion) =>
+                            closestRegion.distance2 <= currentRegion.distance2 ?
+                                closestRegion : currentRegion)
+                        .value
+                ) => ({
+                    withInitialValue: initialValue => ({
+                        withKeyValueMap: keyValueMap => Module.of((
+                            Preview=Module.of((
+                                previewIndicator=RegionIndicatorBuilder.preview()
+                            ) => ({
+                                get: () => previewIndicator.region.value,
+                                set: (preview) => previewIndicator.region = regionByValue(preview)})),
+                            Selected=Module.of((
+                                selectedIndicator=RegionIndicatorBuilder
+                                    .selected
+                                    .withInitialRegion(regionByValue(initialValue)),
+                                changeListener=undefined
+                            ) => ({
+                                get: () => selectedIndicator.region.value,
+                                set: (selected) => {
+                                    if(selected !== selectedIndicator.region.value) {
+                                        selectedIndicator.region = regionByValue(selected);
+                                        if(changeListener !== undefined) {
+                                            changeListener(selected);}}},
+                                setChangeListener: listener => changeListener = listener}))
+                        ) => SVG.Builder.G()
+                            .withClass("finger-input")
+                            .withChild(SVG.Builder.Path //hand-outline
+                                .withD(
+                                    `M
+                                    90.24086,	287.90208
+                                C
+                                    65.553543,	278.2203
+                                    58.735661,	267.8963
+                                    44.888627,	249.27999
+                            
+                                    41.477532,	244.69408
+                                    31.698887,	231.03142
+                                    29.347764,	224.59326
+                            
+                                    27.055052,	214.83116
+                                    25.07621,	205.17052
+                                    22.760006,	198.50736
+                            
+                                    20.885747,	193.11564
+                                    14.138771,	180.79899
+                                    12.027004,	174.7266
+                            
+                                    10.37836,	169.98589
+                                    10.255809,	162.7399
+                                    8.2089209,	155.89701
+                            
+                                    6.8990141,	151.51793
+                                    5.4228811,	145.45277
+                                    1.4765024,	135.88287
+                                c
+                                    -2.8811867,	-6.98685
+                                    5.8594728,	-11.25498
+                                    18.1170216,	-5.80672
+                            
+                                    10.822529,	4.81044
+                                    12.906949,	8.67208
+                                    17.992632,	15.02954
+                            
+                                    4.381971,	5.47776
+                                    11.338612,	33.54161
+                                    22.276197,	41.0769
+                            
+                                    1.759648,	1.21229
+                                    3.823847,	-0.1425
+                                    3.823847,	-0.1425
+                            
+                                    3.403311,	-9.60373
+                                    12.928881,	-18.62113
+                                    12.156321,	-50.01484
+                                C
+                                    75.591525,		125.82638
+                                    74.091922,		108.61179
+                                    72.695207,		93.170149
+                            
+                                    72.187304,		87.554666
+                                    71.917408,		76.230509
+                                    71.60716,		70.018286
+                            
+                                    71.27307,		63.328224
+                                    69.998647,		52.954412
+                                    69.976007,		48.065245
+                                c
+                                    -0.02475,		-5.335972
+                                    -0.09676,		-15.052854
+                                    1.293281,		-23.298712
+                            
+                                    1.834863,		-10.884309
+                                    17.963013,		-10.117052
+                                    20.891868,		-2.365259
+                            
+                                    2.804369,		11.617646
+                                    3.238162,		18.094071
+                                    4.170184,		23.550833
+                            
+                                    1.18185,		6.919363
+                                    2.16547,		15.427318
+                                    3.194578,		20.506386
+                            
+                                    1.032022,		5.093395
+                                    3.237512,		14.515669
+                                    5.231872,		24.123065
+                            
+                                    2.63942,		8.691535
+                                    3.12635,		31.588042
+                                    8.42702,		39.301692
+                            
+                                    2.45347,		3.57033
+                                    3.94736,		4.93439
+                                    8.42847,		5.23948
+                            
+                                    -0.0251,		-6.38752
+                                    0.44175,		-11.31791
+                                    0.094,			-15.67938
+                            
+                                    -0.82734,		-10.37706
+                                    -2.74064,		-21.86338
+                                    -3.65289,		-32.619099
+                            
+                                    -0.59983,		-7.071971
+                                    0.13363,		-19.033253
+                                    0.0713,			-23.889905
+                            
+                                    -0.0846,		-6.589073
+                                    0.16482,		-16.634983
+                                    0.0695,			-23.901209
+                            
+                                    -0.11196,		-8.534288
+                                    -0.15176,		-29.014407
+                                    2.89996,		-33.7023676
+                            
+                                    3.69537,		-5.67665103
+                                    16.47153,		-6.09493802
+                                    19.61992,		0.1074513
+                            
+                                    3.77308,		7.4330203
+                                    5.63591,		20.4218263
+                                    6.52689,		33.2823953
+                            
+                                    0.56858,		8.207304
+                                    0.38486,		16.640813
+                                    1.08551,		22.581808
+                            
+                                    0.87318,		7.403734
+                                    2.96756,		16.415731
+                                    3.89178,		25.242315
+                            
+                                    0.85051,		8.122744
+                                    -0.31848,		21.581881
+                                    0.40023,		31.949161
+                            
+                                    0.46752,		6.74365
+                                    0.33744,		9.3262
+                                    2.05853,		12.70339
+                            
+                                    1.07532,		2.10998
+                                    5.85605,		4.02267
+                                    5.85605,		4.02267
+                            
+                                    1.38512,		-5.27093
+                                    1.49689,		-9.3538
+                                    1.69222,		-15.16177
+                            
+                                    0.17522,		-5.20927
+                                    -0.41491,		-12.58731
+                                    0.0408,			-19.73849
+                            
+                                    0.43058,		-6.75742
+                                    2.63894,		-16.998145
+                                    2.85092,		-21.671145
+                            
+                                    0.25085,		-5.530013
+                                    1.21975,		-16.805924
+                                    1.43673,		-19.760198
+                            
+                                    0.65026,		-8.853276
+                                    2.14273,		-25.591214
+                                    3.09617,		-29.71769
+                            
+                                    2.25599,		-9.763798
+                                    19.84553,		-7.945837
+                                    21.60994,		0.380646
+                            
+                                    2.21673,		10.461034
+                                    1.49518,		22.851558
+                                    1.05918,		29.488952
+                            
+                                    -0.38092,		5.79885
+                                    -0.31173,		15.701981
+                                    -0.39707,		20.738562
+                            
+                                    -0.11832,		6.982007
+                                    0.78488,		17.232073
+                                    1.09147,		23.202643
+                            
+                                    0.26513,		5.16193
+                                    -0.21878,		17.33488
+                                    -0.9513,		23.07467
+                            
+                                    -1.77582,		13.91514
+                                    0.90096,		17.44691
+                                    2.30454,		21.55484
+                            
+                                    1.29837,		3.80005
+                                    5.90152,		5.48296
+                                    5.90152,		5.48296
+                            
+                                    0.21924,		-9.03558
+                                    3.21515,		-19.80753
+                                    3.57848,		-23.48812
+                            
+                                    0.44834,		-4.54146
+                                    2.7986,			-12.15729
+                                    3.5118,			-24.00093
+                            
+                                    0.24811,		-4.12051
+                                    0.41604,		-13.362853
+                                    1.30283,		-21.530475
+                            
+                                    0.71803,		-6.613163
+                                    1.2482,			-12.945687
+                                    1.95034,		-17.647274
+                            
+                                    2.16975,		-14.528799
+                                    16.81753,		-8.521086
+                                    18.04217,		-2.46042
+                            
+                                    0.88398,		4.374668
+                                    2.01203,		17.711465
+                                    2.18703,		22.654216
+                            
+                                    0.19566,		5.525447
+                                    0.74185,		21.419513
+                                    0.63958,		23.648943
+                            
+                                    -0.29334,		6.40311
+                                    -0.59407,		20.81883
+                                    -1.08627,		25.13753
+                            
+                                    -0.70125,		6.15295
+                                    0.64604,		18.26691
+                                    0.72939,		31.73454
+                            
+                                    0.0964,			15.58975
+                                    -0.9936,		23.30861
+                                    -2.21163,		33.73706
+                            
+                                    -8.86788,		75.92491
+                                    -30.6335,		85.50484
+                                    -37.94763,		87.08853
+                            
+                                    -8.97573,		1.94339
+                                    -94.248694,		2.47411
+                                    -100.724424,	-0.0632
+                                z`.replace(/\s+/g, " "))
+                                .withClass("hand-outline"))
+                            .withChildren(regions.map(region => region.element))
+                            .withGetterAndSetter("selected", Selected.get, Selected.set)
+                            .withSetter("changeListener", Selected.setChangeListener)
+                            .withMethod("withChangeListener", function(listener) {
+                                this.changeListener = listener;
+                                return this;})
+                            .withMethods(Module.of((
+                                keyCommands = Object
+                                    .entries(keyValueMap)
+                                    .map(keyValue => keyCommands[keyValue[0]] =() => Selected.set(keyValue[1]))
+                            ) => ({
+                                focus: () => KeyboardCommands.setAll(keyCommands),
+                                focused: function() {
+                                    this.focus();
+                                    return this;},
+                                unfocus: () => KeyboardCommands.removeAll(Object.keys(keyCommands)),
+                                unfocused: function() {
+                                    this.unfocus();
+                                    return this;}})))
+                            .withEventListeners({
+                                mouseMove: e => Preview.set(mouseEventToClosestRegionValue(e)),
+                                mouseDown: e => Selected.set(mouseEventToClosestRegionValue(e)),
+                                mouseLeave: () => Preview.set(null)})
+                            .withAttributes({
+                                cursor: "pointer",
+                                pointerEvents: "fill"})
+                            .disableTextSelection())})}))}))
+        ) => Module.of((
+            fingersKeyMap={
+                1: Fingers.index,
+                2: Fingers.middle,
+                3: Fingers.ring,
+                4: Fingers.pinky,
+                t: Fingers.thumb },
+            allKeyMap=Object.assign({a: Fingers.any}, fingersKeyMap)
+        ) => ({
+            withoutWildcard: () => FingerInputBuilder
+                .withRegions(RegionsBuilder.fingers())
+                .withInitialValue(Fingers.index)
+                .withKeyValueMap(fingersKeyMap),
+            withWildcard: () => FingerInputBuilder
+                .withRegions(RegionsBuilder.all())
+                .withInitialValue(Fingers.any)
+                .withKeyValueMap(allKeyMap)})))};
+
     const ShapeInput = Module.of(() => {
         const shapeChartMarginRight = 2;
         const fingerInputScale = .5;
-        const initialActiveFinger = Fingers.index;
         const FretboardMouseTrap = {
             Style: {padding: ShapeChart.FingerIndicator.Style.radius}};
         FretboardMouseTrap.xCoordinateToString = (x) => Strings.all
@@ -1752,11 +1734,15 @@ const ChordJogApp = (() => {
             Style: {
                 width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width * fingerInputScale,
                 height: ShapeChart.Style.height},
-            Builder: Module.of(() => {
-                const buildStep = (schema) => {
+            Builder: Module.of((
+                createShapeInput = (schema, fingerInput) => {
                     const shapeChart = ShapeChart.Builder
                         .forSchema(schema)
                         .unfixed();
+                    fingerInput
+                        .withChangeListener(fingerValue => shapeChart.activeFinger = fingerValue)
+                        .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
+                        .scale(fingerInputScale);   //TODO see if the scaling can be done within FingerInput.Create
                     const previewMeatContainer = SVG.Builder.G()
                         .withClass("preview-meat-container")
                         .withAttributes({
@@ -1792,23 +1778,22 @@ const ChordJogApp = (() => {
                             if(! Shapes.Schema.equals(schema, shapeChart.schema)) {
                                 shapeChartSchemaSetter(schema);
                                 if(changeListener !== undefined) {
-                                    changeListener(schema);}}}) => {
+                                    changeListener(schema);}}}
+                    ) => {
                         shapeChart.withSetter("schema", schemaSetter);
-                        return {
+                        const Schema = {
                             setChangeListener: (listener) => changeListener = listener,
                             get: () => shapeChart.schema,
-                            set: schemaSetter};});
+                            set: schemaSetter};
+                        Schema.set(schema);
+                        return Schema;});
+
+                    //TODO
+                    //  The mouse traps should not know about shapeChart and previewMeatContainer;
+                    //  instead, they should expose a mouseMoveListener.
                     const mouseTraps = MouseTrapsBuilder
                         .withShapeChart(shapeChart)
                         .withPreviewMeatContainer(previewMeatContainer);
-                    const fingerInput = FingerInput.Builder
-                        .withRegionChangeObserver((region) => shapeChart.activeFinger = region)
-                        .withFinger(initialActiveFinger)
-                        .withAttribute("stroke-width", 2)
-                        .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
-                        .scale(fingerInputScale);
-                    Schema.setChangeListener((schema) => shapeChart.schema = schema);
-                    Schema.set(schema);
                     return SVG.Builder.G()
                         .withClass("shape-input")
                         .withChild(shapeChart)
@@ -1822,30 +1807,21 @@ const ChordJogApp = (() => {
                         .withMethod("withChangeListener", function(changeListener) {
                             Schema.setChangeListener(changeListener);
                             return this;})
-                        .withMethods(Module.of(() => {  //focus() and unfocus()
-                            const keyCommands = Module.of(() => {
-                                const command = (finger) => {
-                                    shapeChart.activeFinger = finger;
-                                    fingerInput.selected = finger;};
-                                const keyCommands = {
-                                    1: Fingers.index,
-                                    2: Fingers.middle,
-                                    3: Fingers.ring,
-                                    4: Fingers.pinky,
-                                    t: Fingers.thumb };
-                                Object.entries(keyCommands).forEach(keyFinger =>
-                                    keyCommands[keyFinger[0]] = () => command(keyFinger[1]));
-                                return keyCommands;});
-                            return {
-                                focus: function() {
-                                    KeyboardCommands.setAll(keyCommands);
-                                    return this;},
-                                unfocus: function() {
-                                    KeyboardCommands.removeAll(Object.keys(keyCommands));
-                                    return this;}};}))}
-                return {
-                    forSchema: (schema) => buildStep(schema),
-                    blank: () => buildStep(Shapes.Schema.allUnsounded)};})};});
+                        .withMethods({
+                            focus: () => fingerInput.focus(),
+                            focused: function() {
+                                this.focus();
+                                return this;},
+                            unfocus: () => fingerInput.unfocus(),
+                            unfocused: function() {
+                                this.unfocus();
+                                return this;}})},
+                fingerInputStep=(schema)=>({
+                    withWildcard: () => createShapeInput(schema, FingerInput.new.withWildcard()),
+                    withoutWildcard: () => createShapeInput(schema, FingerInput.new.withoutWildcard())})
+            ) => ({
+                forSchema: schema => fingerInputStep(schema),
+                blank: () => fingerInputStep(Shapes.Schema.allUnsounded)}))};});
     const ShapeCreator = Module.of((
         RootFretRangeInput = Module.of(() => {
             const RootFretRangeStyle = Module.of((
