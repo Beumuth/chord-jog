@@ -343,89 +343,90 @@ const ChordJogApp = (() => {
                             .forEach(selectAttribute => this.style[selectAttribute] = "none");
                         return this; }})
                 .withMethods(Module.of(() => {
-                    const updateTransform = (element, transformKey, updater) => {
+                    const updateTransform = (element, transformKey, values) => {
+                        const valuesString = values.join(" ");
                         const transformAttribute = element.getAttribute("transform");
                         if(transformAttribute === null) {   //Does the element have a transform attribute?
                             //No. Add it.
-                            element.setAttribute("transform", `${transformKey}(${updater().join()})`);
+                            element.setAttribute("transform", `${transformKey}(${valuesString})`);
                             return;}
                         const indexTransform = transformAttribute.lastIndexOf(transformKey);
                         if(indexTransform === -1) { //Does the transform attribute include a matching transform type?
                             //No. Create and append a transform of the given type the to attribute
                             element.setAttribute("transform",
-                                transformAttribute + `${transformKey}(${updater().join()})`);
-                            return;
-                        }
+                                `${transformAttribute} ${transformKey}(${valuesString})`);
+                            return;}
                         //Transform of the given type does exist.
                         //Replace the transform attribute with its arguments updated.
-                        const indexArgsStart = indexTransform + "translate(".length;
+                        const indexArgsStart = indexTransform + `${transformKey}(`.length;
                         const indexArgsEnd = transformAttribute.indexOf(")", indexArgsStart);
-                        const transformArgs = transformAttribute
-                            .substring(indexArgsStart, indexArgsEnd)
-                            .split(",")
-                            .map(arg => Number.parseFloat(arg.trim()));
                         element.setAttribute("transform",
                             transformAttribute.slice(0, indexArgsStart) +
-                            updater(...transformArgs).join() +
+                            valuesString +
                             transformAttribute.slice(indexArgsEnd));};
-                    return {
-                        move: function(x, y) {
-                            updateTransform(this, "translate",
-                                (currentX=0, currentY=0) => [currentX+x, currentY+y]);
+                    return Module.of((x=0, y=0, sx=1, sy=1) => ({
+                        move: function(dx, dy) {
+                            x += dx * 1 / sx;
+                            y += dy * 1 / sy;
+                            updateTransform(this, "translate", [x, y]);
                             return this;},
                         moveTo: function(x, y) {
                             const boundingClientRect = this.getBoundingClientRect();
                             return this.move(x - boundingClientRect.x, y - boundingClientRect.y);},
                         scale: function(scaleX, scaleY=scaleX) {
-                            updateTransform(this, "scale",
-                                (currentScaleX=0, currentScaleY=0) => [currentScaleX+scaleX, currentScaleY+scaleY]);
-                            return this;}};}))
+                            sx *= scaleX;
+                            sy *= scaleY;
+                            updateTransform(this, "scale", [sx, sy]);
+                            return this;}}));}))
                 .withField("eventListeners", {});};
         const svgBuilder = {
             element: createElement,
             G: () => createElement("g"),
-            Circle: ({
-                withCenter: (center) => ({
-                    withRadius: (radius) => createElement("circle")
-                        .withGetterAndSetter("centerX",
-                            function() {
-                                return this.getAttribute("cx");},
-                            function(centerX) {
-                                this.setAttribute("centerX", centerX);})
-                        .withMethod("withCenterX",
-                            function(centerX) {
-                                this.centerX = centerX;
-                                return this;})
-                        .withGetterAndSetter("centerY",
-                            function() {
-                                return this.getAttribute("cy");},
-                            function(centerY) {
-                                this.setAttribute("centerY", centerY);})
-                        .withMethod("withCenterY",
-                            function(centerY) {
-                                this.centerY = centerY;
-                                return this;})
-                        .withGetterAndSetter("center",
-                            function() {
+            Circle: Module.of((
+                createCircle=()=>createElement("circle")
+                    .withGetterAndSetter("centerX",
+                        function() {
+                            return this.getAttribute("cx");},
+                        function(centerX) {
+                            this.setAttribute("cx", centerX);})
+                    .withMethod("withCenterX",
+                        function(centerX) {
+                            this.centerX = centerX;
+                            return this;})
+                    .withGetterAndSetter("centerY",
+                        function() {
+                            return this.getAttribute("cy");},
+                        function(centerY) {
+                            this.setAttribute("cy", centerY);})
+                    .withMethod("withCenterY",
+                        function(centerY) {
+                            this.centerY = centerY;
+                            return this;})
+                    .withGetterAndSetter("center",
+                        function() {
                             return [this.centerX, this.centerY]},
-                            function(center) {
-                                this.centerX = center[0];
-                                this.centerY = center[1];})
-                        .withMethod("withCenter",
-                            function(center) {
-                                this.center = center;
-                                return this;})
-                        .withGetterAndSetter("radius",
-                            function() {
-                                return this.getAttribute("r");},
-                            function(radius) {
-                                this.setAttribute("r", radius);})
-                        .withMethod("withRadius",
-                            function(radius) {
-                                this.radius = radius;
-                                return this;})
-                        .withCenter(center)
-                        .withRadius(radius)})}),
+                        function(center) {
+                            this.centerX = center[0];
+                            this.centerY = center[1];})
+                    .withMethod("withCenter",
+                        function(center) {
+                            this.center = center;
+                            return this;})
+                    .withGetterAndSetter("radius",
+                        function() {
+                            return this.getAttribute("r");},
+                        function(radius) {
+                            this.setAttribute("r", radius);})
+                    .withMethod("withRadius",
+                        function(radius) {
+                            this.radius = radius;
+                            return this;}),
+                withCenterStep=center=>Module.of((circle=createCircle().withCenter(center)) => ({
+                    withoutRadius: () => circle,
+                    withRadius: radius => circle.withRadius(radius)}))
+            ) => ({
+                withoutCenter: () => withCenterStep([0, 0]),
+                withCenter: center => withCenterStep(center)})),
             Ellipse: ({
                 withCenter: (c) => ({
                     withRadius: (r) => createElement("ellipse")
@@ -788,23 +789,23 @@ const ChordJogApp = (() => {
                 Style: FingerlessIndicatorStyle,
                 Builder: Module.of((
                     DeadStringBuilder = {
-                        withCenter: (center) => SVG.Builder.Path
+                        withCenter: center => SVG.Builder.Path
                             .withD(
                                 `M
-                            ${center[0] - FingerlessIndicatorStyle.radius * halfRoot2},
-                            ${center[1] - FingerlessIndicatorStyle.radius * halfRoot2}
-                        l
-                            ${FingerlessIndicatorStyle.diameter * halfRoot2},
-                            ${FingerlessIndicatorStyle.diameter * halfRoot2}
-                        m
-                            0,
-                            ${-FingerlessIndicatorStyle.diameter * halfRoot2}
-                        l
-                            ${-FingerlessIndicatorStyle.diameter * halfRoot2},
-                            ${FingerlessIndicatorStyle.diameter * halfRoot2}`)
+                                    ${center[0] - FingerlessIndicatorStyle.radius * halfRoot2},
+                                    ${center[1] - FingerlessIndicatorStyle.radius * halfRoot2}
+                                l
+                                    ${FingerlessIndicatorStyle.diameter * halfRoot2},
+                                    ${FingerlessIndicatorStyle.diameter * halfRoot2}
+                                m
+                                    0,
+                                    ${-FingerlessIndicatorStyle.diameter * halfRoot2}
+                                l
+                                    ${-FingerlessIndicatorStyle.diameter * halfRoot2},
+                                    ${FingerlessIndicatorStyle.diameter * halfRoot2}`)
                             .withClass("dead-string-indicator")},
                     OpenStringBuilder = {
-                        withCenter: (center) => SVG.Builder.Circle
+                        withCenter: center => SVG.Builder.Circle
                             .withCenter(center)
                             .withRadius(FingerlessIndicatorStyle.radius)
                             .withClass("open-string-indicator")}
@@ -1090,10 +1091,16 @@ const ChordJogApp = (() => {
                 blank: () => withSchema(Shapes.Schema.allUnsounded),
                 forSchema: (schema) => withSchema(schema)}))};});
 
-    const FingerInput = {
+    const FingerInput = Module.of((
+        FingerInputStyle={
+            //hardcoded
+            baseWidth: 237,
+            baseHeight: 292,
+            scale: .5}
+    ) => ({
         Style: {
-            width: 237 /*hardcoded*/,
-            height: undefined /*todo*/},
+            width: FingerInputStyle.scale * FingerInputStyle.width,
+            height: FingerInputStyle.scale * FingerInputStyle.height},
         Builder: Module.of((
             RegionsBuilder = Module.of((
                 StaticRegions = Module.of((
@@ -1165,59 +1172,74 @@ const ChordJogApp = (() => {
                         .withGetter("position", () => point)
                         .hide()
                 ) => ({
-                    forStaticRegion: (staticRegion) => SVG.Builder.G()
-                        .withClass("finger-region-joints")
-                        .withChildren(staticRegion.joints.map(pointToJoint))})),
+                    forStaticRegion: staticRegion => staticRegion.joints.map(pointToJoint)})),
                 RegionBuilder={
                     forStaticRegion: staticRegion =>  Module.of((
                         joints = RegionJointsBuilder.forStaticRegion(staticRegion)
                     ) => SVG.Builder.G()
                         .withClass("finger-region")
                         .withChild(RegionLabelBuilder.forStaticRegion(staticRegion))
-                        .withChildren(joints)
-                        .withGetter("value", staticRegion.value)
-                        .withGetter("position", staticRegion.position)
+                        .withChild(SVG.Builder.G()
+                            .withClass("finger-region-joints")
+                            .withChildren(joints))
+                        .withGetter("value", () => staticRegion.value)
+                        .withGetter("position", () => staticRegion.position)
                         .withMethod("distance2", joints.length === 1 ?
                             (p) => Geometry.distance2(p, joints[0].position) :
                             (p) => Geometry.distance2(p,
                                 Geometry.projectPointOnLineSegment(p,
                                     joints.map(joint => joint.position)))))},
                 RegionsBuilder = {
-                    forStaticRegions: staticRegions => staticRegions.map(staticRegion =>
-                        RegionBuilder.forStaticRegion)}
+                    forStaticRegions: staticRegions => staticRegions.map(RegionBuilder.forStaticRegion)}
             ) => ({
-                fingers: RegionsBuilder.forStaticRegions(StaticRegions.fingers),
-                all: RegionsBuilder.forStaticRegions(StaticRegions.all)})),
+                fingers: () => RegionsBuilder.forStaticRegions(StaticRegions.fingers),
+                all: () => RegionsBuilder.forStaticRegions(StaticRegions.all)})),
             FingerInputBuilder = Module.of((
                 RegionIndicatorBuilder = Module.of((
                     radius=18,
                     previewStrokeDasharray="4 5",
-                    createIndicator = () => Module.of((region) => SVG.Builder.Circle
-                        .withCenter(null)
+                    createIndicator = () => Module.of((region=null) => SVG.Builder.Circle
+                        .withoutCenter()
                         .withRadius(radius)
                         .withGetterAndSetter("region",
                             () => region,
                             function(newRegion) {
-                                if(newRegion !== region) {
-                                    region = newRegion;
-                                    this.center = region.position;}})
+                                //Is the new region the same as the old region?
+                                if(newRegion === region) {
+                                    //Yes. Do nothing.
+                                    return;}
+                                //Is the new region something?
+                                if(newRegion !== null) {
+                                    //Yes. Update the position.
+                                    this.center = newRegion.position;
+                                    //Is the old region nothing?
+                                    if(region === null) {
+                                        //Yes. Show the indicator.
+                                        this.show();}}
+                                //The new region is nothing.
+                                //Is the old region something?
+                                else if(region !== null) {
+                                    //Yes. Hide the indicator.
+                                    this.hide();}
+                                //Finally, update the region.
+                                region = newRegion;})
                         .withMethod("forRegion", function(region) {
                             this.region = region;
                             return this;}))
                 ) => ({
                     selected: {
-                        withInitialRegion: (initialRegion) => createIndicator()
+                        withInitialRegion: initialRegion => createIndicator()
                             .forRegion(initialRegion)},
                     preview: () => createIndicator()
                         .withAttribute("stroke-dasharray", previewStrokeDasharray)
                         .hide()})),
             ) => ({
-                withRegions: (regions) => Module.of((
+                withRegions: regions => Module.of((
                     regionByValue=(value) => regions.find(region => region.value === value),
                     mouseEventToClosestRegionValue = (e) => regions
                         .map(region => ({
                             value: region.value,
-                            distance2: region.distance2([e.clientX, e.clientY])}))
+                            distance2: region.distance2([e.offsetX, e.offsetY])}))
                         .reduce((closestRegion, currentRegion) =>
                             closestRegion.distance2 <= currentRegion.distance2 ?
                                 closestRegion : currentRegion)
@@ -1225,24 +1247,23 @@ const ChordJogApp = (() => {
                 ) => ({
                     withInitialValue: initialValue => ({
                         withKeyValueMap: keyValueMap => Module.of((
-                            Preview=Module.of((
-                                previewIndicator=RegionIndicatorBuilder.preview()
-                            ) => ({
-                                get: () => previewIndicator.region.value,
-                                set: (preview) => previewIndicator.region = regionByValue(preview)})),
-                            Selected=Module.of((
-                                selectedIndicator=RegionIndicatorBuilder
-                                    .selected
-                                    .withInitialRegion(regionByValue(initialValue)),
-                                changeListener=undefined
-                            ) => ({
+                            selectedIndicator=RegionIndicatorBuilder
+                                .selected
+                                .withInitialRegion(regionByValue(initialValue)),
+                            Selected=Module.of((changeListener=undefined) => ({
                                 get: () => selectedIndicator.region.value,
-                                set: (selected) => {
+                                set: selected => {
                                     if(selected !== selectedIndicator.region.value) {
                                         selectedIndicator.region = regionByValue(selected);
                                         if(changeListener !== undefined) {
                                             changeListener(selected);}}},
-                                setChangeListener: listener => changeListener = listener}))
+                                setChangeListener: listener => changeListener = listener})),
+                            previewIndicator=RegionIndicatorBuilder.preview(),
+                            Preview = {
+                                get: () => previewIndicator.region.value,
+                                set: preview => previewIndicator.region = preview !== null ?
+                                    regionByValue(preview) :
+                                    null},
                         ) => SVG.Builder.G()
                             .withClass("finger-input")
                             .withChild(SVG.Builder.Path //hand-outline
@@ -1479,16 +1500,33 @@ const ChordJogApp = (() => {
                                     -100.724424,	-0.0632
                                 z`.replace(/\s+/g, " "))
                                 .withClass("hand-outline"))
-                            .withChildren(regions.map(region => region.element))
+                            .withChild(SVG.Builder.G()
+                                .withClass("finger-regions")
+                                .withChildren(regions))
+                            .withChild(selectedIndicator)
+                            .withChild(previewIndicator)
+                            .withChild(SVG.Builder.MouseTrap
+                                .withX(0)
+                                .withY(0)
+                                .withWidth(FingerInputStyle.baseWidth)
+                                .withHeight(FingerInputStyle.baseHeight)
+                                .withClass("finger-input-mouse-trap")
+                                .withEventListeners({
+                                    mouseMove: e => Preview.set(mouseEventToClosestRegionValue(e)),
+                                    mouseDown: e => Selected.set(mouseEventToClosestRegionValue(e)),
+                                    mouseLeave: () => Preview.set(null)}))
                             .withGetterAndSetter("selected", Selected.get, Selected.set)
                             .withSetter("changeListener", Selected.setChangeListener)
                             .withMethod("withChangeListener", function(listener) {
                                 this.changeListener = listener;
                                 return this;})
                             .withMethods(Module.of((
-                                keyCommands = Object
-                                    .entries(keyValueMap)
-                                    .map(keyValue => keyCommands[keyValue[0]] =() => Selected.set(keyValue[1]))
+                                keyCommands = Object.fromEntries(
+                                    Object
+                                        .entries(keyValueMap)
+                                        .map(keyValue => [
+                                            keyValue[0],
+                                            () => Selected.set(keyValue[1])]))
                             ) => ({
                                 focus: () => KeyboardCommands.setAll(keyCommands),
                                 focused: function() {
@@ -1498,13 +1536,7 @@ const ChordJogApp = (() => {
                                 unfocused: function() {
                                     this.unfocus();
                                     return this;}})))
-                            .withEventListeners({
-                                mouseMove: e => Preview.set(mouseEventToClosestRegionValue(e)),
-                                mouseDown: e => Selected.set(mouseEventToClosestRegionValue(e)),
-                                mouseLeave: () => Preview.set(null)})
-                            .withAttributes({
-                                cursor: "pointer",
-                                pointerEvents: "fill"})
+                            .scale(FingerInputStyle.scale)
                             .disableTextSelection())})}))}))
         ) => Module.of((
             fingersKeyMap={
@@ -1522,14 +1554,11 @@ const ChordJogApp = (() => {
             withWildcard: () => FingerInputBuilder
                 .withRegions(RegionsBuilder.all())
                 .withInitialValue(Fingers.any)
-                .withKeyValueMap(allKeyMap)})))};
+                .withKeyValueMap(allKeyMap)})))}));
 
-    const ShapeInput = Module.of((
-        shapeChartMarginRight=2,
-        fingerInputScale=.5
-    ) => ({
+    const ShapeInput = Module.of((shapeChartMarginRight=2) => ({
         Style: {
-            width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width * fingerInputScale,
+            width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width,
             height: ShapeChart.Style.height},
         Builder: Module.of((
             MouseTrapsBuilder = Module.of((
@@ -1548,10 +1577,11 @@ const ChordJogApp = (() => {
                                     horizontalPadding -
                                     ShapeChart.FingerlessIndicator.Style.radius -
                                     ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-                            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b),
+                            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
+                            .string,
                         schema = Module.of(() => {
                             let schema = state.schema.slice();
-                            schema[targetString - 1] = state.dragActive ?
+                            schema[targetString - 1] = state.dragAction !== null ?
                                 Shapes.StringAction.isFingerless(state.dragAction) ?
                                     state.dragAction :
                                     schema[targetString -1] :
@@ -1580,7 +1610,6 @@ const ChordJogApp = (() => {
                             .map(fret => ({
                                 fret: fret,
                                 distanceYToMouse: Math.abs(state.mousePosition[1] -
-                                    padding -
                                     ShapeChart.Fretboard.Style.fretHeight * (fret - .5))}))
                             .reduce((a, b) => a.distanceYToMouse <= b.distanceYToMouse ? a : b)
                             .fret,
@@ -1662,19 +1691,24 @@ const ChordJogApp = (() => {
                     withPreview: Preview => ({
                         withActiveFingerGetter: activeFingerGetter => Module.of((
                             dragAction=null,
-                            isMouseInside=false,
+                            previousMousePosition=null,
+                            currentMouseTrap=null,  //The mouse trap that the mouse is currently over, or null
+                            mousePositionToState=position => ({
+                                mousePosition: position,
+                                schema: Schema.get(),
+                                activeFinger: activeFingerGetter(),
+                                dragAction: dragAction
+                            }),
                             createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
-                                mouseEventToSchemaChange = e => stateToSchemaChangeMapper({
-                                    mousePosition: [e.offsetX, e.offsetY],
-                                    schema: Schema.get(),
-                                    activeFinger: activeFingerGetter(),
-                                    dragAction: dragAction})
+                                mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
+                                    mousePositionToState([e.offsetX, e.offsetY]))
                             ) => ({
-                                mouseenter: e => {
-                                    isMouseInside = true;
+                                mouseenter: function(e) {
+                                    currentMouseTrap = this;
                                     if(dragAction !== null) return;
                                     Preview.set(mouseEventToSchemaChange(e).schema);},
                                 mousemove: e => {
+                                    previousMousePosition = [e.offsetX, e.offsetY];
                                     const schema = mouseEventToSchemaChange(e).schema;
                                     if(dragAction !== null) {
                                         Schema.set(schema);}
@@ -1684,7 +1718,7 @@ const ChordJogApp = (() => {
                                     mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
                                         mouseUpEventHandler = () => {
                                             dragAction = null;
-                                            if(isMouseInside) {
+                                            if(currentMouseTrap !== null) {
                                                 Preview.set(Schema.get());}
                                             else {
                                                 Preview.set(null);}
@@ -1697,8 +1731,9 @@ const ChordJogApp = (() => {
                                     Preview.set(null);
                                     window.addEventListener("mouseup", mouseUpEventHandler)}),
                                 mouseout: () => {
-                                    isMouseInside = false;
+                                    currentMouseTrap = null;
                                     Preview.set(null);}})),
+                            previousFretboardMousePosition=null,
                             fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
                                 .withX(ShapeChart.FingerlessIndicator.Style.startX  -
                                     FingerlessIndicators.Style.padding.horizontal)
@@ -1715,16 +1750,22 @@ const ChordJogApp = (() => {
                                     FingerlessIndicators.mouseTrapStateToSchemaChange)),
                             fretboardMouseTrap=SVG.Builder.MouseTrap
                                 .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
-                                .withY(ShapeChart.Fretboard.Style.y - Fretboard.Style.padding)
+                                .withY(ShapeChart.Fretboard.Style.y)
                                 .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
-                                .withHeight(ShapeChart.Fretboard.Style.height + 2 * Fretboard.Style.padding)
+                                .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
                                 .withClass("fretboard-mouse-trap")
                                 .withEventListeners(createMouseEventListeners(
                                     Fretboard.mouseTrapStateToSchemaChange))
                         ) => SVG.Builder.G()
                             .withClass("shape-input-mouse-traps")
                             .withChild(fingerlessIndicatorMouseTrap)
-                            .withChild(fretboardMouseTrap))})})})),
+                            .withChild(fretboardMouseTrap)
+                            .withMethod("activeFingerChanged", () => {
+                                if(currentMouseTrap === fretboardMouseTrap) {
+                                    Preview.set(Fretboard
+                                        .mouseTrapStateToSchemaChange(
+                                            mousePositionToState(previousMousePosition))
+                                        .schema)}}))})})})),
             createShapeInput=(schema, fingerInput) => Module.of((
                 shapeChart = ShapeChart.Builder
                     .forSchema(schema)
@@ -1735,7 +1776,7 @@ const ChordJogApp = (() => {
                         fillOpacity: .4,
                         strokeOpacity: .5})
                     .disableTextSelection(),
-                Preview = Module.of((value) => ({
+                Preview = Module.of((value=null) => ({
                     get: () => value,
                     set: preview => {
                         //Do nothing if no difference
@@ -1744,16 +1785,16 @@ const ChordJogApp = (() => {
                         previewMeatContainer.innerHTML = "";
                         //Is the new preview something?
                         if(preview !== null) {
-                            //Yes. Is the old preview nothing?
+                            //Yes. Update the preview meat.
+                            previewMeatContainer.withChild(ShapeChart.Meat.Builder.forSchema(preview));
+                            // Is the old preview nothing?
                             if(value === null) {
                                 //Yes. Make the active meat translucent.
                                 shapeChart
                                     .querySelector(".shape-chart-meat")
                                     .withAttributes({
                                         fillOpacity: .6,
-                                        strokeOpacity: .5});
-                                //Update the preview meat
-                                previewMeatContainer.withChild(ShapeChart.Meat.Builder.forSchema(preview));}}
+                                        strokeOpacity: .5});}}
                         //The new preview is nothing. Is the old preview something?
                         else if(value !== null) {
                             //Yes. Make the active meat opaque
@@ -1777,20 +1818,22 @@ const ChordJogApp = (() => {
                         get: () => shapeChart.schema,
                         set: schemaSetter};
                     Schema.set(schema);
-                    return Schema;})
+                    return Schema;}),
+                mouseTraps = MouseTrapsBuilder
+                    .withSchema(Schema)
+                    .withPreview(Preview)
+                    .withActiveFingerGetter(() => fingerInput.selected)
             ) => SVG.Builder.G()
                 .withClass("shape-input")
                 .withChild(shapeChart
                     .withChild(previewMeatContainer)
-                    .withChild(MouseTrapsBuilder
-                        .withSchema(Schema)
-                        .withPreview(Preview)
-                        .withActiveFingerGetter(() => fingerInput.selected)))
+                    .withChild(mouseTraps))
                 .withChild(fingerInput
                     .moveTo(
                         ShapeChart.Style.width + shapeChartMarginRight,
                         ShapeChart.Fretboard.Style.y)
-                    .scale(fingerInputScale)) //TODO see if the scaling can be done within FingerInput.Create
+                    //When the selected finger updates, refresh the preview
+                    .withChangeListener(mouseTraps.activeFingerChanged))
                 .withGetterAndSetter("schema",
                     () => Schema.get(),
                     (schema) => Schema.set(schema))
@@ -1811,7 +1854,7 @@ const ChordJogApp = (() => {
                 withWildcard: () => createShapeInput(schema, FingerInput.Builder.withWildcard())})
         ) => ({
             withSchema: wildcardStep,
-            blank: wildcardStep(Shapes.Schema.allUnsounded)}))}));
+            blank: () => wildcardStep(Shapes.Schema.allUnsounded)}))}));
 
     const ShapeCreator = Module.of((
         RootFretRangeInput = Module.of(() => {
@@ -1884,18 +1927,21 @@ const ChordJogApp = (() => {
                                 .show() :
                             this.hide();}),
                 Skeleton: {
-                    withBaselines: (baseline, activeBaseline,
-                                    rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
-                                        .withEndpoints(
-                                            [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
-                                            [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
-                                        .withClass("root-fret-range-tick")
-                                        .withDataAttribute("value", rootFretXCoordinate.rootFret),
-                                    rootFretTicks=rootFretXCoordinates.reduce(
-                                        (tickMap, rootFretXCoordinate) => {
-                                            tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
-                                            return tickMap;},
-                                        {})) => SVG.Builder.G()
+                    withBaselines: (
+                        baseline,
+                        activeBaseline,
+                        rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
+                            .withEndpoints(
+                                [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                                [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                            .withClass("root-fret-range-tick")
+                            .withDataAttribute("value", rootFretXCoordinate.rootFret),
+                        rootFretTicks=rootFretXCoordinates.reduce(
+                            (tickMap, rootFretXCoordinate) => {
+                                tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
+                                return tickMap;},
+                            {})
+                    ) => SVG.Builder.G()
                         .withClass("root-fret-range-skeleton")
                         .withChild(baseline)
                         .withChild(activeBaseline)
@@ -2285,9 +2331,11 @@ const ChordJogApp = (() => {
                 .withText("Save")
                 .withClickHandler(() => {
                     Shapes.add(shapeInput.shape);
-                    reset();});
+                    reset();})
+                .withClass("shape-creator-save-button");
             const errorMessage = SVG.Builder.Text
                 .withoutTextContent()
+                .withClass("shape-creator-output")
                 .moveTo(ShapeCreatorStyle.ErrorMessage.x, ShapeCreatorStyle.ErrorMessage.y)
                 .withAttributes({
                     fontSize: ShapeCreatorStyle.ErrorMessage.fontSize,
@@ -2335,7 +2383,8 @@ const ChordJogApp = (() => {
                     validate();}});
             shapeInput = ShapeInput.Builder
                 .blank()
-                .focus()
+                .withoutWildcard()
+                .focused()
                 .withChangeListener(schemaChangeListener);
             schemaChangeListener(shapeInput.schema);
             return SVG.Builder.G()
