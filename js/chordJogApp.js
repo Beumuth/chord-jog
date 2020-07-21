@@ -1524,304 +1524,295 @@ const ChordJogApp = (() => {
                 .withInitialValue(Fingers.any)
                 .withKeyValueMap(allKeyMap)})))};
 
-    const ShapeInput = Module.of(() => {
-        const shapeChartMarginRight = 2;
-        const fingerInputScale = .5;
-        const FretboardMouseTrap = {
-            Style: {padding: ShapeChart.FingerIndicator.Style.radius}};
-        FretboardMouseTrap.xCoordinateToString = (x) => Strings.all
-            .map(string => ({
-                string: string,
-                distanceXToMouse: Math.abs(x -
-                    FretboardMouseTrap.Style.padding -
-                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
-            .string;
-        FretboardMouseTrap.yCoordinateToFret = (y) => Frets.Relative.all
-            .map(fret => ({
-                fret: fret,
-                distanceYToMouse: Math.abs(y -
-                    FretboardMouseTrap.Style.padding -
-                    ShapeChart.Fretboard.Style.fretHeight * (fret - .5))}))
-            .reduce((a, b) => a.distanceYToMouse <= b.distanceYToMouse ? a : b)
-            .fret;
-        const FingerlessIndicatorMouseTrap = {
-            Style: {
-                padding: {
-                    horizontal: ShapeChart.FingerIndicator.Style.radius,
-                    vertical: 7}}};
-        FingerlessIndicatorMouseTrap.xCoordinateToString = (x) => Strings.all
-            .map(string => ({
-                string: string,
-                distanceXToMouse: Math.abs(x -
-                    FingerlessIndicatorMouseTrap.Style.padding.horizontal -
-                    ShapeChart.FingerlessIndicator.Style.radius -
-                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
-            .string;
-        const MouseTrapsBuilder = {
-            withShapeChart: (shapeChart) => {
-                return {
-                    withPreviewMeatContainer: (previewMeatContainer) => {
-                        let dragAction = null;
-                        const dragActive = () => dragAction !== null;
-                        let currentTarget = null;
-                        const isInside = () => currentTarget !== null;
-                        const mouseTrapEventListeners = {
-                            withMousePositionToSchemaChange: (mousePositionToSchemaChange) => {
-                                let mouseUpEventHandler = undefined;
-                                mouseUpEventHandler = function() {
-                                    dragAction = null;
-                                    shapeChart.preview = shapeChart.schema;
-                                    if(isInside()) {
-                                        previewMeatContainer.show();}
+    const ShapeInput = Module.of((
+        shapeChartMarginRight=2,
+        fingerInputScale=.5
+    ) => ({
+        Style: {
+            width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width * fingerInputScale,
+            height: ShapeChart.Style.height},
+        Builder: Module.of((
+            MouseTrapsBuilder = Module.of((
+                FingerlessIndicators = Module.of((
+                    horizontalPadding=ShapeChart.FingerIndicator.Style.radius
+                ) => ({
+                    Style: {
+                        padding: {
+                            horizontal: horizontalPadding,
+                            vertical: 7}},
+                    mouseTrapStateToSchemaChange: state=>Module.of((
+                        targetString = Strings.all
+                            .map(string => ({
+                                string: string,
+                                distanceXToMouse: Math.abs(state.mousePosition[0] -
+                                    horizontalPadding -
+                                    ShapeChart.FingerlessIndicator.Style.radius -
+                                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
+                            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b),
+                        schema = Module.of(() => {
+                            let schema = state.schema.slice();
+                            schema[targetString - 1] = state.dragActive ?
+                                Shapes.StringAction.isFingerless(state.dragAction) ?
+                                    state.dragAction :
+                                    schema[targetString -1] :
+                                Module.of((previousStringAction = state.schema[targetString - 1]) =>
+                                    previousStringAction === Shapes.StringAction.unsounded ?
+                                        Shapes.StringAction.open :
+                                        Shapes.StringAction.unsounded);
+                            return schema;})
+                    ) => ({
+                        change: schema[targetString - 1],
+                        schema: schema}))})),
+                Fretboard = Module.of((
+                    padding=ShapeChart.FingerIndicator.Style.radius
+                ) => ({
+                    Style: {padding: padding},
+                    mouseTrapStateToSchemaChange: state => Module.of((
+                        targetString=Strings.all
+                            .map(string => ({
+                                string: string,
+                                distanceXToMouse: Math.abs(state.mousePosition[0] -
+                                    padding -
+                                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
+                            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
+                            .string,
+                        targetFret=Frets.Relative.all
+                            .map(fret => ({
+                                fret: fret,
+                                distanceYToMouse: Math.abs(state.mousePosition[1] -
+                                    padding -
+                                    ShapeChart.Fretboard.Style.fretHeight * (fret - .5))}))
+                            .reduce((a, b) => a.distanceYToMouse <= b.distanceYToMouse ? a : b)
+                            .fret,
+                        targetFinger = state.activeFinger,
+                        schema = state.schema
+                            //Convert same-fingered but different-fret string actions to unsounded
+                            .map(stringAction => Functions.ifThenElse(
+                                Shapes.StringAction.isFingered(stringAction) &&
+                                stringAction.finger === targetFinger &&
+                                stringAction.fret !== targetFret,
+                                () => Shapes.StringAction.unsounded,
+                                () => stringAction)),
+                        //Determine which stringAction will be used to substitute others.
+                        //This depends on whether the mouse is being dragged and its drag action,
+                        //or whether or not the existing string action on the target string
+                        //is fingered and has a matching fret and finger
+                        substituteStringAction = Module.of((dragAction=state.dragAction) => dragAction !== null ?
+                            //The mouse is being dragged
+                            Shapes.StringAction.isFingerless(dragAction) ?
+                                //The drag action is fingerless
+                                dragAction :
+                                dragAction.sounded === true ?
+                                    //The drag action is fingered and sounded
+                                    Shapes.StringAction.fingered(targetFret, targetFinger) :
+                                    //The drag action is deadened
+                                    Shapes.StringAction.deadened(targetFret, targetFinger) :
+                            //The mouse is not being dragged
+                            Module.of((currentAction = schema[targetString - 1]) =>
+                                Shapes.StringAction.isFingerless(currentAction) ||
+                                currentAction.finger !== targetFinger ||
+                                currentAction.fret !== targetFret
+                                    ?
+                                    //The target action is not over an identical string action
+                                    Shapes.StringAction.fingered(targetFret, targetFinger) : (
+                                        //The target action is over an identical string action
+                                        currentAction.sounded === true ?
+                                            //And that action is sounded
+                                            Shapes.StringAction.deadened(targetFret, targetFinger) :
+                                            //And that action is deadened
+                                            Shapes.StringAction.unsounded)))
+                    ) => {
+                        //A finger action may be created or extended if the substitute string action is
+                        //not a deadened version of its sounded substitutee.
+                        if(Shapes.StringAction.isFingered(substituteStringAction) && (
+                            substituteStringAction.sounded === true ||
+                            Shapes.StringAction.isFingerless(schema[targetString - 1]) ||
+                            schema[targetString - 1].finger !== targetFinger)) {
+                            //Yes. A finger may may have to be created or extended.
+                            //Get the string actions with targetFret and targetFinger
+                            const targetFingerAndFretActions = schema
+                                .map((stringAction, i) => ({
+                                    string: i+1,
+                                    action: stringAction}))
+                                .filter(stringAction =>
+                                    stringAction.string !== targetString &&
+                                    Shapes.StringAction.isFingered(stringAction) &&
+                                    stringAction.action.fret === targetFret &&
+                                    stringAction.action.finger === targetFinger);
+                            //Is there an existing finger action with the same finger and fret?
+                            if(targetFingerAndFretActions.length > 0) {
+                                //Yes. Fill the gap with the substitute action.
+                                Numbers
+                                    .range(
+                                        1 + (
+                                            targetString < targetFingerAndFretActions[0].string ?
+                                                targetString :
+                                                Arrays.last(targetFingerAndFretActions).string),
+                                        targetString > Arrays.last(targetFingerAndFretActions).string ?
+                                            targetString :
+                                            targetFingerAndFretActions[0].string)
+                                    .forEach(string => schema[string - 1] = substituteStringAction);}}
+                        //Finally, substitute for the targetString itself.
+                        schema[targetString - 1] = substituteStringAction;
+                        return {
+                            change: substituteStringAction,
+                            schema: schema};})}))
+            ) => ({
+                withSchema: Schema => ({
+                    withPreview: Preview => ({
+                        withActiveFingerGetter: activeFingerGetter => Module.of((
+                            dragAction=null,
+                            isMouseInside=false,
+                            createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
+                                mouseEventToSchemaChange = e => stateToSchemaChangeMapper({
+                                    mousePosition: [e.offsetX, e.offsetY],
+                                    schema: Schema.get(),
+                                    activeFinger: activeFingerGetter(),
+                                    dragAction: dragAction})
+                            ) => ({
+                                mouseenter: e => {
+                                    isMouseInside = true;
+                                    if(dragAction !== null) return;
+                                    Preview.set(mouseEventToSchemaChange(e).schema);},
+                                mousemove: e => {
+                                    const schema = mouseEventToSchemaChange(e).schema;
+                                    if(dragAction !== null) {
+                                        Schema.set(schema);}
                                     else {
-                                        previewMeatContainer.hide();}
-                                    window.removeEventListener("mouseup", mouseUpEventHandler);};
-                                return {
-                                    mouseenter: (e) => {
-                                        if(dragActive()) return;
-                                        shapeChart.preview = mousePositionToSchemaChange(
-                                            [e.offsetX, e.offsetY]
-                                        ).schema;
-                                        previewMeatContainer.show(); },
-                                    mousemove: (e) => {
-                                        currentTarget = e.target;
-                                        if(dragActive()) {
-                                            shapeChart.schema = mousePositionToSchemaChange(
-                                                [e.offsetX, e.offsetY]
-                                            ).schema;}
-                                        else {
-                                            shapeChart.preview = mousePositionToSchemaChange(
-                                                [e.offsetX, e.offsetY]
-                                            ).schema;}},
-                                    mousedown: (e) => {
-                                        if(e.button !== 0) return;
-                                        const schemaChange = mousePositionToSchemaChange([e.offsetX, e.offsetY]);
-                                        shapeChart.schema = schemaChange.schema;
-                                        dragAction = schemaChange.change;
-                                        previewMeatContainer.hide();
-                                        window.addEventListener("mouseup", mouseUpEventHandler)},
-                                    mouseout: () => {
-                                        previewMeatContainer.hide();
-                                        currentTarget = null;}};}};
-                        const mouseTraps =  {
-                            fretboard: Module.of(() => {
-                                let previousMousePosition = [0,0];
-                                const mousePositionToSchemaChange = (p) => {
-                                    previousMousePosition = p;
-
-                                    //Get target fingered string action
-                                    const targetString = FretboardMouseTrap.xCoordinateToString(p[0]);
-                                    const targetFret = FretboardMouseTrap.yCoordinateToFret(p[1]);
-                                    const targetFinger = shapeChart.activeFinger;
-
-                                    let schema = shapeChart.schema
-                                        //Convert same-fingered but different-fret string actions to unsounded
-                                        .map(stringAction => Functions.ifThenElse(
-                                            Shapes.StringAction.isFingered(stringAction) &&
-                                                stringAction.finger === targetFinger &&
-                                                stringAction.fret !== targetFret,
-                                            () => Shapes.StringAction.unsounded,
-                                            () => stringAction));
-
-                                    //Determine which stringAction will be used to substitute others.
-                                    //This depends on whether the mouse is being dragged and its drag action,
-                                    //or whether or not the existing string action on the target string
-                                    //is fingered and has a matching fret and finger
-                                    const substituteStringAction = dragActive() ? (
-                                        //The mouse is being dragged
-                                        Shapes.StringAction.isFingerless(dragAction) ?
-                                            //The drag action is fingerless
-                                            dragAction :
-                                            dragAction.sounded === true ?
-                                                //The drag action is fingered and sounded
-                                                Shapes.StringAction.fingered(targetFret, targetFinger) :
-                                                //The drag action is deadened
-                                                Shapes.StringAction.deadened(targetFret, targetFinger)) :
-                                        //The mouse is not being dragged
-                                        Module.of((currentAction = schema[targetString - 1]) =>
-                                            Shapes.StringAction.isFingerless(currentAction) ||
-                                            currentAction.finger !== targetFinger ||
-                                            currentAction.fret !== targetFret
-                                        ?
-                                            //The target action is not over an identical string action
-                                            Shapes.StringAction.fingered(targetFret, targetFinger) : (
-                                                //The target action is over an identical string action
-                                                currentAction.sounded === true ?
-                                                    //And that action is sounded
-                                                    Shapes.StringAction.deadened(targetFret, targetFinger) :
-                                                    //And that action is deadened
-                                                    Shapes.StringAction.unsounded));
-
-                                    //A finger action may be created or extended if the substitute string action is
-                                    //not a deadened version of its sounded substitutee.
-                                    if(Shapes.StringAction.isFingered(substituteStringAction) && (
-                                        substituteStringAction.sounded === true ||
-                                        Shapes.StringAction.isFingerless(schema[targetString - 1]) ||
-                                        schema[targetString - 1].finger !== targetFinger)) {
-                                        //Yes. A finger may may have to be created or extended.
-                                        //Get the string actions with targetFret and targetFinger
-                                        const targetFingerAndFretActions = schema
-                                            .map((stringAction, i) => ({
-                                                string: i+1,
-                                                action: stringAction}))
-                                            .filter(stringAction =>
-                                                stringAction.string !== targetString &&
-                                                Shapes.StringAction.isFingered(stringAction) &&
-                                                stringAction.action.fret === targetFret &&
-                                                stringAction.action.finger === targetFinger);
-                                        //Is there an existing finger action with the same finger and fret?
-                                        if(targetFingerAndFretActions.length > 0) {
-                                            //Yes. Fill the gap with the substitute action.
-                                            Numbers
-                                                .range(
-                                                    1 + (
-                                                        targetString < targetFingerAndFretActions[0].string ?
-                                                            targetString :
-                                                            Arrays.last(targetFingerAndFretActions).string),
-                                                    targetString > Arrays.last(targetFingerAndFretActions).string ?
-                                                        targetString :
-                                                        targetFingerAndFretActions[0].string)
-                                                .forEach(string => schema[string - 1] = substituteStringAction);}}
-                                    //Finally, substitute for the targetString itself.
-                                    schema[targetString - 1] = substituteStringAction;
-                                    return {
-                                        change: substituteStringAction,
-                                        schema: schema};};
-                                return SVG.Builder.MouseTrap
-                                    .withX(ShapeChart.Fretboard.Style.x - FretboardMouseTrap.Style.padding)
-                                    .withY(ShapeChart.Fretboard.Style.y - FretboardMouseTrap.Style.padding)
-                                    .withWidth(ShapeChart.Fretboard.Style.width + 2 * FretboardMouseTrap.Style.padding)
-                                    .withHeight(ShapeChart.Fretboard.Style.height + 2 * FretboardMouseTrap.Style.padding)
-                                    .withClass("fretboard-mouse-trap")
-                                        .withDataAttribute("preview", shapeChart.schema)
-                                    .withEventListeners(mouseTrapEventListeners.withMousePositionToSchemaChange(
-                                        mousePositionToSchemaChange))
-                                    .withMethod("updatePreview", function() {
-                                        if(currentTarget === mouseTraps.fretboard && ! dragActive()) {
-                                            shapeChart.preview = mousePositionToSchemaChange(previousMousePosition)
-                                                .schema;}});}),
-                            fingerlessIndicators: SVG.Builder.MouseTrap
+                                        Preview.set(schema);}},
+                                mousedown: Module.of((
+                                    mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
+                                        mouseUpEventHandler = () => {
+                                            dragAction = null;
+                                            if(isMouseInside) {
+                                                Preview.set(Schema.get());}
+                                            else {
+                                                Preview.set(null);}
+                                            window.removeEventListener("mouseup", mouseUpEventHandler);};
+                                        return mouseUpEventHandler;})
+                                ) => e => {
+                                    const schemaChange = mouseEventToSchemaChange(e);
+                                    dragAction = schemaChange.change;
+                                    Schema.set(schemaChange.schema);
+                                    Preview.set(null);
+                                    window.addEventListener("mouseup", mouseUpEventHandler)}),
+                                mouseout: () => {
+                                    isMouseInside = false;
+                                    Preview.set(null);}})),
+                            fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
                                 .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                    FingerlessIndicatorMouseTrap.Style.padding.horizontal)
+                                    FingerlessIndicators.Style.padding.horizontal)
                                 .withY(ShapeChart.FingerlessIndicator.Style.startY -
-                                    FingerlessIndicatorMouseTrap.Style.padding.vertical)
+                                    FingerlessIndicators.Style.padding.vertical)
                                 .withWidth(ShapeChart.Fretboard.Style.width +
                                     ShapeChart.FingerlessIndicator.Style.diameter +
-                                    2 * FingerlessIndicatorMouseTrap.Style.padding.horizontal)
+                                    2 * FingerlessIndicators.Style.padding.horizontal)
                                 .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
                                     ShapeChart.FingerlessIndicator.Style.margin +
-                                    FingerlessIndicatorMouseTrap.Style.padding.vertical)
+                                    FingerlessIndicators.Style.padding.vertical)
                                 .withClass("fingerless-indicators-mouse-trap")
-                                .withEventListeners(mouseTrapEventListeners
-                                    .withMousePositionToSchemaChange((p) => {
-                                        const activeSchema = shapeChart.schema;
-                                        const previewSchema = activeSchema.slice();
-                                        const previewString = FingerlessIndicatorMouseTrap.xCoordinateToString(p[0]);
-                                        previewSchema[previewString - 1] = dragActive() ? (
-                                            Shapes.StringAction.isFingerless(dragAction) ? dragAction :
-                                                previewSchema[previewString -1]) : Module.of(() => {
-                                            const previousStringAction = activeSchema[previewString - 1];
-                                            return previousStringAction === Shapes.StringAction.unsounded ?
-                                                Shapes.StringAction.open :
-                                                Shapes.StringAction.unsounded;});
-                                        return {
-                                            change: previewSchema[previewString - 1],
-                                            schema: previewSchema};}))};
-                        return mouseTraps; }};}};
-        return {
-            Style: {
-                width: ShapeChart.Style.width + shapeChartMarginRight + FingerInput.Style.width * fingerInputScale,
-                height: ShapeChart.Style.height},
-            Builder: Module.of((
-                createShapeInput = (schema, fingerInput) => {
-                    const shapeChart = ShapeChart.Builder
-                        .forSchema(schema)
-                        .unfixed();
-                    fingerInput
-                        .withChangeListener(fingerValue => shapeChart.activeFinger = fingerValue)
-                        .moveTo(ShapeChart.Style.width + shapeChartMarginRight, ShapeChart.Fretboard.Style.y)
-                        .scale(fingerInputScale);   //TODO see if the scaling can be done within FingerInput.Create
-                    const previewMeatContainer = SVG.Builder.G()
-                        .withClass("preview-meat-container")
-                        .withAttributes({
-                            display: "none",
-                            fillOpacity: .4,
-                            strokeOpacity: .5})
-                        .disableTextSelection()
-                        .withMethods({
-                            show: () => {
-                                previewMeatContainer.withoutAttribute("display");
-                                shapeChart.querySelector(".shape-chart-meat").withAttributes({
-                                    fillOpacity: .6,
-                                    strokeOpacity: .5})},
-                            hide:() => {
-                                previewMeatContainer.withAttribute("display", "none");
-                                shapeChart.querySelector(".shape-chart-meat").withoutAttributes(
-                                    ["fill-opacity", "stroke-opacity"]);}});
-                    const Preview = Module.of((value) => ({
-                        get: () => value,
-                        set: (preview) => {
-                            value = preview;
-                            previewMeatContainer.innerHTML = "";
-                            previewMeatContainer.withChild(
-                                ShapeChart.Meat.Builder
-                                    .forSchema(value));}}));
-                    shapeChart.withGetterAndSetter("preview",
-                        Preview.get,
-                        function(preview) { Preview.set(preview); });
-                    const Schema = Module.of((
-                        changeListener=undefined,
-                        shapeChartSchemaSetter = Object.getOwnPropertyDescriptor(shapeChart, "schema").set,
-                        schemaSetter = (schema) => {
-                            if(! Shapes.Schema.equals(schema, shapeChart.schema)) {
-                                shapeChartSchemaSetter(schema);
-                                if(changeListener !== undefined) {
-                                    changeListener(schema);}}}
-                    ) => {
-                        shapeChart.withSetter("schema", schemaSetter);
-                        const Schema = {
-                            setChangeListener: (listener) => changeListener = listener,
-                            get: () => shapeChart.schema,
-                            set: schemaSetter};
-                        Schema.set(schema);
-                        return Schema;});
+                                .withEventListeners(createMouseEventListeners(
+                                    FingerlessIndicators.mouseTrapStateToSchemaChange)),
+                            fretboardMouseTrap=SVG.Builder.MouseTrap
+                                .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
+                                .withY(ShapeChart.Fretboard.Style.y - Fretboard.Style.padding)
+                                .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
+                                .withHeight(ShapeChart.Fretboard.Style.height + 2 * Fretboard.Style.padding)
+                                .withClass("fretboard-mouse-trap")
+                                .withEventListeners(createMouseEventListeners(
+                                    Fretboard.mouseTrapStateToSchemaChange))
+                        ) => SVG.Builder.G()
+                            .withClass("shape-input-mouse-traps")
+                            .withChild(fingerlessIndicatorMouseTrap)
+                            .withChild(fretboardMouseTrap))})})})),
+            createShapeInput=(schema, fingerInput) => Module.of((
+                shapeChart = ShapeChart.Builder
+                    .forSchema(schema)
+                    .unfixed(),
+                previewMeatContainer = SVG.Builder.G()
+                    .withClass("preview-meat-container")
+                    .withAttributes({
+                        fillOpacity: .4,
+                        strokeOpacity: .5})
+                    .disableTextSelection(),
+                Preview = Module.of((value) => ({
+                    get: () => value,
+                    set: preview => {
+                        //Do nothing if no difference
+                        if(value === preview) return;
+                        //Clear the preview meat
+                        previewMeatContainer.innerHTML = "";
+                        //Is the new preview something?
+                        if(preview !== null) {
+                            //Yes. Is the old preview nothing?
+                            if(value === null) {
+                                //Yes. Make the active meat translucent.
+                                shapeChart
+                                    .querySelector(".shape-chart-meat")
+                                    .withAttributes({
+                                        fillOpacity: .6,
+                                        strokeOpacity: .5});
+                                //Update the preview meat
+                                previewMeatContainer.withChild(ShapeChart.Meat.Builder.forSchema(preview));}}
+                        //The new preview is nothing. Is the old preview something?
+                        else if(value !== null) {
+                            //Yes. Make the active meat opaque
+                            shapeChart
+                                .querySelector(".shape-chart-meat")
+                                .withoutAttributes(["fill-opacity", "stroke-opacity"]);}
+                        //Update the value
+                        value = preview;}})),
+                Schema = Module.of((
+                    changeListener=undefined,
+                    shapeChartSchemaSetter = Object.getOwnPropertyDescriptor(shapeChart, "schema").set,
+                    schemaSetter = (schema) => {
+                        if(! Shapes.Schema.equals(schema, shapeChart.schema)) {
+                            shapeChartSchemaSetter(schema);
+                            if(changeListener !== undefined) {
+                                changeListener(schema);}}}
+                ) => {
+                    shapeChart.withSetter("schema", schemaSetter);
+                    const Schema = {
+                        setChangeListener: (listener) => changeListener = listener,
+                        get: () => shapeChart.schema,
+                        set: schemaSetter};
+                    Schema.set(schema);
+                    return Schema;})
+            ) => SVG.Builder.G()
+                .withClass("shape-input")
+                .withChild(shapeChart
+                    .withChild(previewMeatContainer)
+                    .withChild(MouseTrapsBuilder
+                        .withSchema(Schema)
+                        .withPreview(Preview)
+                        .withActiveFingerGetter(() => fingerInput.selected)))
+                .withChild(fingerInput
+                    .moveTo(
+                        ShapeChart.Style.width + shapeChartMarginRight,
+                        ShapeChart.Fretboard.Style.y)
+                    .scale(fingerInputScale)) //TODO see if the scaling can be done within FingerInput.Create
+                .withGetterAndSetter("schema",
+                    () => Schema.get(),
+                    (schema) => Schema.set(schema))
+                .withMethod("withChangeListener", function(changeListener) {
+                    Schema.setChangeListener(changeListener);
+                    return this;})
+                .withMethods({
+                    focus: () => fingerInput.focus(),
+                    focused: function() {
+                        this.focus();
+                        return this;},
+                    unfocus: () => fingerInput.unfocus(),
+                    unfocused: function() {
+                        this.unfocus();
+                        return this;}})),
+            wildcardStep = schema => ({
+                withoutWildcard: () => createShapeInput(schema, FingerInput.Builder.withoutWildcard()),
+                withWildcard: () => createShapeInput(schema, FingerInput.Builder.withWildcard())})
+        ) => ({
+            withSchema: wildcardStep,
+            blank: wildcardStep(Shapes.Schema.allUnsounded)}))}));
 
-                    //TODO
-                    //  The mouse traps should not know about shapeChart and previewMeatContainer;
-                    //  instead, they should expose a mouseMoveListener.
-                    const mouseTraps = MouseTrapsBuilder
-                        .withShapeChart(shapeChart)
-                        .withPreviewMeatContainer(previewMeatContainer);
-                    return SVG.Builder.G()
-                        .withClass("shape-input")
-                        .withChild(shapeChart)
-                        .withChild(previewMeatContainer)
-                        .withChild(mouseTraps.fretboard)
-                        .withChild(mouseTraps.fingerlessIndicators)
-                        .withChild(fingerInput)
-                        .withGetterAndSetter("schema",
-                            () => Schema.get(),
-                            (schema) => Schema.set(schema))
-                        .withMethod("withChangeListener", function(changeListener) {
-                            Schema.setChangeListener(changeListener);
-                            return this;})
-                        .withMethods({
-                            focus: () => fingerInput.focus(),
-                            focused: function() {
-                                this.focus();
-                                return this;},
-                            unfocus: () => fingerInput.unfocus(),
-                            unfocused: function() {
-                                this.unfocus();
-                                return this;}})},
-                fingerInputStep=(schema)=>({
-                    withWildcard: () => createShapeInput(schema, FingerInput.new.withWildcard()),
-                    withoutWildcard: () => createShapeInput(schema, FingerInput.new.withoutWildcard())})
-            ) => ({
-                forSchema: schema => fingerInputStep(schema),
-                blank: () => fingerInputStep(Shapes.Schema.allUnsounded)}))};});
     const ShapeCreator = Module.of((
         RootFretRangeInput = Module.of(() => {
             const RootFretRangeStyle = Module.of((
