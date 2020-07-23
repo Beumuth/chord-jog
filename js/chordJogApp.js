@@ -447,6 +447,60 @@ const ChordJogApp = (() => {
                 ) => ({
                     withEndpoints: (p1, p2) => createLine().withEndpoints(p1, p2),
                     withoutEndpoints: () => createLine()})),
+            ModularGrid: {
+                withX: x => ({
+                withY: y => ({
+                withWidth: width => ({
+                withModuleWidth: moduleWidth => ({
+                withModuleHeight: moduleHeight => ({
+                withPadding: (horizontalPadding, verticalPadding=horizontalPadding) => Module.of((
+                    withModulesStep=modules=>Module.of((
+                        numColumnsAndColumnIndexToModuleX=(numColumns, columnIndex)=>
+                            .5*width +
+                            (columnIndex-numColumns/2)*moduleWidth +
+                            (columnIndex-(numColumns-1)/2)*horizontalPadding,
+                        rowIndexToModuleY=rowIndex=>rowIndex*(moduleHeight+verticalPadding),
+                        numColumnsToInnerWidth=numColumns=>numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
+                    )=> SVG.Builder.G()
+                        .withClass("modular-grid")
+                        .moveTo(x, y)
+                        .withGetterAndSetter("modules",
+                            () => modules,
+                            function(newModules) {
+                                //Remove old modules
+                                modules.forEach(module => {
+                                    if(module.parentNode === this) {
+                                        this.removeChild(module);}});
+                                //Move the new modules to their coordinates and append them to the grid
+                                modules = newModules;
+                                Module.of((
+                                    numColumns=Arrays.findLast(
+                                        Numbers.range(1, 1+modules.length),
+                                        numColumns=>{
+                                            return numColumnsToInnerWidth(numColumns)<=width;}),
+                                    numRows=Math.ceil(modules.length/numColumns),
+                                    moduleIndexToCoordinates=moduleIndex=>Module.of((
+                                        rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
+                                    ) => [
+                                        numColumnsAndColumnIndexToModuleX(
+                                            //How many columns are in this row?
+                                            rowIndex < numRows-1 ?  //Is this not the last row?
+                                                numColumns :        //Yes: numColumns
+                                                Module.of((         //No: the number of columns on the last row
+                                                    remainder=modules.length%numRows
+                                                )=> remainder > 0 ? remainder : numColumns),
+                                            moduleIndex%numColumns),
+                                        rowIndexToModuleY(rowIndex)])
+                                )=> modules.forEach((module, index)=> this.append(
+                                    module.moveTo(...moduleIndexToCoordinates(index)))));})
+                        .withMethod("withModules", function(modules) {
+                            this.modules = modules;
+                            return this;})
+                        .withModules(modules))
+                ) => ({
+                    withModule: module => withModulesStep([module]),
+                    withModules: modules => withModulesStep(modules),
+                    withoutModules: () => withModulesStep([])}))})})})})})},
             Path: ({
                 withD: (d) => createElement("path")
                     .withAttributes({d: d}) }),
@@ -627,36 +681,42 @@ const ChordJogApp = (() => {
                 fingered: (fret, finger) => ({
                     sounded: true,
                     fret: fret,
-                    finger: finger })};
-            StringAction.deadened = (fret, finger) => ({
-                sounded: false,
-                fret: fret,
-                finger: finger });
-            StringAction.fromString = (string) =>
-                string === StringAction.unsounded ?
-                    StringAction.unsounded :
-                    string === StringAction.open ?
-                        StringAction.open :
-                        string.charAt(0) === StringAction.dead ?
-                            StringAction.deadened(
-                                Number.parseInt(string.charAt(1)),
-                                string.charAt(2)) :
-                            StringAction.fingered(
-                                Number.parseInt(string.charAt(0)),
-                                string.charAt(1));
-            StringAction.toString = (stringAction) =>
-                stringAction === StringAction.unsounded ?
-                    StringAction.unsounded :
-                    stringAction === StringAction.open ?
-                        StringAction.open : stringAction.sounded ?
-                        `${stringAction.fret}${stringAction.finger}` :
-                        `x${stringAction.fret}${stringAction.finger}`;
-            StringAction.isFingerless = (stringAction) =>
-                [StringAction.unsounded, StringAction.open].includes(stringAction);
+                    finger: finger }),
+                deadened: (fret, finger) => ({
+                    sounded: false,
+                    fret: fret,
+                    finger: finger }),
+                fromString: (string) =>
+                    string === StringAction.unsounded ?
+                        StringAction.unsounded :
+                        string === StringAction.open ?
+                            StringAction.open :
+                            string.charAt(0) === StringAction.dead ?
+                                StringAction.deadened(
+                                    Number.parseInt(string.charAt(1)),
+                                    string.charAt(2)) :
+                                StringAction.fingered(
+                                    Number.parseInt(string.charAt(0)),
+                                    string.charAt(1)),
+                toString: (stringAction) =>
+                    stringAction === StringAction.unsounded ?
+                        StringAction.unsounded :
+                        stringAction === StringAction.open ?
+                            StringAction.open : stringAction.sounded ?
+                            `${stringAction.fret}${stringAction.finger}` :
+                            `x${stringAction.fret}${stringAction.finger}`,
+                isFingerless: stringAction => [StringAction.unsounded, StringAction.open].includes(stringAction)};
             StringAction.isFingered = (stringAction) => ! StringAction.isFingerless(stringAction);
             StringAction.isDeadened = (stringAction) =>
                 StringAction.isFingered(stringAction) && ! stringAction.sounded;
             StringAction.equals = (a, b) => StringAction.toString(a) === StringAction.toString(b);
+            StringAction.matches = (stringAction, search) =>
+                StringAction.equals(stringAction, search) || (
+                    StringAction.isFingered(search) &&
+                    search.finger === Fingers.any &&
+                    StringAction.isFingered(stringAction) &&
+                    stringAction.sounded === search.sounded &&
+                    stringAction.fret === search.fret);
             return StringAction;});
         const FingerAction = {
             Builder: {
@@ -729,7 +789,11 @@ const ChordJogApp = (() => {
                                         Arrays.lastIndexOf(fingerActions,
                                             (fingerAction) => fingerAction.finger === stringAction.action.finger),
                                         (fingerAction) => fingerAction.range.max = stringAction.string)))),
-                        [])};
+                        []),
+            matches: (schema, search) => undefined === schema.find((stringAction, index) =>
+                Module.of((
+                    searchStringAction=search[index]
+                ) => ! StringAction.matches(stringAction, searchStringAction)))};
             Schema.allUnsounded = Numbers.range(0, Strings.count).map(() => "");
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
             return Schema; });
@@ -768,6 +832,7 @@ const ChordJogApp = (() => {
                 FingerAction: FingerAction,
                 Schema: Schema,
                 Builder: Builder,
+                all: all,
                 equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
                 existsWithSchema: (schema) => all.some(shape =>
                     Schema.equals(shape.schema, schema)),
@@ -942,7 +1007,7 @@ const ChordJogApp = (() => {
                 return text.length <= 1 ? label : label
                     .withTextLength(17); };
             return {
-                fixed: (fret) => forRootFret(fret),
+                fixed: fret => forRootFret(fret),
                 unfixed: () => forRootFret(null)}; });
 
         //The 'skeleton' consists of the passive portion of the ShapeChart -
@@ -1085,7 +1150,7 @@ const ChordJogApp = (() => {
                         return this;})
                     .withRootFret(rootFret)),
                 withSchema = (schema) => ({
-                    fixed: (rootFret) => withSchemaAndRootFret(schema, rootFret),
+                    fixed: rootFret => withSchemaAndRootFret(schema, rootFret),
                     unfixed: () => withSchemaAndRootFret(schema, null)})
             ) => ({
                 blank: () => withSchema(Shapes.Schema.allUnsounded),
@@ -1099,8 +1164,8 @@ const ChordJogApp = (() => {
             scale: .5}
     ) => ({
         Style: {
-            width: FingerInputStyle.scale * FingerInputStyle.width,
-            height: FingerInputStyle.scale * FingerInputStyle.height},
+            width: FingerInputStyle.scale * FingerInputStyle.baseWidth,
+            height: FingerInputStyle.scale * FingerInputStyle.baseHeight},
         Builder: Module.of((
             RegionsBuilder = Module.of((
                 StaticRegions = Module.of((
@@ -1146,9 +1211,9 @@ const ChordJogApp = (() => {
                             .withLineSegmentModel([[219, 63], [217, 158]])],
                     anyFingerRegion=StaticRegionBuilder
                         .withValue(Fingers.any)
-                        .withPosition([133, 200])
-                        .withTextOffset([0, 0])
-                        .withPointModel([133, 200]),
+                        .withPosition([145, 225])
+                        .withTextOffset([0, 4.5])
+                        .withPointModel([150, 230]),
                     allRegions=fingerRegions.concat(anyFingerRegion)
                 ) => ({
                     fingers: fingerRegions,
@@ -1856,441 +1921,442 @@ const ChordJogApp = (() => {
             withSchema: wildcardStep,
             blank: () => wildcardStep(Shapes.Schema.allUnsounded)}))}));
 
-    const ShapeCreator = Module.of((
-        RootFretRangeInput = Module.of(() => {
-            const RootFretRangeStyle = Module.of((
-                marginTop = 29,
-                startX = ShapeChart.Fretboard.Style.x,
-                endX = startX + (ShapeChart.Fretboard.Style.stringSpacing *
-                    (Frets.roots.length - 1)),
-                width = endX - startX,
-                rangeMarkerRadius=11,
-                tickRadius = (3/8) * rangeMarkerRadius,
-                mouseTrapHorizontalPadding = rangeMarkerRadius
-            ) => ({
-                startX: startX,
-                endX: endX,
-                y: ShapeChart.Style.height + marginTop,
-                width: width,
-                height: 2 * tickRadius,
-                normalStrokeWidth: 1,
-                emphasisStrokeWidth: 1.5,
-                activeStrokeWidth: 2,
-                tickRadius: tickRadius,
-                rangeLabelFontSize: 13,
-                rangeLabelFont: "Courier New",
-                rangeLabelHalfHeight: 9,
-                rangeLabelMarginTop: 16,
-                rangeLabelTextSpacing: 40,
-                mouseTrapHorizontalPadding: mouseTrapHorizontalPadding,
-                mouseTrapWidth: width + 2 * mouseTrapHorizontalPadding,
-                mouseTrapHeight: 2 * rangeMarkerRadius,
-                tickSpacing: width / (Frets.roots.length - 1),
-                rangeMarkerRadius: rangeMarkerRadius}));
-            const rootFretToXCoordinate = (rootFret) => (rootFret-1) * RootFretRangeStyle.tickSpacing;
-            const rootFretXCoordinates = Frets.roots.map(rootFret => ({
-                rootFret: rootFret,
-                x: rootFretToXCoordinate(rootFret)}));
-            const xCoordinateToRootFret = Module.of((
-                binarySearchEven = (candidates, x, halfLength = candidates.length/2) =>
-                    x < .5 * (candidates[halfLength-1].x + candidates[halfLength].x) ?
-                        candidates.slice(0, halfLength) :
-                        candidates.slice(halfLength, candidates.length),
-                binarySearchOdd = (candidates, x, halfIndex=(candidates.length-1) / 2) =>
-                    x < candidates[halfIndex].x ?
-                        candidates.slice(0, halfIndex + 1) :
-                        candidates.slice(halfIndex, candidates.length),
-                binarySearch = (candidates, x) => candidates.length > 1 ?
-                    binarySearch(
-                        1 === candidates.length % 2 ?
-                            binarySearchOdd(candidates, x) :
-                            binarySearchEven(candidates, x),
-                        x) :
-                    candidates[0].rootFret) => (x) => binarySearch(rootFretXCoordinates, x));
-            const RootFretRangeInputBuilders = {
-                Baseline: () => SVG.Builder.Line
-                    .withEndpoints(
-                        [0, 0],
-                        [RootFretRangeStyle.width, 0])
-                    .withClass("root-fret-range-input-baseline")
-                    .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth),
-                ActiveBaseline: () => SVG.Builder.Line
-                    .withoutEndpoints()
-                    .withClass("root-fret-range-input-active-baseline")
-                    .withAttribute("stroke-width", RootFretRangeStyle.activeStrokeWidth)
-                    .withMethod("withRange", function(min, max) {
-                        return min !== max ?
-                            this
-                                .withEndpoints(
-                                    [rootFretToXCoordinate(min), 0],
-                                    [rootFretToXCoordinate(max), 0])
-                                .show() :
-                            this.hide();}),
-                Skeleton: {
-                    withBaselines: (
-                        baseline,
-                        activeBaseline,
-                        rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
+    const RootFretRangeInput = Module.of(() => {
+        const RootFretRangeStyle = Module.of((
+            marginTop = 29,
+            startX = ShapeChart.Fretboard.Style.x,
+            endX = startX + (ShapeChart.Fretboard.Style.stringSpacing *
+                (Frets.roots.length - 1)),
+            width = endX - startX,
+            rangeMarkerRadius=11,
+            tickRadius = (3/8) * rangeMarkerRadius,
+            mouseTrapHorizontalPadding = rangeMarkerRadius
+        ) => ({
+            startX: startX,
+            endX: endX,
+            y: ShapeChart.Style.height + marginTop,
+            width: width,
+            height: 2 * tickRadius,
+            normalStrokeWidth: 1,
+            emphasisStrokeWidth: 1.5,
+            activeStrokeWidth: 2,
+            tickRadius: tickRadius,
+            rangeLabelFontSize: 13,
+            rangeLabelFont: "Courier New",
+            rangeLabelHalfHeight: 9,
+            rangeLabelMarginTop: 16,
+            rangeLabelTextSpacing: 40,
+            mouseTrapHorizontalPadding: mouseTrapHorizontalPadding,
+            mouseTrapWidth: width + 2 * mouseTrapHorizontalPadding,
+            mouseTrapHeight: 2 * rangeMarkerRadius,
+            tickSpacing: width / (Frets.roots.length - 1),
+            rangeMarkerRadius: rangeMarkerRadius}));
+        const rootFretToXCoordinate = (rootFret) => (rootFret-1) * RootFretRangeStyle.tickSpacing;
+        const rootFretXCoordinates = Frets.roots.map(rootFret => ({
+            rootFret: rootFret,
+            x: rootFretToXCoordinate(rootFret)}));
+        const xCoordinateToRootFret = Module.of((
+            binarySearchEven = (candidates, x, halfLength = candidates.length/2) =>
+                x < .5 * (candidates[halfLength-1].x + candidates[halfLength].x) ?
+                    candidates.slice(0, halfLength) :
+                    candidates.slice(halfLength, candidates.length),
+            binarySearchOdd = (candidates, x, halfIndex=(candidates.length-1) / 2) =>
+                x < candidates[halfIndex].x ?
+                    candidates.slice(0, halfIndex + 1) :
+                    candidates.slice(halfIndex, candidates.length),
+            binarySearch = (candidates, x) => candidates.length > 1 ?
+                binarySearch(
+                    1 === candidates.length % 2 ?
+                        binarySearchOdd(candidates, x) :
+                        binarySearchEven(candidates, x),
+                    x) :
+                candidates[0].rootFret) => (x) => binarySearch(rootFretXCoordinates, x));
+        const RootFretRangeInputBuilders = {
+            Baseline: () => SVG.Builder.Line
+                .withEndpoints(
+                    [0, 0],
+                    [RootFretRangeStyle.width, 0])
+                .withClass("root-fret-range-input-baseline")
+                .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth),
+            ActiveBaseline: () => SVG.Builder.Line
+                .withoutEndpoints()
+                .withClass("root-fret-range-input-active-baseline")
+                .withAttribute("stroke-width", RootFretRangeStyle.activeStrokeWidth)
+                .withMethod("withRange", function(min, max) {
+                    return min !== max ?
+                        this
                             .withEndpoints(
-                                [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
-                                [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
-                            .withClass("root-fret-range-tick")
-                            .withDataAttribute("value", rootFretXCoordinate.rootFret),
-                        rootFretTicks=rootFretXCoordinates.reduce(
-                            (tickMap, rootFretXCoordinate) => {
-                                tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
-                                return tickMap;},
-                            {})
-                    ) => SVG.Builder.G()
-                        .withClass("root-fret-range-skeleton")
-                        .withChild(baseline)
-                        .withChild(activeBaseline)
-                        .withChild(SVG.Builder.G()
-                            .withClass("root-fret-range-ticks")
-                            .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
-                            .withChildren(Object.values(rootFretTicks)))
-                        .withMethods(
-                            Module.of((
-                                activeRootFrets=[],
-                                setNewActives=(actives) => {
-                                    activeRootFrets.forEach(rootFret =>
-                                        rootFretTicks[rootFret].withAttribute(
-                                            "stroke-width", RootFretRangeStyle.normalStrokeWidth));
-                                    activeRootFrets = actives;
-                                    activeRootFrets.forEach((rootFret) =>
-                                        rootFretTicks[rootFret].withAttribute(
-                                            "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
-                            ) => ({
-                                activateMinAndMax: (min, max) => setNewActives([min, max]),
-                                activatePivot: (pivot) => setNewActives([pivot])})))},
-                RangeLabel: Module.of((
-                    createText=() => SVG.Builder.Text
-                        .withoutTextContent()
-                        .withAttributes({
-                            fontFamily: RootFretRangeStyle.rangeLabelFont,
-                            fontSize: RootFretRangeStyle.rangeLabelFontSize,
-                            textAnchor: "middle"}),
-                    expressionText=createText()
-                        .withTextContent("<= r <=")
-                        .withClass("root-fret-range-input-label-min"),
-                    minText=createText()
-                        .withClass("root-fret-range-input-label-min")
-                        .move(-RootFretRangeStyle.rangeLabelTextSpacing, 0),
-                    maxText=createText()
-                        .withClass("root-fret-range-input-label-max")
-                        .move(RootFretRangeStyle.rangeLabelTextSpacing, 0)) =>
-                    () => SVG.Builder.G()
-                        .withClass("root-fret-range-input-label")
-                        .withChildren([minText, expressionText, maxText])
-                        .disableTextSelection()
-                        .moveTo(.5 * RootFretRangeStyle.width,
-                            RootFretRangeStyle.height + RootFretRangeStyle.rangeLabelMarginTop)
-                        .withMethods({
-                            withRange: function(minRootFret, maxRootFret) {
-                                minText.withTextContent(minRootFret);
-                                maxText.withTextContent(maxRootFret);
-                                return this;},
-                            withValue: function(rootFret) {
-                                return this.withRange(rootFret, rootFret);}})),
-                RangeMarkers: Module.of((
-                    rootFretToCenter=(rootFret)=>[rootFretToXCoordinate(rootFret), 0],
-                    markerForType = (markerType) => SVG.Builder.Circle
-                        .withCenter([0,0])
-                        .withRadius(RootFretRangeStyle.rangeMarkerRadius)
-                        .withClass("root-fret-range-marker")
-                        .withAttributes({
-                            cursor: "pointer",
-                            pointerEvents: "all",
-                            strokeWidth: RootFretRangeStyle.normalStrokeWidth,
-                            fill: "none"})
-                        .withDataAttribute("markerType", markerType)
-                        .withDataAttribute("rootFret", null)
-                        .withGetterAndSetter("rootFret",
-                            function() {return Number.parseInt(this.dataset.rootFret);},
-                            function(rootFret) {this.dataset.rootFret = rootFret;})
-                        .withMethod("atRootFret", function(rootFret) {
-                            const center = rootFretToCenter(rootFret);
-                            return this
-                                .withDataAttribute("rootFret", rootFret)
-                                .withAttributes({
-                                    cx: center[0],
-                                    cy: center[1]});})
-                        .hide()
-                ) => () => {
-                    const markers = {
-                        min: markerForType("min"),
-                        max: markerForType("max"),
-                        pivot: markerForType("pivot"),
-                        preview: markerForType("preview").withAttributes({
-                            strokeDasharray: "3 4",
-                            pointerEvents: "none"})};
-                    markers.minAndMax = [markers.min, markers.max];
-                    markers.all = [markers.preview,   //preview goes first so it is behind others
-                        markers.min, markers.max, markers.pivot];
-                    return markers;}),
-                MouseTrap: () => SVG.Builder.MouseTrap
-                    .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
-                    .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
-                    .withWidth(RootFretRangeStyle.mouseTrapWidth)
-                    .withHeight(RootFretRangeStyle.mouseTrapHeight)
-                    .withClass("root-fret-range-mouse-trap")};
-            RootFretRangeInputBuilders.RootFretRangeInput = Module.of((
-                setupEventHandlers = (rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range) => {
-                    const activateMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.activeStrokeWidth)
-                    const emphasizeMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.emphasisStrokeWidth);
-                    const unemphasizeMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.normalStrokeWidth);
-                    const States = {
-                        extremaInactive: {},
-                        extremumDragging: {},
-                        maxDragging: {},
-                        pivot: {},
-                        pivotInactive: {}};
-                    const mouseEventToRootFret = (e) => xCoordinateToRootFret(
-                        MouseEvents.relativeMousePosition(e, baseline)[0]);
-                    const emphasizeMarkerIfMouseOnRootFret = (marker, mouseEvent,
-                                                              relativeMousePosition=MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)
-                    ) => Functions.ifThenElse(
-                        mouseEventToRootFret(mouseEvent) !== marker.rootFret ||
-                        relativeMousePosition[0] < 0 ||
-                        relativeMousePosition[1] < 0 ||
-                        relativeMousePosition[0] > RootFretRangeStyle.mouseTrapWidth ||
-                        relativeMousePosition[1] > RootFretRangeStyle.mouseTrapHeight,
-                        () => unemphasizeMarker(marker),
-                        () => emphasizeMarker(marker));
-                    let previewRootFret = null;
-                    const setPreviewRootFret = (rootFret) => {
-                        previewRootFret = rootFret;
-                        rangeMarkers.preview.atRootFret(rootFret);};
-                    const inactivateRangeMouseMove = (e, relevantMarkers,
-                                                      rootFret=mouseEventToRootFret(e)
-                    ) => {
-                        relevantMarkers.forEach(marker =>
-                            emphasizeMarkerIfMouseOnRootFret(marker, e));
-                        Functions.ifThen(
-                            rootFret !== previewRootFret,
-                            () => setPreviewRootFret(rootFret))};
-                    const inactiveRangeMouseEnter = (e, relevantMarkers) => {
-                        rangeMarkers.preview.show();
-                        inactivateRangeMouseMove(e, relevantMarkers); };
-                    const inactiveRangeMouseLeave = () => {
-                        rangeMarkers.preview.hide();
-                        rangeMarkers.minAndMax.concat(rangeMarkers.pivot).forEach(marker =>
-                            unemphasizeMarker(marker));};
-                    Objects.using(States.extremaInactive).withFields(Module.of(() => {
-                        let deactivate;
-                        const markerMouseEnter = (marker, rootFret) => {
-                            setPreviewRootFret(rootFret);
-                            emphasizeMarker(marker);};
-                        const markerMouseLeave = (marker) => unemphasizeMarker(marker);
-                        const rangeEventListeners = {
-                            mouseEnter: (e) => inactiveRangeMouseEnter(e, rangeMarkers.minAndMax),
-                            mouseMove: (e) => inactivateRangeMouseMove(e, rangeMarkers.minAndMax),
-                            mouseDown: (e) => {
-                                deactivate();
-                                Range.set(mouseEventToRootFret(e));
-                                States.pivot.activate();},
-                            mouseLeave: inactiveRangeMouseLeave};
-                        const minMarkerEventListeners = {
-                            mouseEnter: () => markerMouseEnter(rangeMarkers.min, rangeMarkers.min.rootFret),
-                            mouseLeave: () => markerMouseLeave(rangeMarkers.min),
-                            mouseDown: () => {
-                                deactivate();
-                                States.extremumDragging.activate().forMin()}};
-                        const maxMarkerEventListeners = {
-                            mouseEnter: () => markerMouseEnter(rangeMarkers.max, rangeMarkers.max.rootFret),
-                            mouseLeave: () => markerMouseLeave(rangeMarkers.max),
-                            mouseDown: () => {
-                                deactivate();
-                                States.extremumDragging.activate().forMax();}};
-                        deactivate = () => {
-                            mouseTrap.withoutEventListeners(rangeEventListeners);
-                            rangeMarkers.min.withoutEventListeners(minMarkerEventListeners);
-                            rangeMarkers.max.withoutEventListeners(maxMarkerEventListeners);};
-                        return {
-                            activate: () => {
-                                mouseTrap.withEventListeners(rangeEventListeners);
-                                rangeMarkers.min.withEventListeners(minMarkerEventListeners);
-                                rangeMarkers.max.withEventListeners(maxMarkerEventListeners);}};}));
-                    Objects.using(States.extremumDragging).withFields(Module.of(() => {
-                        const internalState = Objects.using({
-                            activeRangeMarker: null,
-                            activeRootFret: null,
-                            inactiveRootFret: null,
-                            polarity: null });
-                        let deactivate;
-                        const mouseMoveHandler = (e,
-                            rootFret = mouseEventToRootFret(e),
-                            getRange = (rootFret) => internalState.polarity === 1 ?
-                                [internalState.inactiveRootFret, rootFret] :
-                                [rootFret, internalState.inactiveRootFret]
-                        ) => Functions.ifThenElse(
-                            //Did the active marker drag onto or cross the inactive marker?
-                            internalState.polarity * (rootFret - internalState.inactiveRootFret) > 0,
-                            //No.
-                            () => Functions.ifThen(
-                                //Is the mouse over a different root fret than the active markers'?
-                                rootFret !== internalState.activeRootFret,
-                                () => {
-                                    internalState.activeRootFret = rootFret;
-                                    internalState.activeRangeMarker.atRootFret(rootFret);
-                                    Range.set(...getRange(rootFret));}),
-                            //Yes.
-                            () => {
-                                internalState.activeRangeMarker.atRootFret(
-                                    internalState.inactiveRootFret);
-                                Range.set(internalState.inactiveRootFret);
-                                deactivate();
-                                States.pivot.activate();});
-                        const mouseUpHandler = (e) => {
-                            deactivate();
-                            emphasizeMarkerIfMouseOnRootFret(internalState.activeRangeMarker, e);
-                            States.extremaInactive.activate();};
-                        deactivate = () => {
-                            window.removeEventListener("mousemove", mouseMoveHandler);
-                            window.removeEventListener("mouseup", mouseUpHandler);};
-                        const activateExtremum = (activeRangeMarker, inactiveRangeMarker, polarity) => {
-                            activateMarker(activeRangeMarker);
-                            unemphasizeMarker(inactiveRangeMarker);
-                            const activeRootFret = activeRangeMarker.rootFret;
-                            const inactiveRootFret = inactiveRangeMarker.rootFret;
-                            polarity === -1 ?
-                                Range.set(activeRootFret, inactiveRootFret) :
-                                Range.set(inactiveRootFret, activeRootFret);
-                            internalState.withFields({
-                                activeRangeMarker: activeRangeMarker,
-                                activeRootFret: activeRootFret,
-                                inactiveRootFret: inactiveRootFret,
-                                polarity: polarity})};
-                        return {
-                            activate: () => {
-                                window.addEventListener("mousemove", mouseMoveHandler);
-                                window.addEventListener("mouseup", mouseUpHandler);
-                                rangeMarkers.preview.hide();
-                                return {
-                                    forMin: () => activateExtremum(
-                                        rangeMarkers.min, rangeMarkers.max, -1),
-                                    forMax: () => activateExtremum(
-                                        rangeMarkers.max, rangeMarkers.min, 1)};}};}));
-                    Objects.using(States.pivot).withFields(Module.of(() => {
-                        let pivotFret = null;
-                        let deactivate;
-                        const mouseUp=(e) => {
-                            emphasizeMarkerIfMouseOnRootFret(rangeMarkers.pivot, e);
-                            deactivate();
-                            States.pivotInactive.activate();};
-                        const mouseMove = (e, rootFret=mouseEventToRootFret(e)) =>
-                            Functions.ifThen(rootFret !== pivotFret, () => {
-                                deactivate();
-                                Functions.ifThenElse(rootFret < pivotFret,
-                                    () => {
-                                        Range.set(rootFret, pivotFret);
-                                        States.extremumDragging.activate().forMin();},
-                                    () => {
-                                        Range.set(pivotFret, rootFret);
-                                        States.extremumDragging.activate().forMax();})});
-                        deactivate=() => {
-                            window.removeEventListener("mouseup", mouseUp);
-                            window.removeEventListener("mousemove", mouseMove);};
-                        return {
-                            activate: () => {
-                                pivotFret = rangeMarkers.pivot.rootFret;
-                                activateMarker(rangeMarkers.pivot);
-                                rangeMarkers.minAndMax.forEach(rangeMarker =>
-                                    rangeMarker.atRootFret(pivotFret));
-                                rangeMarkers.preview.hide();
-                                rangeLabel.withValue(pivotFret);
-                                window.addEventListener("mouseup", mouseUp);
-                                window.addEventListener("mousemove", mouseMove);}};}));
-                    Objects.using(States.pivotInactive).withFields(Module.of(() => {
-                        let deactivate;
-                        const mouseDown = (e) => {
+                                [rootFretToXCoordinate(min), 0],
+                                [rootFretToXCoordinate(max), 0])
+                            .show() :
+                        this.hide();}),
+            Skeleton: {
+                withBaselines: (
+                    baseline,
+                    activeBaseline,
+                    rootFretXCoordinateToTick=(rootFretXCoordinate) => SVG.Builder.Line
+                        .withEndpoints(
+                            [rootFretXCoordinate.x, -RootFretRangeStyle.tickRadius],
+                            [rootFretXCoordinate.x, RootFretRangeStyle.tickRadius])
+                        .withClass("root-fret-range-tick")
+                        .withDataAttribute("value", rootFretXCoordinate.rootFret),
+                    rootFretTicks=rootFretXCoordinates.reduce(
+                        (tickMap, rootFretXCoordinate) => {
+                            tickMap[rootFretXCoordinate.rootFret] = rootFretXCoordinateToTick(rootFretXCoordinate);
+                            return tickMap;},
+                        {})
+                ) => SVG.Builder.G()
+                    .withClass("root-fret-range-skeleton")
+                    .withChild(baseline)
+                    .withChild(activeBaseline)
+                    .withChild(SVG.Builder.G()
+                        .withClass("root-fret-range-ticks")
+                        .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
+                        .withChildren(Object.values(rootFretTicks)))
+                    .withMethods(
+                        Module.of((
+                            activeRootFrets=[],
+                            setNewActives=(actives) => {
+                                activeRootFrets.forEach(rootFret =>
+                                    rootFretTicks[rootFret].withAttribute(
+                                        "stroke-width", RootFretRangeStyle.normalStrokeWidth));
+                                activeRootFrets = actives;
+                                activeRootFrets.forEach((rootFret) =>
+                                    rootFretTicks[rootFret].withAttribute(
+                                        "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
+                        ) => ({
+                            activateMinAndMax: (min, max) => setNewActives([min, max]),
+                            activatePivot: (pivot) => setNewActives([pivot])})))},
+            RangeLabel: Module.of((
+                createText=() => SVG.Builder.Text
+                    .withoutTextContent()
+                    .withAttributes({
+                        fontFamily: RootFretRangeStyle.rangeLabelFont,
+                        fontSize: RootFretRangeStyle.rangeLabelFontSize,
+                        textAnchor: "middle"}),
+                expressionText=createText()
+                    .withTextContent("<= r <=")
+                    .withClass("root-fret-range-input-label-min"),
+                minText=createText()
+                    .withClass("root-fret-range-input-label-min")
+                    .move(-RootFretRangeStyle.rangeLabelTextSpacing, 0),
+                maxText=createText()
+                    .withClass("root-fret-range-input-label-max")
+                    .move(RootFretRangeStyle.rangeLabelTextSpacing, 0)) =>
+                () => SVG.Builder.G()
+                    .withClass("root-fret-range-input-label")
+                    .withChildren([minText, expressionText, maxText])
+                    .disableTextSelection()
+                    .moveTo(.5 * RootFretRangeStyle.width,
+                        RootFretRangeStyle.height + RootFretRangeStyle.rangeLabelMarginTop)
+                    .withMethods({
+                        withRange: function(minRootFret, maxRootFret) {
+                            minText.withTextContent(minRootFret);
+                            maxText.withTextContent(maxRootFret);
+                            return this;},
+                        withValue: function(rootFret) {
+                            return this.withRange(rootFret, rootFret);}})),
+            RangeMarkers: Module.of((
+                rootFretToCenter=(rootFret)=>[rootFretToXCoordinate(rootFret), 0],
+                markerForType = (markerType) => SVG.Builder.Circle
+                    .withCenter([0,0])
+                    .withRadius(RootFretRangeStyle.rangeMarkerRadius)
+                    .withClass("root-fret-range-marker")
+                    .withAttributes({
+                        cursor: "pointer",
+                        pointerEvents: "all",
+                        strokeWidth: RootFretRangeStyle.normalStrokeWidth,
+                        fill: "none"})
+                    .withDataAttribute("markerType", markerType)
+                    .withDataAttribute("rootFret", null)
+                    .withGetterAndSetter("rootFret",
+                        function() {return Number.parseInt(this.dataset.rootFret);},
+                        function(rootFret) {this.dataset.rootFret = rootFret;})
+                    .withMethod("atRootFret", function(rootFret) {
+                        const center = rootFretToCenter(rootFret);
+                        return this
+                            .withDataAttribute("rootFret", rootFret)
+                            .withAttributes({
+                                cx: center[0],
+                                cy: center[1]});})
+                    .hide()
+            ) => () => {
+                const markers = {
+                    min: markerForType("min"),
+                    max: markerForType("max"),
+                    pivot: markerForType("pivot"),
+                    preview: markerForType("preview").withAttributes({
+                        strokeDasharray: "3 4",
+                        pointerEvents: "none"})};
+                markers.minAndMax = [markers.min, markers.max];
+                markers.all = [markers.preview,   //preview goes first so it is behind others
+                    markers.min, markers.max, markers.pivot];
+                return markers;}),
+            MouseTrap: () => SVG.Builder.MouseTrap
+                .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
+                .withY(-.5 * RootFretRangeStyle.mouseTrapHeight)
+                .withWidth(RootFretRangeStyle.mouseTrapWidth)
+                .withHeight(RootFretRangeStyle.mouseTrapHeight)
+                .withClass("root-fret-range-mouse-trap")};
+        RootFretRangeInputBuilders.RootFretRangeInput = Module.of((
+            setupEventHandlers = (rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range) => {
+                const activateMarker = (marker) => marker.withAttribute(
+                    "stroke-width", RootFretRangeStyle.activeStrokeWidth)
+                const emphasizeMarker = (marker) => marker.withAttribute(
+                    "stroke-width", RootFretRangeStyle.emphasisStrokeWidth);
+                const unemphasizeMarker = (marker) => marker.withAttribute(
+                    "stroke-width", RootFretRangeStyle.normalStrokeWidth);
+                const States = {
+                    extremaInactive: {},
+                    extremumDragging: {},
+                    maxDragging: {},
+                    pivot: {},
+                    pivotInactive: {}};
+                const mouseEventToRootFret = (e) => xCoordinateToRootFret(
+                    MouseEvents.relativeMousePosition(e, baseline)[0]);
+                const emphasizeMarkerIfMouseOnRootFret = (marker, mouseEvent,
+                                                          relativeMousePosition=MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)
+                ) => Functions.ifThenElse(
+                    mouseEventToRootFret(mouseEvent) !== marker.rootFret ||
+                    relativeMousePosition[0] < 0 ||
+                    relativeMousePosition[1] < 0 ||
+                    relativeMousePosition[0] > RootFretRangeStyle.mouseTrapWidth ||
+                    relativeMousePosition[1] > RootFretRangeStyle.mouseTrapHeight,
+                    () => unemphasizeMarker(marker),
+                    () => emphasizeMarker(marker));
+                let previewRootFret = null;
+                const setPreviewRootFret = (rootFret) => {
+                    previewRootFret = rootFret;
+                    rangeMarkers.preview.atRootFret(rootFret);};
+                const inactivateRangeMouseMove = (e, relevantMarkers,
+                                                  rootFret=mouseEventToRootFret(e)
+                ) => {
+                    relevantMarkers.forEach(marker =>
+                        emphasizeMarkerIfMouseOnRootFret(marker, e));
+                    Functions.ifThen(
+                        rootFret !== previewRootFret,
+                        () => setPreviewRootFret(rootFret))};
+                const inactiveRangeMouseEnter = (e, relevantMarkers) => {
+                    rangeMarkers.preview.show();
+                    inactivateRangeMouseMove(e, relevantMarkers); };
+                const inactiveRangeMouseLeave = () => {
+                    rangeMarkers.preview.hide();
+                    rangeMarkers.minAndMax.concat(rangeMarkers.pivot).forEach(marker =>
+                        unemphasizeMarker(marker));};
+                Objects.using(States.extremaInactive).withFields(Module.of(() => {
+                    let deactivate;
+                    const markerMouseEnter = (marker, rootFret) => {
+                        setPreviewRootFret(rootFret);
+                        emphasizeMarker(marker);};
+                    const markerMouseLeave = (marker) => unemphasizeMarker(marker);
+                    const rangeEventListeners = {
+                        mouseEnter: (e) => inactiveRangeMouseEnter(e, rangeMarkers.minAndMax),
+                        mouseMove: (e) => inactivateRangeMouseMove(e, rangeMarkers.minAndMax),
+                        mouseDown: (e) => {
                             deactivate();
                             Range.set(mouseEventToRootFret(e));
-                            States.pivot.activate();};
-                        const pivotMouseEvents = {
-                            mouseEnter: () => emphasizeMarker(rangeMarkers.pivot),
-                            mouseDown: mouseDown,
-                            mouseLeave: () => unemphasizeMarker(rangeMarkers.pivot),};
-                        const rangeMouseEvents = {
-                            mouseEnter: (e) => inactiveRangeMouseEnter(e, [rangeMarkers.pivot]),
-                            mouseDown: mouseDown,
-                            mouseMove: (e) => inactivateRangeMouseMove(e, [rangeMarkers.pivot]),
-                            mouseLeave: inactiveRangeMouseLeave};
-                        deactivate = () => {
-                            mouseTrap.withoutEventListeners(rangeMouseEvents);
-                            rangeMarkers.pivot.withoutEventListeners(pivotMouseEvents);};
-                        return {
-                            activate: () => {
-                                mouseTrap.withEventListeners(rangeMouseEvents);
-                                rangeMarkers.pivot.withEventListeners(pivotMouseEvents);}};}));
-                    States.extremaInactive.activate();
-                }) => ({
-                withRange: (range) => {
-                    const baseline = RootFretRangeInputBuilders.Baseline(),
-                        activeBaseline = RootFretRangeInputBuilders.ActiveBaseline(),
-                        skeleton = RootFretRangeInputBuilders.Skeleton.withBaselines(baseline, activeBaseline),
-                        rangeLabel = RootFretRangeInputBuilders.RangeLabel(),
-                        rangeMarkers = RootFretRangeInputBuilders.RangeMarkers(),
-                        mouseTrap = RootFretRangeInputBuilders.MouseTrap(),
-                        Range = Module.of((value, changeListener=null) => ({
-                            setChangeListener: (listener) => changeListener = listener,
-                            get: () => Shape.get().range,
-                            set: (min, max=min) => {
-                                const range = Frets.Range.create(min, max);
-                                if(value !== undefined && Frets.Range.equals(value, range)) {
-                                    return;}
-                                value = range;
-                                if(changeListener) {
-                                    changeListener(value);}
-                                if(value.min !== value.max) { //min and max
-                                    rangeMarkers.minAndMax.forEach(marker =>
-                                        marker.show());
-                                    rangeMarkers.pivot.hide();
-                                    skeleton.activateMinAndMax(value.min, value.max);
-                                    activeBaseline.show();
-                                    rangeLabel.withRange(value.min, value.max);
-                                    activeBaseline.withRange(value.min, value.max);
-                                    rangeMarkers.min.atRootFret(value.min);
-                                    rangeMarkers.max.atRootFret(value.max);}
-                                else { //pivot
-                                    rangeMarkers.pivot.show();
-                                    rangeMarkers.minAndMax.forEach(marker => marker.hide());
-                                    skeleton.activatePivot(value.min);
-                                    activeBaseline.hide();
-                                    rangeLabel.withValue(value.min);
-                                    rangeMarkers.pivot.atRootFret(value.min);}}}));
-                    setupEventHandlers(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range);
-                    return SVG.Builder.G()
-                        .withClass("root-fret-range-input")
-                        .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
-                        .withChild(skeleton)
-                        .withChild(rangeLabel)
-                        .withChild(mouseTrap)
-                        .withChild(SVG.Builder.G()
-                            .withClass("root-fret-range-markers")
-                            .withChildren(rangeMarkers.all))
-                        .withGetterAndSetter("range",
-                            () => Range.get(),
-                            (range) => Range.set(range.min, range.max))
-                        .withMethod("withRange", function(range) {
-                            this.range = range;
-                            return this;})
-                        .withRange(range)
-                        .withMethod("withChangeListener", function(changeListener) {
-                            Range.setChangeListener(changeListener);
-                            return this;});}}));
-            return {
-                Style: {
-                    x: RootFretRangeStyle.startX - RootFretRangeStyle.rangeMarkerRadius,
-                    y: RootFretRangeStyle.y - RootFretRangeStyle.rangeMarkerRadius,
-                    width: RootFretRangeStyle.width + 2 * RootFretRangeStyle.rangeMarkerRadius,
-                    height: 2 * RootFretRangeStyle.height +
-                        RootFretRangeStyle.rangeLabelMarginTop +
-                        RootFretRangeStyle.rangeLabelHalfHeight},
-                Builder: RootFretRangeInputBuilders.RootFretRangeInput};}),
+                            States.pivot.activate();},
+                        mouseLeave: inactiveRangeMouseLeave};
+                    const minMarkerEventListeners = {
+                        mouseEnter: () => markerMouseEnter(rangeMarkers.min, rangeMarkers.min.rootFret),
+                        mouseLeave: () => markerMouseLeave(rangeMarkers.min),
+                        mouseDown: () => {
+                            deactivate();
+                            States.extremumDragging.activate().forMin()}};
+                    const maxMarkerEventListeners = {
+                        mouseEnter: () => markerMouseEnter(rangeMarkers.max, rangeMarkers.max.rootFret),
+                        mouseLeave: () => markerMouseLeave(rangeMarkers.max),
+                        mouseDown: () => {
+                            deactivate();
+                            States.extremumDragging.activate().forMax();}};
+                    deactivate = () => {
+                        mouseTrap.withoutEventListeners(rangeEventListeners);
+                        rangeMarkers.min.withoutEventListeners(minMarkerEventListeners);
+                        rangeMarkers.max.withoutEventListeners(maxMarkerEventListeners);};
+                    return {
+                        activate: () => {
+                            mouseTrap.withEventListeners(rangeEventListeners);
+                            rangeMarkers.min.withEventListeners(minMarkerEventListeners);
+                            rangeMarkers.max.withEventListeners(maxMarkerEventListeners);}};}));
+                Objects.using(States.extremumDragging).withFields(Module.of(() => {
+                    const internalState = Objects.using({
+                        activeRangeMarker: null,
+                        activeRootFret: null,
+                        inactiveRootFret: null,
+                        polarity: null });
+                    let deactivate;
+                    const mouseMoveHandler = (e,
+                                              rootFret = mouseEventToRootFret(e),
+                                              getRange = (rootFret) => internalState.polarity === 1 ?
+                                                  [internalState.inactiveRootFret, rootFret] :
+                                                  [rootFret, internalState.inactiveRootFret]
+                    ) => Functions.ifThenElse(
+                        //Did the active marker drag onto or cross the inactive marker?
+                        internalState.polarity * (rootFret - internalState.inactiveRootFret) > 0,
+                        //No.
+                        () => Functions.ifThen(
+                            //Is the mouse over a different root fret than the active markers'?
+                            rootFret !== internalState.activeRootFret,
+                            () => {
+                                internalState.activeRootFret = rootFret;
+                                internalState.activeRangeMarker.atRootFret(rootFret);
+                                Range.set(...getRange(rootFret));}),
+                        //Yes.
+                        () => {
+                            internalState.activeRangeMarker.atRootFret(
+                                internalState.inactiveRootFret);
+                            Range.set(internalState.inactiveRootFret);
+                            deactivate();
+                            States.pivot.activate();});
+                    const mouseUpHandler = (e) => {
+                        deactivate();
+                        emphasizeMarkerIfMouseOnRootFret(internalState.activeRangeMarker, e);
+                        States.extremaInactive.activate();};
+                    deactivate = () => {
+                        window.removeEventListener("mousemove", mouseMoveHandler);
+                        window.removeEventListener("mouseup", mouseUpHandler);};
+                    const activateExtremum = (activeRangeMarker, inactiveRangeMarker, polarity) => {
+                        activateMarker(activeRangeMarker);
+                        unemphasizeMarker(inactiveRangeMarker);
+                        const activeRootFret = activeRangeMarker.rootFret;
+                        const inactiveRootFret = inactiveRangeMarker.rootFret;
+                        polarity === -1 ?
+                            Range.set(activeRootFret, inactiveRootFret) :
+                            Range.set(inactiveRootFret, activeRootFret);
+                        internalState.withFields({
+                            activeRangeMarker: activeRangeMarker,
+                            activeRootFret: activeRootFret,
+                            inactiveRootFret: inactiveRootFret,
+                            polarity: polarity})};
+                    return {
+                        activate: () => {
+                            window.addEventListener("mousemove", mouseMoveHandler);
+                            window.addEventListener("mouseup", mouseUpHandler);
+                            rangeMarkers.preview.hide();
+                            return {
+                                forMin: () => activateExtremum(
+                                    rangeMarkers.min, rangeMarkers.max, -1),
+                                forMax: () => activateExtremum(
+                                    rangeMarkers.max, rangeMarkers.min, 1)};}};}));
+                Objects.using(States.pivot).withFields(Module.of(() => {
+                    let pivotFret = null;
+                    let deactivate;
+                    const mouseUp=(e) => {
+                        emphasizeMarkerIfMouseOnRootFret(rangeMarkers.pivot, e);
+                        deactivate();
+                        States.pivotInactive.activate();};
+                    const mouseMove = (e, rootFret=mouseEventToRootFret(e)) =>
+                        Functions.ifThen(rootFret !== pivotFret, () => {
+                            deactivate();
+                            Functions.ifThenElse(rootFret < pivotFret,
+                                () => {
+                                    Range.set(rootFret, pivotFret);
+                                    States.extremumDragging.activate().forMin();},
+                                () => {
+                                    Range.set(pivotFret, rootFret);
+                                    States.extremumDragging.activate().forMax();})});
+                    deactivate=() => {
+                        window.removeEventListener("mouseup", mouseUp);
+                        window.removeEventListener("mousemove", mouseMove);};
+                    return {
+                        activate: () => {
+                            pivotFret = rangeMarkers.pivot.rootFret;
+                            activateMarker(rangeMarkers.pivot);
+                            rangeMarkers.minAndMax.forEach(rangeMarker =>
+                                rangeMarker.atRootFret(pivotFret));
+                            rangeMarkers.preview.hide();
+                            rangeLabel.withValue(pivotFret);
+                            window.addEventListener("mouseup", mouseUp);
+                            window.addEventListener("mousemove", mouseMove);}};}));
+                Objects.using(States.pivotInactive).withFields(Module.of(() => {
+                    let deactivate;
+                    const mouseDown = (e) => {
+                        deactivate();
+                        Range.set(mouseEventToRootFret(e));
+                        States.pivot.activate();};
+                    const pivotMouseEvents = {
+                        mouseEnter: () => emphasizeMarker(rangeMarkers.pivot),
+                        mouseDown: mouseDown,
+                        mouseLeave: () => unemphasizeMarker(rangeMarkers.pivot),};
+                    const rangeMouseEvents = {
+                        mouseEnter: (e) => inactiveRangeMouseEnter(e, [rangeMarkers.pivot]),
+                        mouseDown: mouseDown,
+                        mouseMove: (e) => inactivateRangeMouseMove(e, [rangeMarkers.pivot]),
+                        mouseLeave: inactiveRangeMouseLeave};
+                    deactivate = () => {
+                        mouseTrap.withoutEventListeners(rangeMouseEvents);
+                        rangeMarkers.pivot.withoutEventListeners(pivotMouseEvents);};
+                    return {
+                        activate: () => {
+                            mouseTrap.withEventListeners(rangeMouseEvents);
+                            rangeMarkers.pivot.withEventListeners(pivotMouseEvents);}};}));
+                States.extremaInactive.activate();
+            }) => ({
+            withRange: (range) => {
+                const baseline = RootFretRangeInputBuilders.Baseline(),
+                    activeBaseline = RootFretRangeInputBuilders.ActiveBaseline(),
+                    skeleton = RootFretRangeInputBuilders.Skeleton.withBaselines(baseline, activeBaseline),
+                    rangeLabel = RootFretRangeInputBuilders.RangeLabel(),
+                    rangeMarkers = RootFretRangeInputBuilders.RangeMarkers(),
+                    mouseTrap = RootFretRangeInputBuilders.MouseTrap(),
+                    Range = Module.of((value, changeListener=null) => ({
+                        setChangeListener: (listener) => changeListener = listener,
+                        get: () => Shape.get().range,
+                        set: (min, max=min) => {
+                            const range = Frets.Range.create(min, max);
+                            if(value !== undefined && Frets.Range.equals(value, range)) {
+                                return;}
+                            value = range;
+                            if(changeListener) {
+                                changeListener(value);}
+                            if(value.min !== value.max) { //min and max
+                                rangeMarkers.minAndMax.forEach(marker =>
+                                    marker.show());
+                                rangeMarkers.pivot.hide();
+                                skeleton.activateMinAndMax(value.min, value.max);
+                                activeBaseline.show();
+                                rangeLabel.withRange(value.min, value.max);
+                                activeBaseline.withRange(value.min, value.max);
+                                rangeMarkers.min.atRootFret(value.min);
+                                rangeMarkers.max.atRootFret(value.max);}
+                            else { //pivot
+                                rangeMarkers.pivot.show();
+                                rangeMarkers.minAndMax.forEach(marker => marker.hide());
+                                skeleton.activatePivot(value.min);
+                                activeBaseline.hide();
+                                rangeLabel.withValue(value.min);
+                                rangeMarkers.pivot.atRootFret(value.min);}}}));
+                setupEventHandlers(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range);
+                return SVG.Builder.G()
+                    .withClass("root-fret-range-input")
+                    .moveTo(RootFretRangeStyle.startX, RootFretRangeStyle.y)
+                    .withChild(skeleton)
+                    .withChild(rangeLabel)
+                    .withChild(mouseTrap)
+                    .withChild(SVG.Builder.G()
+                        .withClass("root-fret-range-markers")
+                        .withChildren(rangeMarkers.all))
+                    .withGetterAndSetter("range",
+                        () => Range.get(),
+                        (range) => Range.set(range.min, range.max))
+                    .withMethod("withRange", function(range) {
+                        this.range = range;
+                        return this;})
+                    .withRange(range)
+                    .withMethod("withChangeListener", function(changeListener) {
+                        Range.setChangeListener(changeListener);
+                        return this;});}}));
+        return {
+            Style: {
+                x: RootFretRangeStyle.startX - RootFretRangeStyle.rangeMarkerRadius,
+                y: RootFretRangeStyle.y - RootFretRangeStyle.rangeMarkerRadius,
+                width: RootFretRangeStyle.width + 2 * RootFretRangeStyle.rangeMarkerRadius,
+                height: 2 * RootFretRangeStyle.height +
+                    RootFretRangeStyle.rangeLabelMarginTop +
+                    RootFretRangeStyle.rangeLabelHalfHeight},
+            Builder: RootFretRangeInputBuilders.RootFretRangeInput};});
+
+    const ShapeCreator = Module.of((
         ShapeCreatorStyle = Module.of((
             buttonsMarginTop = 10,
             buttonsWidth = RootFretRangeInput.Style.width / (2 + 3 / Numbers.goldenRatio),
@@ -2402,9 +2468,49 @@ const ChordJogApp = (() => {
                     .withClass("shape-creator-reset-button"))
                 .withChild(saveButton)
                 .withChild(errorMessage)}}));
+
+    const ShapeSearch = Module.of((
+        shapeInputMarginBottom=5,
+        shapeChartGridPadding=5,
+        shapeChartGridMaxColumns=4,
+        maxMatches=12
+    ) => ({
+        new: () => {
+            const width = shapeChartGridMaxColumns*ShapeChart.Style.width +
+                (shapeChartGridMaxColumns-1)*shapeChartGridPadding;
+            const shapeChartGrid=SVG.Builder.ModularGrid
+                .withX(0).withY(0)
+                .withWidth(width)
+                .withModuleWidth(ShapeChart.Style.width)
+                .withModuleHeight(ShapeChart.Style.height)
+                .withPadding(shapeChartGridPadding)
+                .withoutModules()
+                .withClass("shape-chart-grid")
+                .move(0, ShapeInput.Style.height + shapeInputMarginBottom);
+            const shapeInput = SVG.Builder.ModularGrid
+                .withX(0).withY(0)
+                .withWidth(width)
+                .withModuleWidth(ShapeInput.Style.width)
+                .withModuleHeight(ShapeInput.Style.height)
+                .withPadding(0)
+                .withModule(ShapeInput.Builder
+                    .blank()
+                    .withWildcard()
+                    .focused()
+                    .withChangeListener(search => Module.of((
+                        matches=Shapes.all.filter(shape => Shapes.Schema.matches(shape.schema, search))
+                    ) => shapeChartGrid.modules = (
+                        matches.length <= maxMatches ?
+                            matches :
+                            matches.slice(0, maxMatches)
+                    ).map(shape => ShapeChart.Builder.forSchema(shape.schema).unfixed()))));
+            return SVG.Builder.G()
+                .withClass("shape-search")
+                .withChild(shapeInput)
+                .withChild(shapeChartGrid);}}));
     return {
         create: () => SVG.Builder.SVG
-            .withWidth(400)
+            .withWidth(800)
             .withHeight(400)
             .withClass("chord-jog-app")
             .withAttributes({
@@ -2412,4 +2518,4 @@ const ChordJogApp = (() => {
                 stroke: Style.colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
-            .withChild(ShapeCreator.new())};})();
+            .withChild(ShapeSearch.new())};})();
