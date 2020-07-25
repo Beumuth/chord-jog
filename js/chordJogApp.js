@@ -481,16 +481,15 @@ const ChordJogApp = (() => {
                                         Numbers.range(1, 1+modules.length),
                                         numColumns=>{
                                             return numColumnsToInnerWidth(numColumns)<=width;}),
-                                    numRows=Math.ceil(modules.length/numColumns),
                                     moduleIndexToCoordinates=moduleIndex=>Module.of((
                                         rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
                                     ) => [
                                         numColumnsAndColumnIndexToModuleX(
                                             //How many columns are in this row?
-                                            rowIndex < numRows-1 ?  //Is this not the last row?
+                                            rowIndex < Math.ceil(modules.length/numColumns)-1 ?  //Not the last row?
                                                 numColumns :        //Yes: numColumns
                                                 Module.of((         //No: the number of columns on the last row
-                                                    remainder=modules.length%numRows
+                                                    remainder=modules.length%numColumns
                                                 )=> remainder > 0 ? remainder : numColumns),
                                             moduleIndex%numColumns),
                                         rowIndexToModuleY(rowIndex)])
@@ -714,6 +713,7 @@ const ChordJogApp = (() => {
                 StringAction.isFingered(stringAction) && ! stringAction.sounded;
             StringAction.equals = (a, b) => StringAction.toString(a) === StringAction.toString(b);
             StringAction.matches = (stringAction, search) =>
+                search === StringAction.any ||
                 StringAction.equals(stringAction, search) || (
                     StringAction.isFingered(search) &&
                     search.finger === Fingers.any &&
@@ -794,11 +794,7 @@ const ChordJogApp = (() => {
                                         Arrays.lastIndexOf(fingerActions,
                                             (fingerAction) => fingerAction.finger === stringAction.action.finger),
                                         (fingerAction) => fingerAction.range.max = stringAction.string)))),
-                        []),
-            matches: (schema, search) => undefined === schema.find((stringAction, index) =>
-                Module.of((
-                    searchStringAction=search[index]
-                ) => ! StringAction.matches(stringAction, searchStringAction)))};
+                        [])};
             Schema.allUnsounded = Numbers.range(0, Strings.count).map(() => StringAction.unsounded);
             Schema.allAnyStringAction = Numbers.range(0, Strings.count).map(() => StringAction.any);
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
@@ -819,12 +815,11 @@ const ChordJogApp = (() => {
                             return Frets.Range.create(
                                 Number.parseInt(rangeComponents[0]),
                                 Number.parseInt(rangeComponents[1]));})); });
-            const shapesToString = (shapes) => shapes.length === 0 ? "" :
-                shapes
-                    .map(shape =>
-                        Schema.toString(shape.schema) + ";" +
-                        shape.range.min + "," + shape.range.max)
-                    .join("\r\n");
+            const shapesToString = (shapes) => shapes.length === 0 ? "" : shapes
+                .map(shape =>
+                    Schema.toString(shape.schema) + ";" +
+                    shape.range.min + "," + shape.range.max)
+                .join("\r\n");
             const localStorageKey = "chord-jog-shapes";
             const all = Module.of(() => {
                 const shapeString = localStorage.getItem(localStorageKey);
@@ -847,7 +842,10 @@ const ChordJogApp = (() => {
                     saveToLocalStorage();},
                 fromString: shapesFromString,
                 toString: shapesToString,
-                    localStorageKey: localStorageKey};});});
+                search: schemaQuery => all.filter(shape =>undefined === shape.schema.find((stringAction, index) =>
+                    Module.of((
+                        stringActionQuery=schemaQuery[index]
+                    ) => ! StringAction.matches(stringAction, stringActionQuery))))};});});
 
     const ShapeChart = Module.of(() => {
         const halfRoot2 = .5 * Math.SQRT2;
@@ -859,16 +857,16 @@ const ChordJogApp = (() => {
         ) => ({
             Style: FingerlessIndicatorStyle,
             Builder: Module.of((
-                AnyStringActionBuilder = {
+                AnyStringActionBuilder = Module.of((textYOffset=2) => ({
                     withCenter: center => SVG.Builder.Text
-                        .withTextContent("?")
+                        .withTextContent("*")
                         .withClass("any-action-indicator")
                         .withAttributes({
                             fontFamily: "Courier New",
                             fontSize: 14,
                             dominantBaseline: "central",
                             textAnchor: "middle"})
-                        .moveTo(...center)},
+                        .moveTo(center[0], center[1] + textYOffset)})),
                 DeadStringBuilder = {
                     withCenter: center => SVG.Builder.Path
                         .withD(
@@ -1140,7 +1138,7 @@ const ChordJogApp = (() => {
                 width: Fretboard.Style.startX +
                     Fretboard.Style.width +
                     FingerIndicator.Style.radius,
-                height: Fretboard.Style.startY + Fretboard.Style.height},
+                height: Fretboard.Style.startY + Fretboard.Style.height + FingerlessIndicator.Style.diameter},
             MeatBuilder: MeatBuilder,
             Fretboard: {
                 Style: {
@@ -1156,7 +1154,6 @@ const ChordJogApp = (() => {
                 Style: FingerlessIndicator.Style},
             Builder: Module.of((
                 buildStep = (schema, rootFret, includeAnyStringAction) => Module.of((
-                    nothing=console.log(Shapes.Schema.toString(schema), rootFret, includeAnyStringAction),
                     shapeChartMeat = MeatBuilder.forSchema(schema),
                     rootFretLabel = rootFret === null ?
                         RootFretLabel.Builder.unfixed() :
@@ -1210,6 +1207,7 @@ const ChordJogApp = (() => {
             //hardcoded
             baseWidth: 237,
             baseHeight: 292,
+            strokeWidth: 2,
             scale: .5}
     ) => ({
         Style: {
@@ -1651,6 +1649,7 @@ const ChordJogApp = (() => {
                                     this.unfocus();
                                     return this;}})))
                             .scale(FingerInputStyle.scale)
+                            .withAttribute("stroke-width", FingerInputStyle.strokeWidth)
                             .disableTextSelection())})}))}))
         ) => Module.of((
             fingersKeyMap={
@@ -1705,7 +1704,6 @@ const ChordJogApp = (() => {
                                     fingerlessStringActions[
                                         (1+fingerlessStringActions.indexOf(state.schema[targetString-1])) %
                                         fingerlessStringActions.length];
-                                console.log(fingerlessStringActions);
                                 return schema;})
                         ) => ({
                             change: schema[targetString - 1],
@@ -2387,7 +2385,7 @@ const ChordJogApp = (() => {
                     mouseTrap = RootFretRangeInputBuilders.MouseTrap(),
                     Range = Module.of((value, changeListener=null) => ({
                         setChangeListener: (listener) => changeListener = listener,
-                        get: () => Shape.get().range,
+                        get: () => value,
                         set: (min, max=min) => {
                             const range = Frets.Range.create(min, max);
                             if(value !== undefined && Frets.Range.equals(value, range)) {
@@ -2482,7 +2480,9 @@ const ChordJogApp = (() => {
                     ShapeCreatorStyle.Buttons.height)
                 .withText("Save")
                 .withClickHandler(() => {
-                    Shapes.add(shapeInput.shape);
+                    Shapes.add(Shapes.Builder
+                        .withSchema(shapeInput.schema)
+                        .withRange(rootFretRangeInput.range));
                     reset();})
                 .withClass("shape-creator-save-button");
             const errorMessage = SVG.Builder.Text
@@ -2556,7 +2556,7 @@ const ChordJogApp = (() => {
                 .withChild(errorMessage)}}));
 
     const ShapeSearch = Module.of((
-        shapeInputMarginBottom=5,
+        shapeInputMarginBottom=10,
         shapeChartGridPadding=5,
         shapeChartGridMaxColumns=4,
         maxMatches=12
@@ -2584,7 +2584,7 @@ const ChordJogApp = (() => {
                     .blank()
                     .focused()
                     .withChangeListener(search => Module.of((
-                        matches=Shapes.all.filter(shape => Shapes.Schema.matches(shape.schema, search))
+                        matches=Shapes.search(search)
                     ) => shapeChartGrid.modules = (
                         matches.length <= maxMatches ?
                             matches :
@@ -2600,7 +2600,7 @@ const ChordJogApp = (() => {
     return {
         create: () => SVG.Builder.SVG
             .withWidth(800)
-            .withHeight(400)
+            .withHeight(750)
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
