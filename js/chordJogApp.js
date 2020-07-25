@@ -928,7 +928,10 @@ const ChordJogApp = (() => {
                 fontSize: 15,
                 fontFamily: "monospace" }};
         const FingerIndicator = Module.of((radius=11) => ({
-            Style: {radius: radius, diameter: 2*radius}}));
+            Style: {
+                radius: radius,
+                diameter: 2*radius,
+                anyFingerTextYOffset: 3}}));
         const ShapeChartStyle = {
             padding: {
                 x: RootFretLabel.Style.textLength +
@@ -995,7 +998,10 @@ const ChordJogApp = (() => {
                         x: Module.of(() => {
                             const min = Fretboard.stringToXCoordinate(fingerAction.range.min);
                             return min + .5 * (Fretboard.stringToXCoordinate(fingerAction.range.max) - min);}),
-                        y: Fretboard.fretToYCoordinate(fingerAction.fret),
+                        y: Fretboard.fretToYCoordinate(fingerAction.fret) + (
+                            fingerAction.finger === Fingers.any ?
+                                FingerIndicator.Style.anyFingerTextYOffset :
+                                0),
                         dominantBaseline: "central",
                         textAnchor: "middle",
                         stroke: "none",
