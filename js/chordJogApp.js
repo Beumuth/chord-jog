@@ -1872,8 +1872,8 @@ const ChordJogApp = (() => {
                                     .withFingerlessStringActions(
                                         includeAnyStringAction === true ? [
                                             Shapes.StringAction.any,
-                                            Shapes.StringAction.open,
-                                            Shapes.StringAction.unsounded
+                                            Shapes.StringAction.unsounded,
+                                            Shapes.StringAction.open
                                         ] : [
                                             Shapes.StringAction.unsounded,
                                             Shapes.StringAction.open]))),
