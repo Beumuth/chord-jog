@@ -1,8 +1,3 @@
-/**
- * TODO:
- * -shape-creator save functionality
- * -shape-search
- */
 const ChordJogApp = (() => {
     const Style = {
         stroke: {
@@ -677,7 +672,7 @@ const ChordJogApp = (() => {
     const Shapes = Module.of(() => {
         const StringAction = Module.of(() => {
             const StringAction = {
-                any: "?",
+                any: "*",
                 unsounded: "",
                 open: "o",
                 dead: "x",
@@ -887,7 +882,11 @@ const ChordJogApp = (() => {
                     withCenter: center => SVG.Builder.Circle
                         .withCenter(center)
                         .withRadius(FingerlessIndicatorStyle.radius)
-                        .withClass("open-string-indicator")}
+                        .withClass("open-string-indicator")},
+                maxActiveRelativeFretToCenterBottomY=maxActiveRelativeFret=>
+                    Fretboard.fretToYCoordinate(
+                        (maxActiveRelativeFret === undefined ? 0 : maxActiveRelativeFret) + .5) +
+                    FingerlessIndicatorStyle.radius + FingerlessIndicatorStyle.margin
             ) => ({
                 forString: (string) => Module.of((
                     centerX = FingerlessIndicatorStyle.startX + ((string - 1) * Fretboard.Style.stringSpacing),
@@ -903,9 +902,7 @@ const ChordJogApp = (() => {
                         withMaxActiveRelativeFret: maxActiveRelativeFret => Module.of((
                             centerBottom = [
                                 centerX,
-                                Fretboard.fretToYCoordinate(
-                                    (maxActiveRelativeFret === undefined ? 0 : maxActiveRelativeFret) + .5) +
-                                FingerlessIndicatorStyle.radius + FingerlessIndicatorStyle.margin]
+                                maxActiveRelativeFretToCenterBottomY(maxActiveRelativeFret)]
                         ) => ({
                             any: () => SVG.Builder.G()
                                 .withClass("any-string-indicators")
@@ -918,7 +915,16 @@ const ChordJogApp = (() => {
                             open: () => SVG.Builder.G()
                                 .withClass("open-string-indicators")
                                 .withChild(OpenStringBuilder.withCenter(centerTop))
-                                .withChild(OpenStringBuilder.withCenter(centerBottom))}))})}))}))}));
+                                .withChild(OpenStringBuilder.withCenter(centerBottom))}))}),
+                    bottomOnly: ({
+                        withMaxActiveRelativeFret: maxActiveRelativeFret => Module.of((
+                            centerBottom = [
+                                centerX,
+                                maxActiveRelativeFretToCenterBottomY(maxActiveRelativeFret)]
+                        ) => ({
+                            any: () => AnyStringActionBuilder.withCenter(centerBottom),
+                            dead: () => DeadStringBuilder.withCenter(centerBottom),
+                            open: () => OpenStringBuilder.withCenter(centerBottom)}))})}))}))}));
         const RootFretLabel = {
             Style: {
                 paddingRight: 5,
@@ -1037,21 +1043,18 @@ const ChordJogApp = (() => {
         //The 'skeleton' consists of the passive portion of the ShapeChart -
         //fretboard and finger indicator placeholders.
         const SkeletonBuilder = Module.of((
-            createSkeleton=includeAnyStringAction => SVG.Builder.G()
+            createSkeleton=() => SVG.Builder.G()
                 .withClass("shape-chart-skeleton")
                 .withAttribute("stroke", Style.colors.light)
-                .withChild(SVG.Builder
-                    .G()
+                .withChild(SVG.Builder.G()
                     .withClass("fingerless-indicators")
                     .withChildren(Strings.all
-                        .map((string) => FingerlessIndicator.Builder.forString(string).topOnly)
+                        .map(string => FingerlessIndicator.Builder.forString(string).topOnly)
                         .map(fingerIndicatorBuilder => [
                             fingerIndicatorBuilder.open(),
-                            fingerIndicatorBuilder.dead()
-                        ].concat(includeAnyStringAction === true ? fingerIndicatorBuilder.any() : []))
+                            fingerIndicatorBuilder.dead()])
                         .flat()))
-                .withChild(SVG.Builder
-                    .G()
+                .withChild(SVG.Builder.G()
                     .withClass("fretboard")
                     .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                         .forString(string)
@@ -1062,8 +1065,16 @@ const ChordJogApp = (() => {
                             .fromString(Strings.first)
                             .toString(Strings.last))))
         ) => ({
-            withAnyStringAction: () => createSkeleton(true),
-            withoutAnyStringAction: () => createSkeleton(false)}));
+            withAnyStringAction: () => createSkeleton()
+                .withChild(SVG.Builder.G()
+                    .withClass("any-string-action-indicators")
+                    .withChildren(Strings.all
+                        .map(string => FingerlessIndicator.Builder
+                            .forString(string)
+                            .bottomOnly
+                            .withMaxActiveRelativeFret(Frets.Relative.max)
+                            .any()))),
+            withoutAnyStringAction: () => createSkeleton()}));
 
         //The 'meat' consists of the active portion of the ShapeChart -
         // darkened fretboard strings and finger indicators.
@@ -1107,7 +1118,7 @@ const ChordJogApp = (() => {
                     .withChildren(anyStringActions.map(stringAction =>
                         FingerlessIndicator.Builder
                             .forString(stringAction.string)
-                            .topAndBottom
+                            .bottomOnly
                             .withMaxActiveRelativeFret(maxFret)
                             .any()
                             .withAttribute("stroke", Style.colors.black)))
@@ -1675,52 +1686,59 @@ const ChordJogApp = (() => {
             height: ShapeChart.Style.height},
         Builder: Module.of((
             MouseTrapsBuilder = Module.of((
+                MouseXToClosestStringMapperBuilder = {
+                    withLeftPadding: leftPadding => mouseX => Strings.all
+                        .map(string => ({
+                            string: string,
+                            distanceXToMouse: Math.abs(
+                                mouseX -
+                                leftPadding -
+                                ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
+                        .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
+                        .string
+                },
                 FingerlessIndicators = Module.of((
-                    horizontalPadding=ShapeChart.FingerIndicator.Style.radius
+                    horizontalPadding=ShapeChart.FingerIndicator.Style.radius,
+                    mouseXToClosestString=MouseXToClosestStringMapperBuilder
+                        .withLeftPadding(horizontalPadding + ShapeChart.FingerlessIndicator.Style.radius)
                 ) => ({
                     Style: {
                         padding: {
                             horizontal: horizontalPadding,
                             vertical: 7}},
-                    MouseTrapStateToSchemaChangeBuilder: {
-                        //fingerlessStringActions determines which string actions are toggled and in what order
-                        //for the FingerlessIndicator mouse trap
-                        withFingerlessStringActions: fingerlessStringActions => state=>Module.of((
-                            targetString = Strings.all
-                                .map(string => ({
-                                    string: string,
-                                    distanceXToMouse: Math.abs(state.mousePosition[0] -
-                                        horizontalPadding -
-                                        ShapeChart.FingerlessIndicator.Style.radius -
-                                        ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-                                .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
-                                .string,
-                            schema = Module.of(() => {
-                                let schema = state.schema.slice();
-                                schema[targetString - 1] = state.dragAction !== null ?
-                                    Shapes.StringAction.isFingerless(state.dragAction) ?
-                                        state.dragAction :
-                                        schema[targetString -1] :
-                                    fingerlessStringActions[
-                                        (1+fingerlessStringActions.indexOf(state.schema[targetString-1])) %
-                                        fingerlessStringActions.length];
-                                return schema;})
-                        ) => ({
-                            change: schema[targetString - 1],
-                            schema: schema}))}})),
+                    mouseTrapStateToSchemaChange: state=>Module.of((
+                        targetString = mouseXToClosestString(state.mousePosition[0]),
+                        schema = Arrays.replaceItem(
+                            state.schema,
+                            targetString-1,
+                            //Is there currently a drag action?
+                            state.dragAction !== null ?
+                                //Yes. Is it fingerless?
+                                Shapes.StringAction.isFingerless(state.dragAction) ?
+                                    //Yes. Choose it.
+                                    state.dragAction :
+                                    //No. Choose it but at the first relative fret.
+                                    {
+                                        sounded: state.dragAction.sounded,
+                                        finger: state.dragAction.finger,
+                                        fret: Frets.Relative.first} :
+                                //No. Is the current string unsounded?
+                                state.schema[targetString-1] === Shapes.StringAction.unsounded ?
+                                    //Yes. Replace with open.
+                                    Shapes.StringAction.open :
+                                    //No. Replace with unsounded.
+                                    Shapes.StringAction.unsounded)
+                    ) => ({
+                        change: schema[targetString - 1],
+                        schema: schema}))})),
                 Fretboard = Module.of((
-                    padding=ShapeChart.FingerIndicator.Style.radius
+                    padding=ShapeChart.FingerIndicator.Style.radius,
+                    mouseXToClosestString=MouseXToClosestStringMapperBuilder
+                        .withLeftPadding(padding)
                 ) => ({
                     Style: {padding: padding},
                     mouseTrapStateToSchemaChange: state => Module.of((
-                        targetString=Strings.all
-                            .map(string => ({
-                                string: string,
-                                distanceXToMouse: Math.abs(state.mousePosition[0] -
-                                    padding -
-                                    ShapeChart.Fretboard.Style.stringSpacing * (string - 1))}))
-                            .reduce((a, b) => a.distanceXToMouse <= b.distanceXToMouse ? a : b)
-                            .string,
+                        targetString=mouseXToClosestString(state.mousePosition[0]),
                         targetFret=Frets.Relative.all
                             .map(fret => ({
                                 fret: fret,
@@ -1809,7 +1827,41 @@ const ChordJogApp = (() => {
                         schema[targetString - 1] = substituteStringAction;
                         return {
                             change: substituteStringAction,
-                            schema: schema};})}))
+                            schema: schema};})})),
+                AnyStringAction = Module.of((
+                    horizontalPadding=ShapeChart.FingerIndicator.Style.radius,
+                    mouseXToClosestString=MouseXToClosestStringMapperBuilder
+                        .withLeftPadding(horizontalPadding + ShapeChart.FingerlessIndicator.Style.radius)
+                ) => ({
+                    Style: {
+                        padding: {
+                            horizontal: horizontalPadding,
+                            vertical: 7}},
+                    mouseTrapStateToSchemaChange: state=>Module.of((
+                        targetString = mouseXToClosestString(state.mousePosition[0]),
+                        schema = Arrays.replaceItem(
+                            state.schema,
+                            targetString-1,
+                            //Is there currently a drag action?
+                            state.dragAction !== null ?
+                                //Yes. Is it fingerless?
+                                Shapes.StringAction.isFingerless(state.dragAction) ?
+                                    //Yes. Choose it.
+                                    state.dragAction :
+                                    //No. Choose it but at the last relative fret.
+                                    {
+                                        sounded: state.dragAction.sounded,
+                                        finger: state.dragAction.finger,
+                                        fret: Frets.Relative.last} :
+                                //No. Is the current string action *?
+                                state.schema[targetString-1] === Shapes.StringAction.any ?
+                                    //Yes. Replace with unsounded.
+                                    Shapes.StringAction.unsounded :
+                                    //No. Replace with *.
+                                    Shapes.StringAction.any)
+                    ) => ({
+                        change: schema[targetString - 1],
+                        schema: schema}))}))
             ) => ({
                 withSchema: Schema => ({
                 withPreview: Preview => ({
@@ -1830,8 +1882,11 @@ const ChordJogApp = (() => {
                         ) => ({
                             mouseenter: function(e) {
                                 currentMouseTrap = this;
-                                if(dragAction !== null) return;
-                                Preview.set(mouseEventToSchemaChange(e).schema);},
+                                const schema = mouseEventToSchemaChange(e).schema;
+                                if(dragAction !== null) {
+                                    Schema.set(schema);}
+                                else {
+                                    Preview.set(schema);}},
                             mousemove: e => {
                                 previousMousePosition = [e.offsetX, e.offsetY];
                                 const schema = mouseEventToSchemaChange(e).schema;
@@ -1872,15 +1927,7 @@ const ChordJogApp = (() => {
                                 FingerlessIndicators.Style.padding.vertical)
                             .withClass("fingerless-indicators-mouse-trap")
                             .withEventListeners(createMouseEventListeners(
-                                FingerlessIndicators.MouseTrapStateToSchemaChangeBuilder
-                                    .withFingerlessStringActions(
-                                        includeAnyStringAction === true ? [
-                                            Shapes.StringAction.any,
-                                            Shapes.StringAction.unsounded,
-                                            Shapes.StringAction.open
-                                        ] : [
-                                            Shapes.StringAction.unsounded,
-                                            Shapes.StringAction.open]))),
+                                FingerlessIndicators.mouseTrapStateToSchemaChange)),
                         fretboardMouseTrap=SVG.Builder.MouseTrap
                             .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
                             .withY(ShapeChart.Fretboard.Style.y)
@@ -1888,17 +1935,34 @@ const ChordJogApp = (() => {
                             .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
                             .withClass("fretboard-mouse-trap")
                             .withEventListeners(createMouseEventListeners(
-                                Fretboard.mouseTrapStateToSchemaChange))
-                    ) => SVG.Builder.G()
-                        .withClass("shape-input-mouse-traps")
-                        .withChild(fingerlessIndicatorMouseTrap)
-                        .withChild(fretboardMouseTrap)
-                        .withMethod("activeFingerChanged", () => {
-                            if(currentMouseTrap === fretboardMouseTrap) {
-                                Preview.set(Fretboard
-                                    .mouseTrapStateToSchemaChange(
-                                        mousePositionToState(previousMousePosition))
-                                    .schema)}}))
+                                Fretboard.mouseTrapStateToSchemaChange)),
+                        shapeInputMouseTraps=SVG.Builder.G()
+                            .withClass("shape-input-mouse-traps")
+                            .withChild(fingerlessIndicatorMouseTrap)
+                            .withChild(fretboardMouseTrap)
+                            .withMethod("activeFingerChanged", () => {
+                                if(currentMouseTrap === fretboardMouseTrap) {
+                                    Preview.set(Fretboard
+                                        .mouseTrapStateToSchemaChange(
+                                            mousePositionToState(previousMousePosition))
+                                        .schema)}})
+                    ) => includeAnyStringAction === false ?
+                        shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
+                        shapeInputMouseTraps.withChild( //Do include...
+                            SVG.Builder.MouseTrap
+                                .withX(ShapeChart.FingerlessIndicator.Style.startX  -
+                                    AnyStringAction.Style.padding.horizontal)
+                                .withY(ShapeChart.Fretboard.Style.y +
+                                    ShapeChart.Fretboard.Style.height)
+                                .withWidth(ShapeChart.Fretboard.Style.width +
+                                    ShapeChart.FingerlessIndicator.Style.diameter +
+                                    2 * AnyStringAction.Style.padding.horizontal)
+                                .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                    ShapeChart.FingerlessIndicator.Style.margin +
+                                    AnyStringAction.Style.padding.vertical)
+                                .withClass("fingerless-indicators-mouse-trap")
+                                .withEventListeners(createMouseEventListeners(
+                                    AnyStringAction.mouseTrapStateToSchemaChange))))
                 ) => ({
                     withAnyStringAction: () => withAnyStringActionStep(true),
                     withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
