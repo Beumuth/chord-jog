@@ -12,7 +12,6 @@ const ChordJogApp = (() => {
             white: "#ffffff"}};
     Style.stroke.halfWidth = Style.stroke.width * .5;
     Style.textColor = Style.colors.heavy;
-    Style.font = "Helvetica";
 
     /**
      * A wrapper for the Module pattern
@@ -362,7 +361,7 @@ const ChordJogApp = (() => {
                             transformAttribute.slice(0, indexArgsStart) +
                             valuesString +
                             transformAttribute.slice(indexArgsEnd));};
-                    return Module.of((x=0, y=0, sx=1, sy=1) => ({
+                    return Module.of((x=0, y=0, sx=1, sy=1, rotation=0) => ({
                         move: function(dx, dy) {
                             x += dx * 1 / sx;
                             y += dy * 1 / sy;
@@ -371,6 +370,12 @@ const ChordJogApp = (() => {
                         moveTo: function(x, y) {
                             const boundingClientRect = this.getBoundingClientRect();
                             return this.move(x - boundingClientRect.x, y - boundingClientRect.y);},
+                        rotateTo: function(degrees, origin=[0,0]) {
+                            rotation = degrees % 360;
+                            updateTransform(this, "rotate", [rotation, origin[0], origin[1]]);
+                            return this;},
+                        rotateBy: function(degrees, origin=[0,0]) {
+                            return this.rotateTo(rotation +  degrees, origin);},
                         scale: function(scaleX, scaleY=scaleX) {
                             sx *= scaleX;
                             sy *= scaleY;
@@ -545,8 +550,7 @@ const ChordJogApp = (() => {
                             this.setAttribute("lengthAdjust", "spacingAndGlyphs");
                             return this; }})
                     .withAttributes({
-                        fill: Style.textColor,
-                        fontFamily: Style.font})) => ({
+                        fill: Style.textColor})) => ({
                 withTextContent: (textContent) => createText().withTextContent(textContent),
                 withoutTextContent: () => createText()}))};
         svgBuilder.Rect.copy = (svgRect) => SVG.Builder.Rect
@@ -554,90 +558,89 @@ const ChordJogApp = (() => {
             .withY(svgRect.y)
             .withWidth(svgRect.width)
             .withHeight(svgRect.height);
-        svgBuilder.TextButton = Module.of(() => {
-            return {
-                withDimensions: (x, y, width, height) => ({
-                    withText: (text) => ({
-                        withClickHandler: (clickHandler) => {
-                            let rect = null;
-                            const label = SVG.Builder.Text
-                                .withTextContent(text)
-                                .moveTo(.5 * width, .5 * height)
-                                .withClass("text-button-label")
-                                .withAttributes({
-                                    textAnchor: "middle",
-                                    dominantBaseline: "central",
-                                    fontSize: 17,
-                                    fontFamily: "Courier New"})
-                                .disableTextSelection();
-                            const preview = () => rect.withAttribute("stroke-width", 1.5);
-                            const normal = () => rect.withAttribute("stroke-width", 1);
-                            const active = () => rect.withAttribute("stroke-width", 2);
-                            const eventListeners = Module.of(() => {
-                                let isMouseOver = false,
-                                    isMouseDown = false,
-                                    mouseUpHandler = undefined;
-                                mouseUpHandler = function () {
-                                    isMouseDown = false;
-                                    window.removeEventListener("mouseup", mouseUpHandler);
-                                    Functions.ifThenElse(isMouseOver,
-                                        () => {
-                                            preview();
-                                            clickHandler();},
-                                        () => normal());};
-                                return {
-                                    mouseEnter: () => {
-                                        isMouseOver = true;
-                                        Functions.ifThenElse(isMouseDown,
-                                            active,
-                                            preview);},
-                                    mouseDown: (e) => Functions.ifThen(
-                                        e.button === 0,
-                                        () => {
-                                            isMouseDown = true;
-                                            window.addEventListener("mouseup", mouseUpHandler);
-                                            active();}),
-                                    mouseLeave: () => {
-                                        isMouseOver = false;
-                                        normal();}};});
-                            rect = SVG.Builder.Rect
-                                .withX(0).withY(0)
-                                .withWidth(width).withHeight(height)
-                                .withClass("text-button-outline")
-                                .withAttributes({});
-                            return SVG.Builder.G()
-                                .withClass("text-button")
-                                .moveTo(x, y)
-                                .withChild(label)
-                                .withChild(rect)
-                                .withGetter("label", () => label)
-                                .withGetter("rect", () => rect)
-                                .withMethods(Module.of((enabled=false) => ({
-                                    enable: function() {
-                                        if(enabled === true) {
-                                            return;}
-                                        enabled = true;
-                                        this.withAttributes({
-                                            pointerEvents: "all",
-                                            cursor: "pointer"
-                                        });
-                                        label.withoutAttribute("text-decoration");
-                                        this.withEventListeners(eventListeners);},
-                                    enabled: function() {
-                                        this.enable();
-                                        return this;},
-                                    disable: function() {
-                                        if(enabled === false) {
-                                            return;}
-                                        enabled = false;
-                                        this.withAttributes({
-                                            cursor: "not-allowed"});
-                                        label.withAttribute("text-decoration", "line-through");
-                                        this.withoutEventListeners(eventListeners); },
-                                    disabled: function() {
-                                        this.disable();
-                                        return this;}})))
-                                .enabled();}})})};});
+        svgBuilder.TextButton = {
+            withDimensions: (x, y, width, height) => ({
+            withText: (text) => ({
+            withClickHandler: (clickHandler) => {
+                let rect = null;
+                const label = SVG.Builder.Text
+                    .withTextContent(text)
+                    .moveTo(.5 * width, .5 * height)
+                    .withClass("text-button-label")
+                    .withAttributes({
+                        textAnchor: "middle",
+                        dominantBaseline: "central",
+                        fontSize: 17,
+                        fontFamily: "Courier New"})
+                    .disableTextSelection();
+                const preview = () => rect.withAttribute("stroke-width", 1.5);
+                const normal = () => rect.withAttribute("stroke-width", 1);
+                const active = () => rect.withAttribute("stroke-width", 2);
+                const eventListeners = Module.of(() => {
+                    let isMouseOver = false,
+                        isMouseDown = false,
+                        mouseUpHandler = undefined;
+                    mouseUpHandler = function () {
+                        isMouseDown = false;
+                        window.removeEventListener("mouseup", mouseUpHandler);
+                        Functions.ifThenElse(isMouseOver,
+                            () => {
+                                preview();
+                                clickHandler();},
+                            () => normal());};
+                    return {
+                        mouseEnter: () => {
+                            isMouseOver = true;
+                            Functions.ifThenElse(isMouseDown,
+                                active,
+                                preview);},
+                        mouseDown: (e) => Functions.ifThen(
+                            e.button === 0,
+                            () => {
+                                isMouseDown = true;
+                                window.addEventListener("mouseup", mouseUpHandler);
+                                active();}),
+                        mouseLeave: () => {
+                            isMouseOver = false;
+                            normal();}};});
+                rect = SVG.Builder.Rect
+                    .withX(0).withY(0)
+                    .withWidth(width).withHeight(height)
+                    .withClass("text-button-outline")
+                    .withAttributes({});
+                return SVG.Builder.G()
+                    .withClass("text-button")
+                    .moveTo(x, y)
+                    .withChild(label)
+                    .withChild(rect)
+                    .withGetter("label", () => label)
+                    .withGetter("rect", () => rect)
+                    .withMethods(Module.of((enabled=false) => ({
+                        enable: function() {
+                            if(enabled === true) {
+                                return;}
+                            enabled = true;
+                            this.withAttributes({
+                                pointerEvents: "all",
+                                cursor: "pointer"
+                            });
+                            label.withoutAttribute("text-decoration");
+                            this.withEventListeners(eventListeners);},
+                        enabled: function() {
+                            this.enable();
+                            return this;},
+                        disable: function() {
+                            if(enabled === false) {
+                                return;}
+                            enabled = false;
+                            this.withAttributes({
+                                cursor: "not-allowed"});
+                            label.withAttribute("text-decoration", "line-through");
+                            this.withoutEventListeners(eventListeners); },
+                        disabled: function() {
+                            this.disable();
+                            return this;}})))
+                    .enabled();}})})};
         svgBuilder.MouseTrap = {
             withX: (x) => ({
                 withY: (y) => ({
@@ -933,6 +936,7 @@ const ChordJogApp = (() => {
                 fontFamily: "monospace" }};
         const FingerIndicator = Module.of((radius=11) => ({
             Style: {
+                font: "Helvetica",
                 radius: radius,
                 diameter: 2*radius,
                 anyFingerTextYOffset: 3}}));
@@ -1006,6 +1010,7 @@ const ChordJogApp = (() => {
                             fingerAction.finger === Fingers.any ?
                                 FingerIndicator.Style.anyFingerTextYOffset :
                                 0),
+                        fontFamily: FingerIndicator.Style.font,
                         dominantBaseline: "central",
                         textAnchor: "middle",
                         stroke: "none",
@@ -2619,48 +2624,129 @@ const ChordJogApp = (() => {
                 .withChild(saveButton)
                 .withChild(errorMessage)}}));
 
-    const ShapeSearch = Module.of((
-        shapeInputMarginBottom=10,
+    const ShapesPage = Module.of((
+        shapeFilterMarginRight=32,
+        topRowMarginBottom=10,
         shapeChartGridPadding=5,
         shapeChartGridMaxColumns=4,
         maxMatches=12
     ) => ({
-        new: () => {
-            const width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-                (shapeChartGridMaxColumns-1)*shapeChartGridPadding;
-            const shapeChartGrid=SVG.Builder.ModularGrid
+        new: () => Module.of((
+            width = shapeChartGridMaxColumns*ShapeChart.Style.width +
+                (shapeChartGridMaxColumns-1)*shapeChartGridPadding,
+            shapesToShapeItems=shapes => shapes
+                .slice(0, maxMatches)
+                .map(shape =>ShapeChart.Builder
+                    .forSchema(shape.schema)
+                    .unfixed()
+                    .withoutAnyStringAction()),
+            shapeChartGrid=SVG.Builder.ModularGrid
                 .withX(0).withY(0)
                 .withWidth(width)
                 .withModuleWidth(ShapeChart.Style.width)
                 .withModuleHeight(ShapeChart.Style.height)
                 .withPadding(shapeChartGridPadding)
-                .withoutModules()
+                .withModules(shapesToShapeItems(Shapes.all))
                 .withClass("shape-chart-grid")
-                .move(0, ShapeInput.Style.height + shapeInputMarginBottom);
-            const shapeInput = SVG.Builder.ModularGrid
-                .withX(0).withY(0)
-                .withWidth(width)
-                .withModuleWidth(ShapeInput.Style.width)
-                .withModuleHeight(ShapeInput.Style.height)
-                .withPadding(0)
-                .withModule(ShapeInput.Builder
-                    .withWildcards()
-                    .blank()
-                    .focused()
-                    .withChangeListener(search => Module.of((
-                        matches=Shapes.search(search)
-                    ) => shapeChartGrid.modules = (
-                        matches.length <= maxMatches ?
-                            matches :
-                            matches.slice(0, maxMatches)
-                    ).map(shape => ShapeChart.Builder
-                        .forSchema(shape.schema)
-                        .unfixed()
-                        .withoutAnyStringAction()))));
-            return SVG.Builder.G()
-                .withClass("shape-search")
-                .withChild(shapeInput)
-                .withChild(shapeChartGrid);}}));
+                .move(0, ShapeInput.Style.height + topRowMarginBottom),
+        ) => SVG.Builder.G()
+            .withClass("shape-search")
+            .withChild(SVG.Builder.G()
+                .withClass("shape-page-top-row")
+                .withChild(SVG.Builder.G()
+                    .withClass("shapes-filter-container")
+                    .withChild(ShapeInput.Builder
+                        .withWildcards()
+                        .blank()
+                        .focused()
+                        .withChangeListener(search => shapeChartGrid.modules = shapesToShapeItems(Shapes.search(search))))
+                    .withChild(SVG.Builder.Text
+                        .withTextContent("filte")
+                        .withClass("shape-filter-label")
+                        .withAttributes({
+                            fontFamily: "monospace",
+                            fontSize: 15,
+                            dominantBaseline: "hanging",
+                            textAnchor: "end"})
+                        .withTextLength(80)
+                        .disableTextSelection()
+                        .moveTo(4, 48)
+                        .rotateTo(270)))
+                .withChild(Module.of((
+                    buttonWidth=width - ShapeInput.Style.width - shapeFilterMarginRight - ShapeChart.FingerIndicator.Style.radius,
+                    numButtons=3,
+                    buttonHeight=ShapeChart.Fretboard.Style.height/numButtons,
+                    buttonIndexToYCoordinate=index=>index*buttonHeight
+                ) => SVG.Builder.G()
+                    .withClass("shapes-button-actions-container")
+                    .move(ShapeInput.Style.width + shapeFilterMarginRight, ShapeChart.Fretboard.Style.y)
+                    .withChild(SVG.Builder.TextButton
+                        .withDimensions(0, 0, buttonWidth, buttonHeight)
+                        .withText("Create")
+                        .withClickHandler(() => console.log("Create clicked")))
+                    .withChild(SVG.Builder.TextButton
+                        .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
+                        .withText("Download")
+                        .withClickHandler(() => console.log("Download clicked")))
+                    .withChild(Module.of((
+                        nonInteractiveToInteractiveWidthRatio=1/3,
+                        medianWidth=18,
+                        medianStartX=nonInteractiveToInteractiveWidthRatio*buttonWidth - medianWidth
+                    ) => SVG.Builder.G()
+                        .withClass("upload-buttons-container")
+                        .moveTo(0, buttonIndexToYCoordinate(2))
+                        .withAttributes({
+                            textAnchor: "middle",
+                            dominantBaseline: "central",
+                            fontSize: 17,
+                            fontFamily: "Courier New"})
+                        .disableTextSelection()
+                        .withChild(SVG.Builder.G()
+                            .withClass("upload-buttons-label-container")
+                            .withChild(SVG.Builder.Rect
+                                .withX(0)
+                                .withY(0)
+                                .withWidth(medianStartX)
+                                .withHeight(buttonHeight)
+                                .withClass("upload-buttons-label-outline")
+                                .withAttribute("fill", "#D0D0D0"))
+                            .withChild(SVG.Builder.Text
+                                .withTextContent("Upload")
+                                .withClass("upload-buttons-label")
+                                .moveTo(.5 * medianStartX, .5 * buttonHeight)))
+                        .withChild(SVG.Builder.G()
+                            .withClass("upload-buttons-median-container")
+                            .moveTo(medianStartX, 0)
+                            .withChild(SVG.Builder.Rect
+                                .withX(0)
+                                .withY(0)
+                                .withWidth(medianWidth)
+                                .withHeight(buttonHeight)
+                                .withClass("upload-buttons-median-outline")
+                                .withAttribute("fill", "#D0D0D0"))
+                            .withChild(SVG.Builder.Text
+                                .withTextContent("and")
+                                .withClass("upload-buttons-median-label")
+                                .withTextLength(buttonHeight - 10)
+                                .moveTo(.5 * medianWidth, .5 * buttonHeight)
+                                .rotateTo(270)))
+                        .withChild(Module.of((
+                            optionWidth=(1-nonInteractiveToInteractiveWidthRatio) * buttonWidth,
+                            optionHeight=.5*buttonHeight
+                        ) => SVG.Builder.G()
+                            .withClass("upload-buttons-options-container")
+                            .moveTo(medianStartX + medianWidth, 0)
+                            .withChild(SVG.Builder.TextButton
+                                .withDimensions(0, 0, optionWidth, optionHeight)
+                                .withText("Append")
+                                .withClickHandler(() => console.log("Append clicked"))
+                                .withClass("upload-and-append-button"))
+                            .withChild(SVG.Builder.TextButton
+                                .withDimensions(0, optionHeight, optionWidth, optionHeight)
+                                .withText("Replace")
+                                .withClickHandler(() => console.log("Replace clicked"))
+                                .withClass("upload-and-replace-button")))))))))
+            .withChild(shapeChartGrid))}));
     return {
         create: () => SVG.Builder.SVG
             .withWidth(800)
@@ -2671,4 +2757,4 @@ const ChordJogApp = (() => {
                 stroke: Style.colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
-            .withChild(ShapeSearch.new())};})();
+            .withChild(ShapesPage.new())};})();
