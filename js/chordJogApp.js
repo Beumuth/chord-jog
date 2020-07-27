@@ -642,20 +642,19 @@ const ChordJogApp = (() => {
                             return this;}})))
                     .enabled();}})})};
         svgBuilder.MouseTrap = {
-            withX: (x) => ({
-                withY: (y) => ({
-                    withWidth: (width) => ({
-                        withHeight: (height) =>
-                            svgBuilder.Rect
-                                .withX(x)
-                                .withY(y)
-                                .withWidth(width)
-                                .withHeight(height)
-                                .withAttributes({
-                                    pointerEvents: "fill",
-                                    cursor: "pointer",
-                                    fill: "none",
-                                    stroke: "none"})})})})};
+            withX: x => ({
+            withY: y => ({
+            withWidth: width => ({
+            withHeight: height => svgBuilder.Rect
+                .withX(x)
+                .withY(y)
+                .withWidth(width)
+                .withHeight(height)
+                .withAttributes({
+                    pointerEvents: "fill",
+                    cursor: "pointer",
+                    fill: "none",
+                    stroke: "none"})})})})};
         return {Builder: svgBuilder};});
 
     //A shape defines the sounding of a guitar as an array of six string actions called its schema.
@@ -798,15 +797,21 @@ const ChordJogApp = (() => {
             Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
             return Schema; });
         return Module.of(() => {
-            const Builder = {
-                withSchema: (schema) => ({
-                    withRange: (range) => ({
-                        schema: schema,
-                        range: range})})};
+            const Builder = Module.of((
+                withSchemaStep=id=>({
+                withSchema: schema => ({
+                withRange: range => ({
+                    id: id,
+                    schema: schema,
+                    range: range})})})
+            ) => ({
+                withId: withSchemaStep,
+                withoutId: withSchemaStep(null)}));
             const shapesFromString = (string) => string.length === 0 ? [] :
-                string.split(/\r?\n/).map((line) => {
+                string.split(/\r?\n/).map((line, lineIndex) => {
                     const lineProperties = line.split(";");
                     return Builder
+                        .withId(lineIndex)
                         .withSchema(Schema.fromString(lineProperties[0]))
                         .withRange(Module.of(() => {
                             const rangeComponents = lineProperties[1].split(",");
@@ -835,7 +840,8 @@ const ChordJogApp = (() => {
                 equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
                 existsWithSchema: (schema) => all.some(shape =>
                     Schema.equals(shape.schema, schema)),
-                add: (shape) => {
+                add: shape => {
+                    shape.id = all.length;
                     all.push(shape);
                     saveToLocalStorage();},
                 fromString: shapesFromString,
@@ -2550,6 +2556,7 @@ const ChordJogApp = (() => {
                 .withText("Save")
                 .withClickHandler(() => {
                     Shapes.add(Shapes.Builder
+                        .withoutId()
                         .withSchema(shapeInput.schema)
                         .withRange(rootFretRangeInput.range));
                     reset();})
@@ -2627,39 +2634,72 @@ const ChordJogApp = (() => {
     const ShapesPage = Module.of((
         shapeFilterMarginRight=32,
         topRowMarginBottom=10,
-        shapeChartGridPadding=5,
+        shapeChartGridPadding= {
+            horizontal: 5,
+            vertical: 10},
         shapeChartGridMaxColumns=4,
         maxMatches=12
     ) => ({
         new: () => Module.of((
             width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-                (shapeChartGridMaxColumns-1)*shapeChartGridPadding,
-            shapesToShapeItems=shapes => shapes
-                .slice(0, maxMatches)
-                .map(shape =>ShapeChart.Builder
-                    .forSchema(shape.schema)
-                    .unfixed()
-                    .withoutAnyStringAction()),
+                (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
+            ShapeItem=Module.of((
+                shapeChartMarginBottom=3,
+                buttonHeight=18,
+                buttonWidth=65,
+                buttonPadding=8,
+                buttonContainerWidth = 2*buttonWidth + buttonPadding
+            ) => ({
+                Style: {
+                    width: ShapeChart.Style.width,
+                    height: ShapeChart.Style.height + shapeChartMarginBottom + buttonHeight},
+                shapesToShapeItems: shapes => shapes
+                    .slice(0, maxMatches)
+                    .map(shape=>Module.of((
+                        buttonsContainer=SVG.Builder.ModularGrid
+                            .withX(ShapeChart.Fretboard.Style.x - .5 * (
+                                buttonContainerWidth - ShapeChart.Fretboard.Style.width))
+                            .withY(ShapeChart.Style.height + shapeChartMarginBottom)
+                            .withWidth(buttonContainerWidth)
+                            .withModuleWidth(buttonWidth)
+                            .withModuleHeight(buttonHeight)
+                            .withPadding(buttonPadding)
+                            .withModules([
+                                SVG.Builder.TextButton
+                                    .withDimensions(0,0, buttonWidth, buttonHeight)
+                                    .withText("Edit")
+                                    .withClickHandler(() => console.log("edit clicked for shape with id [" + shape.id + "]")),
+                                SVG.Builder.TextButton
+                                    .withDimensions(0, 0, buttonWidth, buttonHeight)
+                                    .withText("Delete")
+                                    .withClickHandler(() => console.log("delete clicked for shape with id [" + shape.id + "]"))])
+                            .withClass("shape-item-buttons-container")
+                    ) => SVG.Builder.G()
+                        .withClass("shape-item")
+                        .withChild(ShapeChart.Builder
+                            .forSchema(shape.schema)
+                            .unfixed()
+                            .withoutAnyStringAction())
+                        .withChild(buttonsContainer)))})),
             shapeChartGrid=SVG.Builder.ModularGrid
                 .withX(0).withY(0)
                 .withWidth(width)
                 .withModuleWidth(ShapeChart.Style.width)
-                .withModuleHeight(ShapeChart.Style.height)
-                .withPadding(shapeChartGridPadding)
-                .withModules(shapesToShapeItems(Shapes.all))
+                .withModuleHeight(ShapeItem.Style.height)
+                .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
+                .withModules(ShapeItem.shapesToShapeItems(Shapes.all))
                 .withClass("shape-chart-grid")
                 .move(0, ShapeInput.Style.height + topRowMarginBottom),
-        ) => SVG.Builder.G()
-            .withClass("shape-search")
-            .withChild(SVG.Builder.G()
-                .withClass("shape-page-top-row")
-                .withChild(SVG.Builder.G()
+            shapesPageTopRow=Module.of((
+                shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
                     .withChild(ShapeInput.Builder
                         .withWildcards()
                         .blank()
                         .focused()
-                        .withChangeListener(search => shapeChartGrid.modules = shapesToShapeItems(Shapes.search(search))))
+                        .withChangeListener(search =>
+                            shapeChartGrid.modules = ShapeItem.shapesToShapeItems(
+                                Shapes.search(search))))
                     .withChild(SVG.Builder.Text
                         .withTextContent("filte")
                         .withClass("shape-filter-label")
@@ -2671,24 +2711,21 @@ const ChordJogApp = (() => {
                         .withTextLength(80)
                         .disableTextSelection()
                         .moveTo(4, 48)
-                        .rotateTo(270)))
-                .withChild(Module.of((
+                        .rotateTo(270)),
+                shapesButtonContainer=Module.of((
                     buttonWidth=width - ShapeInput.Style.width - shapeFilterMarginRight - ShapeChart.FingerIndicator.Style.radius,
                     numButtons=3,
                     buttonHeight=ShapeChart.Fretboard.Style.height/numButtons,
-                    buttonIndexToYCoordinate=index=>index*buttonHeight
-                ) => SVG.Builder.G()
-                    .withClass("shapes-button-actions-container")
-                    .move(ShapeInput.Style.width + shapeFilterMarginRight, ShapeChart.Fretboard.Style.y)
-                    .withChild(SVG.Builder.TextButton
+                    buttonIndexToYCoordinate=index=>index*buttonHeight,
+                    createShapeButton=SVG.Builder.TextButton
                         .withDimensions(0, 0, buttonWidth, buttonHeight)
                         .withText("Create")
-                        .withClickHandler(() => console.log("Create clicked")))
-                    .withChild(SVG.Builder.TextButton
+                        .withClickHandler(() => console.log("Create clicked")),
+                    downloadShapesButton=SVG.Builder.TextButton
                         .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
                         .withText("Download")
-                        .withClickHandler(() => console.log("Download clicked")))
-                    .withChild(Module.of((
+                        .withClickHandler(() => console.log("Download clicked")),
+                    uploadShapesButtonContainer=Module.of((
                         nonInteractiveToInteractiveWidthRatio=1/3,
                         medianWidth=18,
                         medianStartX=nonInteractiveToInteractiveWidthRatio*buttonWidth - medianWidth
@@ -2745,12 +2782,25 @@ const ChordJogApp = (() => {
                                 .withDimensions(0, optionHeight, optionWidth, optionHeight)
                                 .withText("Replace")
                                 .withClickHandler(() => console.log("Replace clicked"))
-                                .withClass("upload-and-replace-button")))))))))
+                                .withClass("upload-and-replace-button")))))
+                ) => SVG.Builder.G()
+                    .withClass("shapes-button-actions-container")
+                    .move(ShapeInput.Style.width + shapeFilterMarginRight, ShapeChart.Fretboard.Style.y)
+                    .withChild(createShapeButton)
+                    .withChild(uploadShapesButtonContainer)
+                    .withChild(downloadShapesButton))
+            ) => SVG.Builder.G()
+                .withClass("shape-page-top-row")
+                .withChild(shapesFilterContainer)
+                .withChild(shapesButtonContainer))
+        ) => SVG.Builder.G()
+            .withClass("shape-search")
+            .withChild(shapesPageTopRow)
             .withChild(shapeChartGrid))}));
     return {
         create: () => SVG.Builder.SVG
             .withWidth(800)
-            .withHeight(750)
+            .withHeight(800)
             .withClass("chord-jog-app")
             .withAttributes({
                 fill: "none",
