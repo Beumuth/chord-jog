@@ -725,9 +725,9 @@ const ChordJogApp = (() => {
     //Shapes are defined with a fret range ∈ {(a,b)|1<=a<=b<=11}
     //
     //A chord is a shape with a fixed root fret.
-    const Shapes = Module.of(() => {
-        const StringAction = Module.of(() => {
-            const StringAction = {
+    const Shapes = Module.of((
+        StringAction = Module.of((
+            StringAction = {
                 any: "*",
                 unsounded: "",
                 open: "o",
@@ -740,7 +740,7 @@ const ChordJogApp = (() => {
                     sounded: false,
                     fret: fret,
                     finger: finger }),
-                fromString: (string) =>
+                fromString: string =>
                     string === StringAction.unsounded ?
                         StringAction.unsounded :
                         string === StringAction.open ?
@@ -752,166 +752,176 @@ const ChordJogApp = (() => {
                                 StringAction.fingered(
                                     Number.parseInt(string.charAt(0)),
                                     string.charAt(1)),
-                toString: (stringAction) =>
+                toString: stringAction =>
                     [StringAction.unsounded, StringAction.open, StringAction.any].includes(stringAction) ?
                         stringAction :
                         stringAction.sounded ?
                             `${stringAction.fret}${stringAction.finger}` :
                             `x${stringAction.fret}${stringAction.finger}`,
-                isFingerless: stringAction => [StringAction.any, StringAction.unsounded, StringAction.open].includes(stringAction)};
-            StringAction.isFingered = (stringAction) => ! StringAction.isFingerless(stringAction);
-            StringAction.isDeadened = (stringAction) =>
-                StringAction.isFingered(stringAction) && ! stringAction.sounded;
-            StringAction.equals = (a, b) => StringAction.toString(a) === StringAction.toString(b);
-            StringAction.matches = (stringAction, search) =>
+                isFingerless: stringAction => [
+                    StringAction.any,
+                    StringAction.unsounded,
+                    StringAction.open
+                ].includes(stringAction)},
+            StringActionStep2=Objects.withFields(StringAction, {
+                isFingered: stringAction => ! StringAction.isFingerless(stringAction),
+                equals: (a, b) => StringAction.toString(a) === StringAction.toString(b)})
+        ) => Objects.withFields(StringActionStep2, ({
+            isDeadened: stringAction => StringAction.isFingered(stringAction) && ! stringAction.sounded,
+            matches: (stringAction, search) =>
                 search === StringAction.any ||
                 StringAction.equals(stringAction, search) || (
                 StringAction.isFingered(search) &&
                 search.finger === Fingers.any &&
                 StringAction.isFingered(stringAction) &&
                 stringAction.sounded === search.sounded &&
-                stringAction.fret === search.fret);
-            return StringAction;});
-        const FingerAction = {
+                stringAction.fret === search.fret)}))),
+        FingerAction={
             Builder: {
-                withFinger: (finger) => ({
-                    atRootFret: (fret) => ({
-                        fromString: (fromString) => ({
-                            toString: (toString) => ({
-                                finger: finger,
-                                fret: fret,
-                                range: Strings.range(fromString, toString)})})})})},
-            Validations: {
-                lacksRootFret: fingerActions => ! fingerActions.some(fingerAction =>
-                    fingerAction.fret === Frets.roots.first),
-                usesAFingerMoreThanOnce: fingerActions => Object.values(
-                    fingerActions.reduce(
-                        (numPerFinger, fingerAction) => {
-                            undefined === numPerFinger[fingerAction.finger] ?
-                                numPerFinger[fingerAction.finger] = 1 :
-                                ++numPerFinger[fingerAction.finger];
-                            return numPerFinger;},
-                        {}))
-                    .some(count => count > 1),
-                hasFingersCrossedOnAFret: (fingerActions) => Object
-                    .values(fingerActions
-                        .map(fingerAction => ({
-                            fret: fingerAction.fret,
-                            fingerOrder: fingerAction.finger === Fingers.thumb ?
-                                0 : Number.parseInt(fingerAction.finger)}))
-                        .reduce(
-                            (fingersOnFret, fingerAction) => {
-                                undefined === fingersOnFret[fingerAction.fret] ?
-                                    fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
-                                    fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
-                                return fingersOnFret; },
-                            {}))
-                    .some(fingersOnFret => {
-                        let previousFinger = undefined;
-                        return fingersOnFret.some(finger => {
-                            const outOfOrder = finger < previousFinger;
-                            previousFinger = finger;
-                            return outOfOrder;});})}};
-        const Schema = Module.of(() => {
-            const Schema = {
-                fromString: string => string.split(",").map(StringAction.fromString),
-                toString: schema => schema.map(StringAction.toString).join(","),
-                getFingerActions: schema => schema
-                    .map((action, index) => ({
-                        string: index + 1,
-                        action: Shapes.StringAction.isFingerless(action) ||
-                        action === Shapes.StringAction.any ? null : action}))
-                    .filter(stringAction => stringAction.action !== null)
-                    .reduce(Module.of(
-                        ((stringActionToFingerAction = (stringAction) => FingerAction.Builder
-                            .withFinger(stringAction.action.finger)
-                            .atRootFret(stringAction.action.fret)
-                            .fromString(stringAction.string)
-                            .toString(stringAction.string)
-                        ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
-                            [stringActionToFingerAction(stringAction)] :
-                            Module.of((lastRelevantStringAction = Arrays.findLast(
-                                schema.slice(0, stringAction.string - 1),
-                                candidate => Shapes.StringAction.isFingerless(candidate) ||
-                                    candidate.fret <= stringAction.action.fret)) =>
-                                lastRelevantStringAction === undefined ||
-                                Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
-                                lastRelevantStringAction.finger !== stringAction.action.finger ||
-                                lastRelevantStringAction.finger === Fingers.any
-                                    ?
-                                    fingerActions.concat(stringActionToFingerAction(stringAction)) :
-                                    Arrays.updateItem(
-                                        fingerActions,
-                                        Arrays.lastIndexOf(fingerActions,
-                                            (fingerAction) => fingerAction.finger === stringAction.action.finger),
-                                        (fingerAction) => fingerAction.range.max = stringAction.string)))),
-                        [])};
-            Schema.allUnsounded = Numbers.range(0, Strings.count).map(() => StringAction.unsounded);
-            Schema.allAnyStringAction = Numbers.range(0, Strings.count).map(() => StringAction.any);
-            Schema.equals = (a, b) => Schema.toString(a) === Schema.toString(b);
-            return Schema; });
-        return Module.of(() => {
-            const Builder = Module.of((
-                withSchemaStep=id=>({
-                    withSchema: schema => ({
+                withFinger: finger => ({
+                atRootFret: fret => ({
+                fromString: fromString => ({
+                toString: toString => ({
+                    finger: finger,
+                    fret: fret,
+                    range: Strings.range(fromString, toString)})})})})}},
+        Schema = Module.of((
+            schemaToString=schema => schema.map(StringAction.toString).join(",")
+        ) => ({
+            allUnsounded: Numbers.range(0, Strings.count).map(() => StringAction.unsounded),
+            allAnyStringAction: Numbers.range(0, Strings.count).map(() => StringAction.any),
+            fromString: string => string.split(",").map(StringAction.fromString),
+            toString: schemaToString,
+            getFingerActions: schema => schema
+                .map((action, index) => ({
+                    string: index + 1,
+                    action: Shapes.StringAction.isFingerless(action) ||
+                    action === Shapes.StringAction.any ? null : action}))
+                .filter(stringAction => stringAction.action !== null)
+                .reduce(Module.of(
+                    ((stringActionToFingerAction = (stringAction) => FingerAction.Builder
+                        .withFinger(stringAction.action.finger)
+                        .atRootFret(stringAction.action.fret)
+                        .fromString(stringAction.string)
+                        .toString(stringAction.string)
+                    ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
+                        [stringActionToFingerAction(stringAction)] :
+                        Module.of((lastRelevantStringAction = Arrays.findLast(
+                            schema.slice(0, stringAction.string - 1),
+                            candidate => Shapes.StringAction.isFingerless(candidate) ||
+                                candidate.fret <= stringAction.action.fret)) =>
+                            lastRelevantStringAction === undefined ||
+                            Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
+                            lastRelevantStringAction.finger !== stringAction.action.finger ||
+                            lastRelevantStringAction.finger === Fingers.any
+                                ?
+                                fingerActions.concat(stringActionToFingerAction(stringAction)) :
+                                Arrays.updateItem(
+                                    fingerActions,
+                                    Arrays.lastIndexOf(fingerActions,
+                                        (fingerAction) => fingerAction.finger === stringAction.action.finger),
+                                    (fingerAction) => fingerAction.range.max = stringAction.string)))),
+                    []),
+            equals: (a, b) => schemaToString(a) === schemaToString(b)})),
+        clickTempElement = element => {
+            element.style.display = "none";
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);},
+        ShapesBuilder = Module.of((
+            withSchemaStep=id=>({
+                withSchema: schema => ({
                     withRange: range => ({
                         id: id,
                         schema: schema,
                         range: range})})})
-            ) => ({
-                withId: withSchemaStep,
-                withoutId: () => withSchemaStep(null)}));
-            const shapesFromString = string => string.length === 0 ? [] :
-                string.split(/\r?\n/).map((line, lineIndex) => {
-                    const lineProperties = line.split(";");
-                    return Builder
-                        .withId(lineIndex)
-                        .withSchema(Schema.fromString(lineProperties[0]))
-                        .withRange(Module.of(() => {
-                            const rangeComponents = lineProperties[1].split(",");
-                            return Frets.Range.create(
-                                Number.parseInt(rangeComponents[0]),
-                                Number.parseInt(rangeComponents[1]));})); });
-            const shapesToString = (shapes) => shapes.length === 0 ? "" : shapes
-                .map(shape =>
-                    Schema.toString(shape.schema) + ";" +
-                    shape.range.min + "," + shape.range.max)
-                .join("\r\n");
-            const localStorageKey = "chord-jog-shapes";
-            const all = Module.of(() => {
-                const shapeString = localStorage.getItem(localStorageKey);
-                return shapeString === null || shapeString.length === 0 ?
-                    [] : shapesFromString(shapeString);});
-            const saveToLocalStorage = () => localStorage.setItem(
-                localStorageKey,
-                shapesToString(all));
-            return {
-                StringAction: StringAction,
-                FingerAction: FingerAction,
-                Schema: Schema,
-                Builder: Builder,
-                all: all,
-                equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
-                existsWithSchema: schema => all.some(shape =>
-                    Schema.equals(shape.schema, schema)),
-                getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
-                add: shape => {
-                    shape.id = all.length;
-                    all.push(shape);
-                    saveToLocalStorage();},
-                update: shape => {
-                    all[shape.id] = shape;
-                    saveToLocalStorage();},
-                delete: id => {
-                    all.splice(id, 1);
-                    Numbers.range(id, all.length).forEach(i => all[i].id = i - 1);
-                    saveToLocalStorage();},
-                fromString: shapesFromString,
-                toString: shapesToString,
-                search: schemaQuery => all.filter(shape =>undefined === shape.schema.find((stringAction, index) =>
-                    Module.of((
-                        stringActionQuery=schemaQuery[index]
-                    ) => ! StringAction.matches(stringAction, stringActionQuery))))};});});
+        ) => ({
+            withId: withSchemaStep,
+            withoutId: () => withSchemaStep(null)})),
+        shapesFromString = string => string.length === 0 ? [] :
+            string.split(/\r?\n/).map((line, lineIndex) => {
+                const lineProperties = line.split(";");
+                return ShapesBuilder
+                    .withId(lineIndex)
+                    .withSchema(Schema.fromString(lineProperties[0]))
+                    .withRange(Module.of(() => {
+                        const rangeComponents = lineProperties[1].split(",");
+                        return Frets.Range.create(
+                            Number.parseInt(rangeComponents[0]),
+                            Number.parseInt(rangeComponents[1]));})); }),
+        shapesToString = shapes => shapes.length === 0 ? "" : shapes
+            .map(shape =>`${Schema.toString(shape.schema)};${shape.range.min},${shape.range.max}`)
+            .join("\r\n"),
+        localStorageKey = "chord-jog-shapes",
+        all = Module.of(() => {
+            const shapeString = localStorage.getItem(localStorageKey);
+            return shapeString === null || shapeString.length === 0 ?
+                [] : shapesFromString(shapeString);}),
+        saveToLocalStorage = () => localStorage.setItem(
+            localStorageKey,
+            shapesToString(all))
+    ) => ({
+        StringAction: StringAction,
+        FingerAction: FingerAction,
+        Schema: Schema,
+        Builder: ShapesBuilder,
+        all: all,
+        existsWithSchema: schema => all.some(shape =>
+            Schema.equals(shape.schema, schema)),
+        getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
+        add: shape => {
+            shape.id = all.length;
+            all.push(shape);
+            saveToLocalStorage();},
+        update: shape => {
+            all[shape.id] = shape;
+            saveToLocalStorage();},
+        delete: id => {
+            all.splice(id, 1);
+            Numbers.range(id, all.length).forEach(i => all[i].id = i - 1);
+            saveToLocalStorage();},
+        search: schemaQuery => all.filter(shape =>undefined === shape.schema.find((stringAction, index) =>
+            Module.of((
+                stringActionQuery=schemaQuery[index]
+            ) => ! StringAction.matches(stringAction, stringActionQuery)))),
+        download: () => {
+            //Convert the shapes to a text string and open in a new tab
+            const tempLink = document.createElement('a');
+            tempLink.setAttribute(
+                'href',
+                'data:text/plain;charset=utf-8,' +
+                encodeURIComponent(shapesToString(all)));
+            tempLink.setAttribute('download', "library.shapes");
+            clickTempElement(tempLink);},
+        upload: Module.of((
+            mergeShapesLists = Module.of((
+                equals=(a, b) =>Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range)
+            ) => (a, b) => a.concat(//Merge a with
+                //Items from b that are not in a
+                b.filter(bShape => undefined===a.find(aShape => equals(aShape, bShape)))))
+        ) => (overwrite=false) => {
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.accept = ".shapes";
+            fileInput.multiple = true;
+            fileInput.onchange = () => Module.of((
+                files=fileInput.files,
+                numLoaded=0,
+                shapes=[],
+                fileReader = new FileReader(),
+                readNext=()=>fileReader.readAsText(files[numLoaded])
+            ) => {
+                fileReader.addEventListener('loadend', e => {
+                    shapes = mergeShapesLists(shapes, shapesFromString(e.target.result));
+                    if(++numLoaded===files.length) {
+                        overwrite === true ?
+                            all = shapes :
+                            all = mergeShapesLists(all, shapes);
+                        saveToLocalStorage();}
+                    else {
+                        readNext();}});
+                readNext();});
+            clickTempElement(fileInput);})}));
 
     const ShapeChart = Module.of(() => {
         const halfRoot2 = .5 * Math.SQRT2;
