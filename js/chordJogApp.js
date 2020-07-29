@@ -854,14 +854,14 @@ const ChordJogApp = (() => {
             const Builder = Module.of((
                 withSchemaStep=id=>({
                     withSchema: schema => ({
-                        withRange: range => ({
-                            id: id,
-                            schema: schema,
-                            range: range})})})
+                    withRange: range => ({
+                        id: id,
+                        schema: schema,
+                        range: range})})})
             ) => ({
                 withId: withSchemaStep,
                 withoutId: () => withSchemaStep(null)}));
-            const shapesFromString = (string) => string.length === 0 ? [] :
+            const shapesFromString = string => string.length === 0 ? [] :
                 string.split(/\r?\n/).map((line, lineIndex) => {
                     const lineProperties = line.split(";");
                     return Builder
@@ -892,11 +892,15 @@ const ChordJogApp = (() => {
                 Builder: Builder,
                 all: all,
                 equals: (a, b) => Schema.equals(a.schema, b.schema) && Frets.Range.equals(a.range, b.range),
-                existsWithSchema: (schema) => all.some(shape =>
+                existsWithSchema: schema => all.some(shape =>
                     Schema.equals(shape.schema, schema)),
+                getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
                 add: shape => {
                     shape.id = all.length;
                     all.push(shape);
+                    saveToLocalStorage();},
+                update: shape => {
+                    all[shape.id] = shape;
                     saveToLocalStorage();},
                 fromString: shapesFromString,
                 toString: shapesToString,
@@ -2425,8 +2429,8 @@ const ChordJogApp = (() => {
                                     markersEventListeners=Object.fromEntries(
                                         visibleRangeMarkers.map(marker => [
                                             marker.type,
-                                            Module.of((markerRootFret=marker.rootFret) => ({
-                                                mouseEnter: () => PreviewRootFret.set(markerRootFret),
+                                            Module.of(() => ({
+                                                mouseEnter: () => PreviewRootFret.set(marker.rootFret),
                                                 mouseLeave: () => PreviewRootFret.unset(),
                                                 mouseDown: () => changeToDraggingState(marker)}))]));
                                     visibleRangeMarkers.forEach(marker =>
@@ -2527,7 +2531,7 @@ const ChordJogApp = (() => {
                                     MinDragging.activate() :
                                 activeMarker === rangeMarkers.max ?
                                     MaxDragging.activate() :
-                                PivotDragging.activate(activeMarker.rootFret);}}))}
+                                    PivotDragging.activate(activeMarker.rootFret);}}))}
                 ) => States.Inactive.activate())
             ) => SVG.Builder.G()
                 .withClass("root-fret-range-input")
@@ -2547,8 +2551,8 @@ const ChordJogApp = (() => {
                     Range.setChangeListener(changeListener);
                     return this;}))})}}));
 
-    const ShapeCreator = Module.of((
-        ShapeCreatorStyle = Module.of((
+    const ShapeForm = Module.of((
+        ShapeFormStyle = Module.of((
             width=ShapeInput.Style.width,
             RootFretRangeStyle = Module.of((marginTop=29) => ({
                 x: ShapeChart.Fretboard.Style.x,
@@ -2588,104 +2592,172 @@ const ChordJogApp = (() => {
             ErrorMessage: ErrorMessageStyle}))
     ) => ({
         Style: {
-            width: ShapeCreatorStyle.width,
-            height: ShapeCreatorStyle.height},
-        new: () => {
-            let shapeInput;
-            const rootFretRangeInput = Module.of((
-                padding=8
-            ) => RootFretRangeInput.Builder
-                .withRange(Frets.Range.roots)
-                .withWidth(ShapeCreatorStyle.width - 2 * padding)
-                .move(padding, ShapeCreatorStyle.RootFretRange.y));
-            const reset = () => {
-                shapeInput.schema = Shapes.Schema.allUnsounded;
-                rootFretRangeInput.range = Frets.Range.roots; };
-            const saveButton = SVG.Builder.TextButton
-                .withDimensions(
-                    ShapeCreatorStyle.Buttons.startX +
-                    2 * ShapeCreatorStyle.Buttons.height +
-                    ShapeCreatorStyle.Buttons.width,
-                    ShapeCreatorStyle.Buttons.y,
-                    ShapeCreatorStyle.Buttons.width,
-                    ShapeCreatorStyle.Buttons.height)
-                .withText("Save")
-                .withClickHandler(() => {
-                    Shapes.add(Shapes.Builder
+            width: ShapeFormStyle.width,
+            height: ShapeFormStyle.height},
+        Builder: {
+            new: Module.of((
+                ShapeValidations = Module.of((
+                    ShapeValidationBuilder={
+                        withFailCondition: conditional => ({
+                        withErrorMessage: errorMessage => (schema, fingerActions) =>
+                            conditional(schema, fingerActions) === true ? errorMessage : null})}
+                ) => ({
+                    Builder: ShapeValidationBuilder,
+                    common:[
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => fingerActions.length  === 0)
+                            .withErrorMessage("A shape must use at least one finger"),
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => Object.values(
+                                fingerActions.reduce(
+                                    (numPerFinger, fingerAction) => {
+                                        undefined === numPerFinger[fingerAction.finger] ?
+                                            numPerFinger[fingerAction.finger] = 1 :
+                                            ++numPerFinger[fingerAction.finger];
+                                        return numPerFinger;},
+                                    {}))
+                            .some(count => count > 1))
+                            .withErrorMessage("A finger is used multiple times on a fret"),
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => ! fingerActions.some(fingerAction =>
+                                fingerAction.fret === Frets.roots.first))
+                            .withErrorMessage("Fingers are used, but not on the root fret"),
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => Object
+                                .values(fingerActions
+                                    .map(fingerAction => ({
+                                        fret: fingerAction.fret,
+                                        fingerOrder: fingerAction.finger === Fingers.thumb ?
+                                            0 : Number.parseInt(fingerAction.finger)}))
+                                    .reduce(
+                                        (fingersOnFret, fingerAction) => {
+                                            undefined === fingersOnFret[fingerAction.fret] ?
+                                                fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
+                                                fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
+                                            return fingersOnFret; },
+                                        {}))
+                                .some(fingersOnFret => {
+                                    let previousFinger = undefined;
+                                    return fingersOnFret.some(finger => {
+                                        const outOfOrder = finger < previousFinger;
+                                        previousFinger = finger;
+                                        return outOfOrder;});}))
+                            .withErrorMessage("Fingers are crossed on a fret")],
+                    forCreation: [
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) =>
+                                Shapes.Schema.equals(schema, Shapes.Schema.allUnsounded))
+                            .withErrorMessage("Enter a shape"),
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => Shapes.existsWithSchema(schema))
+                            .withErrorMessage("A matching shape already exists")],
+                    forEditing: idShape => [
+                        ShapeValidationBuilder
+                            .withFailCondition((schema, fingerActions) => Module.of((
+                                existingShape=Shapes.getWithSchema(schema)
+                            ) => ! (existingShape === undefined || existingShape.id === idShape)))
+                            .withErrorMessage("A matching shape already exists")]})),
+            ) => () => Module.of((
+                shapeInput = undefined,
+                reset = undefined,
+                save = undefined,
+                rootFretRangeInput=undefined,
+                saveButton = SVG.Builder.TextButton
+                    .withDimensions(
+                        ShapeFormStyle.Buttons.startX +
+                        2 * ShapeFormStyle.Buttons.height +
+                        ShapeFormStyle.Buttons.width,
+                        ShapeFormStyle.Buttons.y,
+                        ShapeFormStyle.Buttons.width,
+                        ShapeFormStyle.Buttons.height)
+                    .withText("Save")
+                    .withClickHandler(() => {
+                        save();
+                        reset();})
+                    .withClass("shape-form-save-button"),
+                errorMessage = SVG.Builder.Text
+                    .withoutTextContent()
+                    .withClass("shape-form-output")
+                    .moveTo(ShapeFormStyle.ErrorMessage.x, ShapeFormStyle.ErrorMessage.y)
+                    .withAttributes({
+                        fontSize: ShapeFormStyle.ErrorMessage.fontSize,
+                        fontFamily: ShapeFormStyle.ErrorMessage.fontFamily,
+                        textAnchor: "middle",
+                        dominantBaseline: "hanging"})
+                    .disableTextSelection(),
+                shapeValidations=ShapeValidations.common,
+                schemaChangeListener=Module.of((
+                    invalidSaveButtonEventListeners = {
+                        mouseEnter: function() {
+                            errorMessage.withAttribute("text-decoration", "underline"); },
+                        mouseLeave: function() {
+                            errorMessage.withoutAttribute("text-decoration"); }},
+                    invalidate=reason => {
+                        errorMessage.textContent = reason;
+                        saveButton.withEventListeners(invalidSaveButtonEventListeners).disable();},
+                    validate=() => {
+                        errorMessage.textContent = null;
+                        saveButton.withoutEventListeners(invalidSaveButtonEventListeners).enable();}
+                ) => newSchema => Module.of((
+                        fingerActions=Shapes.Schema.getFingerActions(newSchema)
+                    ) => {
+                    for(const validation of shapeValidations) {
+                        const errorReason = validation(newSchema, fingerActions);
+                        if(errorReason !== null) {
+                            return invalidate(errorReason);}}
+                    validate();})),
+                shapeFormWithSchemaAndRange=(schema, range) => Module.of((
+                    setShapeInput=shapeInput=ShapeInput.Builder
+                        .withoutWildcards()
+                        .withSchema(schema)
+                        .focused()
+                        .withChangeListener(schemaChangeListener),
+                    setRootFretRangeInput=rootFretRangeInput=Module.of((
+                        padding=8
+                    ) => RootFretRangeInput.Builder
+                        .withRange(range)
+                        .withWidth(ShapeFormStyle.width - 2 * padding)
+                        .move(padding, ShapeFormStyle.RootFretRange.y)),
+                    shapeForm=SVG.Builder.G()
+                        .withClass("shape-form")
+                        .withChild(shapeInput)
+                        .withChild(rootFretRangeInput)
+                        .withChild(SVG.Builder.TextButton
+                            .withDimensions(
+                                ShapeFormStyle.Buttons.startX + ShapeFormStyle.Buttons.height,
+                                ShapeFormStyle.Buttons.y,
+                                ShapeFormStyle.Buttons.width,
+                                ShapeFormStyle.Buttons.height)
+                            .withText("Reset")
+                            .withClickHandler(reset)
+                            .withClass("shape-form-reset-button"))
+                        .withChild(saveButton)
+                        .withChild(errorMessage),
+                    firstSchemaChange=schemaChangeListener(schema)
+                ) => shapeForm)
+            ) => ({
+                forEditing: shape => {
+                    shapeValidations = ShapeValidations.forEditing(shape.id).concat(shapeValidations);
+                    reset = () => Module.of((
+                        shapeToResetTo=Shapes.all[shape.id]
+                    ) => {
+                        shapeInput.schema = shapeToResetTo.schema;
+                        rootFretRangeInput.range = shapeToResetTo.range; });
+                    save = () => Shapes.update(Shapes.Builder
+                        .withId(shape.id)
+                        .withSchema(shapeInput.schema)
+                        .withRange(rootFretRangeInput.range));
+                    return shapeFormWithSchemaAndRange(shape.schema, shape.range);},
+                forCreation: () => {
+                    shapeValidations = ShapeValidations.forCreation.concat(shapeValidations);
+                    reset = () => {
+                        shapeInput.schema = Shapes.Schema.allUnsounded;
+                        rootFretRangeInput.range = Frets.Range.roots; };
+                    save = () => Shapes.add(Shapes.Builder
                         .withoutId()
                         .withSchema(shapeInput.schema)
                         .withRange(rootFretRangeInput.range));
-                    reset();})
-                .withClass("shape-creator-save-button");
-            const errorMessage = SVG.Builder.Text
-                .withoutTextContent()
-                .withClass("shape-creator-output")
-                .moveTo(ShapeCreatorStyle.ErrorMessage.x, ShapeCreatorStyle.ErrorMessage.y)
-                .withAttributes({
-                    fontSize: ShapeCreatorStyle.ErrorMessage.fontSize,
-                    fontFamily: ShapeCreatorStyle.ErrorMessage.fontFamily,
-                    textAnchor: "middle",
-                    dominantBaseline: "hanging"})
-                .disableTextSelection();
-            const schemaChangeListener = Module.of((
-                schema,
-                invalidSaveButtonEventListeners = {
-                    mouseEnter: function() {
-                        errorMessage.withAttribute("text-decoration", "underline"); },
-                    mouseLeave: function() {
-                        errorMessage.withoutAttribute("text-decoration"); }},
-                validate = () => {
-                    errorMessage.textContent = null;
-                    saveButton.withoutEventListeners(invalidSaveButtonEventListeners);
-                    saveButton.enable();},
-                invalidate = (reason) => {
-                    errorMessage.textContent = reason;
-                    saveButton.withEventListeners(invalidSaveButtonEventListeners);
-                    saveButton.disable();}
-            ) => (newSchema) => {
-                if(schema !== undefined && Shapes.Schema.equals(schema, newSchema)) {
-                    return;}
-                schema = newSchema;
-                const fingerActions = Shapes.Schema.getFingerActions(schema);
-                //Validate the schema
-                if(Shapes.Schema.equals(schema, Shapes.Schema.allUnsounded)) {
-                    invalidate("Enter a shape");}
-                else if(false === schema.some(Shapes.StringAction.isFingered)) {
-                    invalidate("A shape must use at least one finger");}
-                else if(Shapes.existsWithSchema(schema)) {
-                    invalidate("A matching shape already exists");}
-                else if(fingerActions.length > 0) {
-                    if(Shapes.FingerAction.Validations.usesAFingerMoreThanOnce(fingerActions)) {
-                        invalidate("A finger is used multiple times on a fret");}
-                    else if(Shapes.FingerAction.Validations.lacksRootFret(fingerActions)) {
-                        invalidate("Fingers are used, but not on the root fret");}
-                    else if(Shapes.FingerAction.Validations.hasFingersCrossedOnAFret(fingerActions)) {
-                        invalidate("Fingers are impractically arranged on a fret");}
-                    else {
-                        validate();}}
-                else {
-                    validate();}});
-            shapeInput = ShapeInput.Builder
-                .withoutWildcards()
-                .blank()
-                .focused()
-                .withChangeListener(schemaChangeListener);
-            schemaChangeListener(shapeInput.schema);
-            return SVG.Builder.G()
-                .withClass("shape-creator")
-                .withChild(shapeInput)
-                .withChild(rootFretRangeInput)
-                .withChild(SVG.Builder.TextButton
-                    .withDimensions(
-                        ShapeCreatorStyle.Buttons.startX + ShapeCreatorStyle.Buttons.height,
-                        ShapeCreatorStyle.Buttons.y,
-                        ShapeCreatorStyle.Buttons.width,
-                        ShapeCreatorStyle.Buttons.height)
-                    .withText("Reset")
-                    .withClickHandler(reset)
-                    .withClass("shape-creator-reset-button"))
-                .withChild(saveButton)
-                .withChild(errorMessage)}}));
+                    return shapeFormWithSchemaAndRange(Shapes.Schema.allUnsounded, Frets.Range.roots);}})))}}));
 
     const ShapesPage = Module.of((
         shapeFilterMarginRight=32,
@@ -2698,7 +2770,9 @@ const ChordJogApp = (() => {
     ) => ({
         new: () => Module.of((
             width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-            (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
+                (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
+            filterShapes=undefined,
+            shapeFilterInput=undefined,
             ShapeItem=Module.of((
                 shapeChartMarginBottom=3,
                 buttonHeight=18,
@@ -2724,7 +2798,14 @@ const ChordJogApp = (() => {
                                 SVG.Builder.TextButton
                                     .withDimensions(0,0, buttonWidth, buttonHeight)
                                     .withText("Edit")
-                                    .withClickHandler(() => console.log("edit clicked for shape with id [" + shape.id + "]")),
+                                    .withClickHandler(() => {
+                                        shapeFilterInput.unfocus();
+                                        shapesPage.withChild(SVG.Builder.Modal
+                                            .withContent(ShapeForm.Builder.new().forEditing(Shapes.all[shape.id]))
+                                            .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
+                                            .withCloseCallback(() => {
+                                                shapeFilterInput.focus();
+                                                filterShapes(shapeFilterInput.schema)}));}),
                                 SVG.Builder.TextButton
                                     .withDimensions(0, 0, buttonWidth, buttonHeight)
                                     .withText("Delete")
@@ -2747,16 +2828,16 @@ const ChordJogApp = (() => {
                 .withClass("shape-chart-grid")
                 .move(0, ShapeInput.Style.height + topRowMarginBottom),
             shapesPageTopRow=Module.of((
-                filterShapes=shapeFilter=>shapeChartGrid.modules = ShapeItem.shapesToShapeItems(
-                    Shapes.search(shapeFilter)),
-                shapeInput=ShapeInput.Builder
+                setFilterShapes=filterShapes=shapeFilter=>
+                    shapeChartGrid.modules = ShapeItem.shapesToShapeItems(Shapes.search(shapeFilter)),
+                setShapeFilterInput=shapeFilterInput=ShapeInput.Builder
                     .withWildcards()
                     .blank()
                     .focused()
                     .withChangeListener(filterShapes),
                 shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
-                    .withChild(shapeInput)
+                    .withChild(shapeFilterInput)
                     .withChild(SVG.Builder.Text
                         .withTextContent("filte")
                         .withClass("shape-filter-label")
@@ -2779,13 +2860,13 @@ const ChordJogApp = (() => {
                         .withDimensions(0, 0, buttonWidth, buttonHeight)
                         .withText("Create")
                         .withClickHandler(() => {
-                            shapeInput.unfocus();
+                            shapeFilterInput.unfocus();
                             shapesPage.withChild(SVG.Builder.Modal
-                                .withContent(ShapeCreator.new())
-                                .withContentSize(ShapeCreator.Style.width, ShapeCreator.Style.height)
+                                .withContent(ShapeForm.Builder.new().forCreation())
+                                .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                 .withCloseCallback(() => {
-                                    shapeInput.focus();
-                                    filterShapes(shapeInput.schema);}));}),
+                                    shapeFilterInput.focus();
+                                    filterShapes(shapeFilterInput.schema);}));}),
                     downloadShapesButton=SVG.Builder.TextButton
                         .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
                         .withText("Download")
