@@ -2433,9 +2433,6 @@ const ChordJogApp = (() => {
                                         marker.withEventListeners(markersEventListeners[marker.type]));
                                     mouseTrap.withEventListeners(mouseTrapEventListeners);}};}),
                         Dragging: Module.of((
-                            minMaxAndMouseTrap=rangeMarkers.minAndMax.concat(mouseTrap),
-                            MinDragging=undefined,
-                            MaxDragging=undefined,
                             ActiveMarker=Module.of((value=null) => ({
                                 get: () => value,
                                 set: activeMarker => {
@@ -2477,6 +2474,8 @@ const ChordJogApp = (() => {
                                 MouseMoveListener.unset();
                                 window.removeEventListener("mouseup", mouseUpListener);
                                 States.Inactive.activate();},
+                            MinDragging=undefined,
+                            MaxDragging=undefined,
                             PivotDragging={
                                 activate: pivotRootFret => {
                                     ActiveMarker.set(rangeMarkers.pivot);
