@@ -2259,6 +2259,12 @@ const ChordJogApp = (() => {
                     .withClass("root-fret-range-mouse-trap"),
                 rangeMarkers = Module.of((
                     rootFretToCenter=rootFret=>[rootFretToXCoordinate(rootFret), 0],
+                    rootFret=null,
+                    moveMarkerToRootFret=(marker, rootFret) => {
+                        const center = rootFretToCenter(rootFret);
+                        marker.withAttributes({
+                            cx: center[0],
+                            cy: center[1]})},
                     markerForType=markerType=>SVG.Builder.Circle
                         .withCenter([0,0])
                         .withRadius(RootFretRangeStyle.rangeMarkerRadius)
@@ -2269,18 +2275,26 @@ const ChordJogApp = (() => {
                             fill: "none"})
                         .withDataAttribute("markerType", markerType)
                         .withGetter("type", () => markerType)
-                        .withDataAttribute("rootFret", null)
-                        .withGetterAndSetter("rootFret",
-                            function() {return Number.parseInt(this.dataset.rootFret);},
-                            function(rootFret) {this.dataset.rootFret = rootFret;})
+                        .withModification(function() {
+                            const RootFret = Module.of((value=null) => ({
+                                get: () => value,
+                                set: rootFret => {
+                                    if(rootFret !== value) {
+                                        if(rootFret !== null) {
+                                            this.center=rootFretToCenter(rootFret);
+                                            if(value === null) {
+                                                this.show();}}
+                                        else {
+                                            this.hide();}
+                                        value = rootFret;}}}));
+                            this.withGetterAndSetter("rootFret", RootFret.get, RootFret.set);
+                            this.withMethod("atRootFret", function(rootFret) {
+                                this.rootFret = rootFret;
+                                return this;});
+                            this.withMethod("withoutRootFret", function() {
+                                this.rootFret = null;
+                                return this;})})
                         .withMethods({
-                            atRootFret: function(rootFret) {
-                                const center = rootFretToCenter(rootFret);
-                                return this
-                                    .withDataAttribute("rootFret", rootFret)
-                                    .withAttributes({
-                                        cx: center[0],
-                                        cy: center[1]});},
                             deactivate: function() {
                                 this.withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth);},
                             deactivated: function() {
@@ -2334,8 +2348,7 @@ const ChordJogApp = (() => {
                                 //Was the old range not a single value?
                                 if(value === undefined || ! isSingleValue(value)) {
                                     //Yes. Swap which markers are visible.
-                                    rangeMarkers.pivot.show();
-                                    rangeMarkers.minAndMax.forEach(rangeMarker => rangeMarker.hide());}}
+                                    rangeMarkers.minAndMax.forEach(rangeMarker => rangeMarker.rootFret = null);}}
                             else {
                                 //No.
                                 activeBaseline.show();
@@ -2345,9 +2358,8 @@ const ChordJogApp = (() => {
                                 rangeMarkers.max.atRootFret(range.max);
                                 //Was the old range a single value?
                                 if(value === undefined || isSingleValue(value)) {
-                                    //Yes. Swap which markers are visible.
-                                    rangeMarkers.minAndMax.forEach(rangeMarker => rangeMarker.show());
-                                    rangeMarkers.pivot.hide();}}
+                                    //Yes. Hide the pivot.
+                                    rangeMarkers.pivot.rootFret = null;}}
                             value = range;
                             if(changeListener) {
                                 changeListener(range);}},
@@ -2386,10 +2398,6 @@ const ChordJogApp = (() => {
                                     if(value !== rootFret) {
                                         EmphasizedMarker.atRootFret(rootFret);
                                         rangeMarkers.preview.atRootFret(rootFret);
-                                        if(value === null) {
-                                            rangeMarkers.preview.show();}
-                                        if(rootFret === null) {
-                                            rangeMarkers.preview.hide();}
                                         value = rootFret;}}
                             ) => ({
                                 set: setPreviewRootFret,
@@ -2422,7 +2430,7 @@ const ChordJogApp = (() => {
                                                 mouseLeave: () => PreviewRootFret.unset(),
                                                 mouseDown: () => changeToDraggingState(marker)}))]));
                                     visibleRangeMarkers.forEach(marker =>
-                                        marker.show().withEventListeners(markersEventListeners[marker.type]));
+                                        marker.withEventListeners(markersEventListeners[marker.type]));
                                     mouseTrap.withEventListeners(mouseTrapEventListeners);}};}),
                         Dragging: Module.of((
                             minMaxAndMouseTrap=rangeMarkers.minAndMax.concat(mouseTrap),
@@ -2471,7 +2479,7 @@ const ChordJogApp = (() => {
                                 States.Inactive.activate();},
                             PivotDragging={
                                 activate: pivotRootFret => {
-                                    ActiveMarker.set(rangeMarkers.pivot.show());
+                                    ActiveMarker.set(rangeMarkers.pivot);
                                     rangeMarkers.minAndMax.forEach(extremumMarker=>extremumMarker.hide());
                                     MouseMoveListener.set(e=>{
                                         const rootFret = mouseEventToRootFret(e);
@@ -2486,9 +2494,8 @@ const ChordJogApp = (() => {
                             setupMinDragging=MinDragging={
                                 activate: () => {
                                     const range = Range.get();
-                                    ActiveMarker.set(rangeMarkers.min.show());
+                                    ActiveMarker.set(rangeMarkers.min);
                                     const maxRootFret = range.max;
-                                    rangeMarkers.max.show();
                                     MouseMoveListener.set(e=>{
                                         const rootFret = mouseEventToRootFret(e);
                                         if(rootFret === maxRootFret) {
@@ -2502,9 +2509,8 @@ const ChordJogApp = (() => {
                             setupMaxDragging=MaxDragging = {
                                 activate: () => {
                                     const range = Range.get();
-                                    ActiveMarker.set(rangeMarkers.max.show());
+                                    ActiveMarker.set(rangeMarkers.max);
                                     const minRootFret = range.min;
-                                    rangeMarkers.min.show();
                                     MouseMoveListener.set(e=>{
                                         const rootFret = mouseEventToRootFret(e);
                                         if(rootFret === minRootFret) {
