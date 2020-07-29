@@ -446,12 +446,12 @@ const ChordJogApp = (() => {
                 withCenter: center => withCenterStep(center)})),
             Ellipse: ({
                 withCenter: (c) => ({
-                    withRadius: (r) => createElement("ellipse")
-                        .withAttributes({
-                            cx: c[0],
-                            cy: c[1],
-                            rx: r instanceof Array ? r[0] : r,
-                            ry: r instanceof Array ? r[1] : r }) }) }),
+                withRadius: (r) => createElement("ellipse")
+                    .withAttributes({
+                        cx: c[0],
+                        cy: c[1],
+                        rx: r instanceof Array ? r[0] : r,
+                        ry: r instanceof Array ? r[1] : r }) }) }),
             Line: Module.of(
                 (createLine = () =>
                     createElement("line").withMethod("withEndpoints",
@@ -466,84 +466,84 @@ const ChordJogApp = (() => {
                     withoutEndpoints: () => createLine()})),
             ModularGrid: {
                 withX: x => ({
-                    withY: y => ({
-                        withWidth: width => ({
-                            withModuleWidth: moduleWidth => ({
-                                withModuleHeight: moduleHeight => ({
-                                    withPadding: (horizontalPadding, verticalPadding=horizontalPadding) => Module.of((
-                                        withModulesStep=modules=>Module.of((
-                                            numColumnsAndColumnIndexToModuleX=(numColumns, columnIndex)=>
-                                                .5*width +
-                                                (columnIndex-numColumns/2)*moduleWidth +
-                                                (columnIndex-(numColumns-1)/2)*horizontalPadding,
-                                            rowIndexToModuleY=rowIndex=>rowIndex*(moduleHeight+verticalPadding),
-                                            numColumnsToInnerWidth=numColumns=>numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
-                                        )=> SVG.Builder.G()
-                                            .withClass("modular-grid")
-                                            .moveTo(x, y)
-                                            .withGetterAndSetter("modules",
-                                                () => modules,
-                                                function(newModules) {
-                                                    //Remove old modules
-                                                    modules.forEach(module => {
-                                                        if(module.parentNode === this) {
-                                                            this.removeChild(module);}});
-                                                    //Move the new modules to their coordinates and append them to the grid
-                                                    modules = newModules;
-                                                    Module.of((
-                                                        numColumns=Arrays.findLast(
-                                                            Numbers.range(1, 1+modules.length),
-                                                            numColumns=>{
-                                                                return numColumnsToInnerWidth(numColumns)<=width;}),
-                                                        moduleIndexToCoordinates=moduleIndex=>Module.of((
-                                                            rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
-                                                        ) => [
-                                                            numColumnsAndColumnIndexToModuleX(
-                                                                //How many columns are in this row?
-                                                                rowIndex < Math.ceil(modules.length/numColumns)-1 ?  //Not the last row?
-                                                                    numColumns :        //Yes: numColumns
-                                                                    Module.of((         //No: the number of columns on the last row
-                                                                        remainder=modules.length%numColumns
-                                                                    )=> remainder > 0 ? remainder : numColumns),
-                                                                moduleIndex%numColumns),
-                                                            rowIndexToModuleY(rowIndex)])
-                                                    )=> modules.forEach((module, index)=> this.append(
-                                                        module.moveTo(...moduleIndexToCoordinates(index)))));})
-                                            .withMethod("withModules", function(modules) {
-                                                this.modules = modules;
-                                                return this;})
-                                            .withModules(modules))
-                                    ) => ({
-                                        withModule: module => withModulesStep([module]),
-                                        withModules: modules => withModulesStep(modules),
-                                        withoutModules: () => withModulesStep([])}))})})})})})},
+                withY: y => ({
+                withWidth: width => ({
+                withModuleWidth: moduleWidth => ({
+                withModuleHeight: moduleHeight => ({
+                withPadding: (horizontalPadding, verticalPadding=horizontalPadding) => Module.of((
+                    withModulesStep=modules=>Module.of((
+                        numColumnsAndColumnIndexToModuleX=(numColumns, columnIndex)=>
+                            .5*width +
+                            (columnIndex-numColumns/2)*moduleWidth +
+                            (columnIndex-(numColumns-1)/2)*horizontalPadding,
+                        rowIndexToModuleY=rowIndex=>rowIndex*(moduleHeight+verticalPadding),
+                        numColumnsToInnerWidth=numColumns=>numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
+                    )=> SVG.Builder.G()
+                        .withClass("modular-grid")
+                        .moveTo(x, y)
+                        .withGetterAndSetter("modules",
+                            () => modules,
+                            function(newModules) {
+                                //Remove old modules
+                                modules.forEach(module => {
+                                    if(module.parentNode === this) {
+                                        this.removeChild(module);}});
+                                //Move the new modules to their coordinates and append them to the grid
+                                modules = newModules;
+                                Module.of((
+                                    numColumns=Arrays.findLast(
+                                        Numbers.range(1, 1+modules.length),
+                                        numColumns=>{
+                                            return numColumnsToInnerWidth(numColumns)<=width;}),
+                                    moduleIndexToCoordinates=moduleIndex=>Module.of((
+                                        rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
+                                    ) => [
+                                        numColumnsAndColumnIndexToModuleX(
+                                            //How many columns are in this row?
+                                            rowIndex < Math.ceil(modules.length/numColumns)-1 ?  //Not the last row?
+                                                numColumns :        //Yes: numColumns
+                                                Module.of((         //No: the number of columns on the last row
+                                                    remainder=modules.length%numColumns
+                                                )=> remainder > 0 ? remainder : numColumns),
+                                            moduleIndex%numColumns),
+                                        rowIndexToModuleY(rowIndex)])
+                                )=> modules.forEach((module, index)=> this.append(
+                                    module.moveTo(...moduleIndexToCoordinates(index)))));})
+                        .withMethod("withModules", function(modules) {
+                            this.modules = modules;
+                            return this;})
+                        .withModules(modules))
+                ) => ({
+                    withModule: module => withModulesStep([module]),
+                    withModules: modules => withModulesStep(modules),
+                    withoutModules: () => withModulesStep([])}))})})})})})},
             Path: ({
                 withD: (d) => createElement("path")
                     .withAttributes({d: d}) }),
             Rect: ({
                 withX: (x) => ({
-                    withY: (y) => ({
-                        withWidth: (width) => ({
-                            withHeight: (height) => {
-                                const rect = createElement("rect")
-                                    .withAttributes({
-                                        x: x,
-                                        y: y,
-                                        width: width,
-                                        height: height});
-                                rect.withMethods({
-                                    withRx: (rx) => rect.withAttribute("rx", rx),
-                                    withRy: (ry) => rect.withAttribute("ry", ry)});
-                                rect.withMethod("withRadius", (r) => rect.withRx(r).withRy(r))
-                                return rect;}})})})}),
+                withY: (y) => ({
+                withWidth: (width) => ({
+                withHeight: (height) => {
+                    const rect = createElement("rect")
+                        .withAttributes({
+                            x: x,
+                            y: y,
+                            width: width,
+                            height: height});
+                    rect.withMethods({
+                        withRx: (rx) => rect.withAttribute("rx", rx),
+                        withRy: (ry) => rect.withAttribute("ry", ry)});
+                    rect.withMethod("withRadius", (r) => rect.withRx(r).withRy(r))
+                    return rect;}})})})}),
             SVG: {
                 withWidth: (width) => ({
-                    withHeight: (height) => createElement("svg")
-                        .withAttributes({
-                            viewBox: `0 0 ${width} ${height}`,
-                            xmlns: "xmlns='http://www.w3.org/2000/svg'",
-                            width: width,
-                            height: height })})},
+                withHeight: (height) => createElement("svg")
+                    .withAttributes({
+                        viewBox: `0 0 ${width} ${height}`,
+                        xmlns: "xmlns='http://www.w3.org/2000/svg'",
+                        width: width,
+                        height: height })})},
             Text: Module.of((
                 createText = () => createElement("text")
                     .withMethods({
@@ -573,142 +573,142 @@ const ChordJogApp = (() => {
             .withHeight(svgRect.height);
         svgBuilder.TextButton = {
             withDimensions: (x, y, width, height) => ({
-                withText: (text) => ({
-                    withClickHandler: (clickHandler) => {
-                        let rect = null;
-                        const label = SVG.Builder.Text
-                            .withTextContent(text)
-                            .moveTo(.5 * width, .5 * height)
-                            .withClass("text-button-label")
-                            .withAttributes({
-                                textAnchor: "middle",
-                                dominantBaseline: "central",
-                                fontSize: 17,
-                                fontFamily: "Courier New"})
-                            .disableTextSelection();
-                        const preview = () => rect.withAttribute("stroke-width", 1.5);
-                        const normal = () => rect.withAttribute("stroke-width", 1);
-                        const active = () => rect.withAttribute("stroke-width", 2);
-                        const eventListeners = Module.of(() => {
-                            let isMouseOver = false,
-                                isMouseDown = false,
-                                mouseUpHandler = undefined;
-                            mouseUpHandler = function () {
-                                isMouseDown = false;
-                                window.removeEventListener("mouseup", mouseUpHandler);
-                                Functions.ifThenElse(isMouseOver,
-                                    () => {
-                                        preview();
-                                        clickHandler();},
-                                    () => normal());};
-                            return {
-                                mouseEnter: () => {
-                                    isMouseOver = true;
-                                    Functions.ifThenElse(isMouseDown,
-                                        active,
-                                        preview);},
-                                mouseDown: (e) => Functions.ifThen(
-                                    e.button === 0,
-                                    () => {
-                                        isMouseDown = true;
-                                        window.addEventListener("mouseup", mouseUpHandler);
-                                        active();}),
-                                mouseLeave: () => {
-                                    isMouseOver = false;
-                                    normal();}};});
-                        rect = SVG.Builder.Rect
-                            .withX(0).withY(0)
-                            .withWidth(width).withHeight(height)
-                            .withClass("text-button-outline")
-                            .withAttributes({});
-                        return SVG.Builder.G()
-                            .withClass("text-button")
-                            .moveTo(x, y)
-                            .withChild(label)
-                            .withChild(rect)
-                            .withGetter("label", () => label)
-                            .withGetter("rect", () => rect)
-                            .withMethods(Module.of((enabled=false) => ({
-                                enable: function() {
-                                    if(enabled === true) {
-                                        return;}
-                                    enabled = true;
-                                    this.withAttributes({
-                                        pointerEvents: "all",
-                                        cursor: "pointer"
-                                    });
-                                    label.withoutAttribute("text-decoration");
-                                    this.withEventListeners(eventListeners);},
-                                enabled: function() {
-                                    this.enable();
-                                    return this;},
-                                disable: function() {
-                                    if(enabled === false) {
-                                        return;}
-                                    enabled = false;
-                                    this.withAttributes({
-                                        cursor: "not-allowed"});
-                                    label.withAttribute("text-decoration", "line-through");
-                                    this.withoutEventListeners(eventListeners); },
-                                disabled: function() {
-                                    this.disable();
-                                    return this;}})))
-                            .enabled();}})})};
+            withText: (text) => ({
+            withClickHandler: (clickHandler) => {
+                let rect = null;
+                const label = SVG.Builder.Text
+                    .withTextContent(text)
+                    .moveTo(.5 * width, .5 * height)
+                    .withClass("text-button-label")
+                    .withAttributes({
+                        textAnchor: "middle",
+                        dominantBaseline: "central",
+                        fontSize: 17,
+                        fontFamily: "Courier New"})
+                    .disableTextSelection();
+                const preview = () => rect.withAttribute("stroke-width", 1.5);
+                const normal = () => rect.withAttribute("stroke-width", 1);
+                const active = () => rect.withAttribute("stroke-width", 2);
+                const eventListeners = Module.of(() => {
+                    let isMouseOver = false,
+                        isMouseDown = false,
+                        mouseUpHandler = undefined;
+                    mouseUpHandler = function () {
+                        isMouseDown = false;
+                        window.removeEventListener("mouseup", mouseUpHandler);
+                        Functions.ifThenElse(isMouseOver,
+                            () => {
+                                preview();
+                                clickHandler();},
+                            () => normal());};
+                    return {
+                        mouseEnter: () => {
+                            isMouseOver = true;
+                            Functions.ifThenElse(isMouseDown,
+                                active,
+                                preview);},
+                        mouseDown: (e) => Functions.ifThen(
+                            e.button === 0,
+                            () => {
+                                isMouseDown = true;
+                                window.addEventListener("mouseup", mouseUpHandler);
+                                active();}),
+                        mouseLeave: () => {
+                            isMouseOver = false;
+                            normal();}};});
+                rect = SVG.Builder.Rect
+                    .withX(0).withY(0)
+                    .withWidth(width).withHeight(height)
+                    .withClass("text-button-outline")
+                    .withAttributes({});
+                return SVG.Builder.G()
+                    .withClass("text-button")
+                    .moveTo(x, y)
+                    .withChild(label)
+                    .withChild(rect)
+                    .withGetter("label", () => label)
+                    .withGetter("rect", () => rect)
+                    .withMethods(Module.of((enabled=false) => ({
+                        enable: function() {
+                            if(enabled === true) {
+                                return;}
+                            enabled = true;
+                            this.withAttributes({
+                                pointerEvents: "all",
+                                cursor: "pointer"
+                            });
+                            label.withoutAttribute("text-decoration");
+                            this.withEventListeners(eventListeners);},
+                        enabled: function() {
+                            this.enable();
+                            return this;},
+                        disable: function() {
+                            if(enabled === false) {
+                                return;}
+                            enabled = false;
+                            this.withAttributes({
+                                cursor: "not-allowed"});
+                            label.withAttribute("text-decoration", "line-through");
+                            this.withoutEventListeners(eventListeners); },
+                        disabled: function() {
+                            this.disable();
+                            return this;}})))
+                    .enabled();}})})};
         svgBuilder.MouseTrap = {
             withX: x => ({
-                withY: y => ({
-                    withWidth: width => ({
-                        withHeight: height => svgBuilder.Rect
-                            .withX(x)
-                            .withY(y)
-                            .withWidth(width)
-                            .withHeight(height)
-                            .withAttributes({
-                                pointerEvents: "fill",
-                                cursor: "pointer",
-                                fill: "none",
-                                stroke: "none"})})})})};
+            withY: y => ({
+            withWidth: width => ({
+            withHeight: height => svgBuilder.Rect
+                .withX(x)
+                .withY(y)
+                .withWidth(width)
+                .withHeight(height)
+                .withAttributes({
+                    pointerEvents: "fill",
+                    cursor: "pointer",
+                    fill: "none",
+                    stroke: "none"})})})})};
         svgBuilder.Modal = Module.of((
             fillOpacity=.95,
             contentPadding=10
         ) => ({
             withContent: content => ({
-                withContentSize: (width, height) => {
-                    let modal = undefined;
-                    let onCloseCallback = null;
-                    modal = SVG.Builder.G()
-                        .withClass("modal")
-                        .withChild(SVG.Builder.MouseTrap
-                            .withX(0)
-                            .withY(0)
-                            .withWidth(Style.width)
-                            .withHeight(Style.height)
-                            .withClass("modal-backdrop")
-                            .withAttributes({
-                                fill: Style.colors.black,
-                                fillOpacity: fillOpacity})
-                            .withEventListener("mousedown", () => modal.close()))
-                        .withChild(SVG.Builder.G()
-                            .withClass("modal-content-container")
-                            .moveTo(.5 * (Style.width - width), .5 * (Style.height - height))
-                            .withChild(SVG.Builder.Rect
-                                .withX(-contentPadding)
-                                .withY(-contentPadding)
-                                .withWidth(width + 2 * contentPadding)
-                                .withHeight(height + 2 * contentPadding)
-                                .withClass("modal-content-container-background")
-                                .withAttribute("fill", Style.colors.white))
-                            .withChild(content))
-                        .withMethod("close", function(){
-                            this.parentElement.removeChild(modal);
-                            if(onCloseCallback !== null) {
-                                onCloseCallback();}})
-                        .withSetter("onclose", function(callback) {
-                            onCloseCallback = callback; })
-                        .withMethod("withCloseCallback", function(callback) {
-                            this.onclose = callback;
-                            return this;})
-                    return modal;}})}));
+            withContentSize: (width, height) => {
+                let modal = undefined;
+                let onCloseCallback = null;
+                modal = SVG.Builder.G()
+                    .withClass("modal")
+                    .withChild(SVG.Builder.MouseTrap
+                        .withX(0)
+                        .withY(0)
+                        .withWidth(Style.width)
+                        .withHeight(Style.height)
+                        .withClass("modal-backdrop")
+                        .withAttributes({
+                            fill: Style.colors.black,
+                            fillOpacity: fillOpacity})
+                        .withEventListener("mousedown", () => modal.close()))
+                    .withChild(SVG.Builder.G()
+                        .withClass("modal-content-container")
+                        .moveTo(.5 * (Style.width - width), .5 * (Style.height - height))
+                        .withChild(SVG.Builder.Rect
+                            .withX(-contentPadding)
+                            .withY(-contentPadding)
+                            .withWidth(width + 2 * contentPadding)
+                            .withHeight(height + 2 * contentPadding)
+                            .withClass("modal-content-container-background")
+                            .withAttribute("fill", Style.colors.white))
+                        .withChild(content))
+                    .withMethod("close", function(){
+                        this.parentElement.removeChild(modal);
+                        if(onCloseCallback !== null) {
+                            onCloseCallback();}})
+                    .withSetter("onclose", function(callback) {
+                        onCloseCallback = callback; })
+                    .withMethod("withCloseCallback", function(callback) {
+                        this.onclose = callback;
+                        return this;})
+                return modal;}})}));
         return {Builder: svgBuilder};});
 
     //A shape defines the sounding of a guitar as an array of six string actions called its schema.
@@ -2820,8 +2820,9 @@ const ChordJogApp = (() => {
                                     .withDimensions(0, 0, buttonWidth, buttonHeight)
                                     .withText("delete")
                                     .withClickHandler(() => {
-                                        Shapes.delete(shape.id);
-                                        filterShapes(shapeFilterInput.schema);})
+                                        if(true===confirm("Are you sure you want to delete this shape?")) {
+                                            Shapes.delete(shape.id);
+                                            filterShapes(shapeFilterInput.schema);}})
                                     .withModification(function() {
                                         this.label.withAttribute("font-size", 14);})])
                             .withClass("shape-item-buttons-container")
