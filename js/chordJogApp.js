@@ -2797,7 +2797,7 @@ const ChordJogApp = (() => {
                             .withModules([
                                 SVG.Builder.TextButton
                                     .withDimensions(0,0, buttonWidth, buttonHeight)
-                                    .withText("Edit")
+                                    .withText("edit")
                                     .withClickHandler(() => {
                                         shapeFilterInput.unfocus();
                                         shapesPage.withChild(SVG.Builder.Modal
@@ -2805,11 +2805,15 @@ const ChordJogApp = (() => {
                                             .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                             .withCloseCallback(() => {
                                                 shapeFilterInput.focus();
-                                                filterShapes(shapeFilterInput.schema)}));}),
+                                                filterShapes(shapeFilterInput.schema)}));})
+                                    .withModification(function() {
+                                        this.label.withAttribute("font-size", 14)}),
                                 SVG.Builder.TextButton
                                     .withDimensions(0, 0, buttonWidth, buttonHeight)
-                                    .withText("Delete")
-                                    .withClickHandler(() => console.log("delete clicked for shape with id [" + shape.id + "]"))])
+                                    .withText("delete")
+                                    .withClickHandler(() => console.log("delete clicked for shape with id [" + shape.id + "]"))
+                                    .withModification(function() {
+                                        this.label.withAttribute("font-size", 14);})])
                             .withClass("shape-item-buttons-container")
                     ) => SVG.Builder.G()
                         .withClass("shape-item")
