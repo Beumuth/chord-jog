@@ -83,7 +83,13 @@ const ChordJogApp = (() => {
         const objects = {
             isNil: Module.of((nils = [null, undefined]) =>
                 (object) => nils.includes(object)),
-            using: (object) => helpers.withMethods.bind(object)(helpers)};
+            using: (object) => helpers.withMethods.bind(object)(helpers),
+            withField: (object, key, value) => {
+                object[key] = value;
+                return object;},
+            withFields: (object, fieldKeyValues) => {
+                Object.entries(fieldKeyValues).forEach(fieldKeyValue => object[fieldKeyValue[0]] = fieldKeyValue[1]);
+                return object;}};
         objects.new = () => objects.using({});
         return objects;});
     const Numbers = {
@@ -95,8 +101,8 @@ const ChordJogApp = (() => {
             return range;},
         clamp: (value, fromInclusive, toInclusive) =>
             value < fromInclusive ? fromInclusive :
-            value > toInclusive ? toInclusive :
-            value};
+                value > toInclusive ? toInclusive :
+                    value};
     const Arrays = {
         replaceItem: (array, index, replacement) => {
             array[index] = replacement;
@@ -326,9 +332,9 @@ const ChordJogApp = (() => {
                             .forEach(e => listener.bind(e.target)({
                                 oldValue: e.oldValue,
                                 value: e.value})))
-                        .observe(this, {
-                            attributeFilter: [attributeName],
-                            attributeOldValue: true});
+                            .observe(this, {
+                                attributeFilter: [attributeName],
+                                attributeOldValue: true});
                         return this;},
                     withAttributeChangeListeners: function(attributeChangeListeners) {
                         Object
@@ -460,84 +466,84 @@ const ChordJogApp = (() => {
                     withoutEndpoints: () => createLine()})),
             ModularGrid: {
                 withX: x => ({
-                withY: y => ({
-                withWidth: width => ({
-                withModuleWidth: moduleWidth => ({
-                withModuleHeight: moduleHeight => ({
-                withPadding: (horizontalPadding, verticalPadding=horizontalPadding) => Module.of((
-                    withModulesStep=modules=>Module.of((
-                        numColumnsAndColumnIndexToModuleX=(numColumns, columnIndex)=>
-                            .5*width +
-                            (columnIndex-numColumns/2)*moduleWidth +
-                            (columnIndex-(numColumns-1)/2)*horizontalPadding,
-                        rowIndexToModuleY=rowIndex=>rowIndex*(moduleHeight+verticalPadding),
-                        numColumnsToInnerWidth=numColumns=>numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
-                    )=> SVG.Builder.G()
-                        .withClass("modular-grid")
-                        .moveTo(x, y)
-                        .withGetterAndSetter("modules",
-                            () => modules,
-                            function(newModules) {
-                                //Remove old modules
-                                modules.forEach(module => {
-                                    if(module.parentNode === this) {
-                                        this.removeChild(module);}});
-                                //Move the new modules to their coordinates and append them to the grid
-                                modules = newModules;
-                                Module.of((
-                                    numColumns=Arrays.findLast(
-                                        Numbers.range(1, 1+modules.length),
-                                        numColumns=>{
-                                            return numColumnsToInnerWidth(numColumns)<=width;}),
-                                    moduleIndexToCoordinates=moduleIndex=>Module.of((
-                                        rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
-                                    ) => [
-                                        numColumnsAndColumnIndexToModuleX(
-                                            //How many columns are in this row?
-                                            rowIndex < Math.ceil(modules.length/numColumns)-1 ?  //Not the last row?
-                                                numColumns :        //Yes: numColumns
-                                                Module.of((         //No: the number of columns on the last row
-                                                    remainder=modules.length%numColumns
-                                                )=> remainder > 0 ? remainder : numColumns),
-                                            moduleIndex%numColumns),
-                                        rowIndexToModuleY(rowIndex)])
-                                )=> modules.forEach((module, index)=> this.append(
-                                    module.moveTo(...moduleIndexToCoordinates(index)))));})
-                        .withMethod("withModules", function(modules) {
-                            this.modules = modules;
-                            return this;})
-                        .withModules(modules))
-                ) => ({
-                    withModule: module => withModulesStep([module]),
-                    withModules: modules => withModulesStep(modules),
-                    withoutModules: () => withModulesStep([])}))})})})})})},
+                    withY: y => ({
+                        withWidth: width => ({
+                            withModuleWidth: moduleWidth => ({
+                                withModuleHeight: moduleHeight => ({
+                                    withPadding: (horizontalPadding, verticalPadding=horizontalPadding) => Module.of((
+                                        withModulesStep=modules=>Module.of((
+                                            numColumnsAndColumnIndexToModuleX=(numColumns, columnIndex)=>
+                                                .5*width +
+                                                (columnIndex-numColumns/2)*moduleWidth +
+                                                (columnIndex-(numColumns-1)/2)*horizontalPadding,
+                                            rowIndexToModuleY=rowIndex=>rowIndex*(moduleHeight+verticalPadding),
+                                            numColumnsToInnerWidth=numColumns=>numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
+                                        )=> SVG.Builder.G()
+                                            .withClass("modular-grid")
+                                            .moveTo(x, y)
+                                            .withGetterAndSetter("modules",
+                                                () => modules,
+                                                function(newModules) {
+                                                    //Remove old modules
+                                                    modules.forEach(module => {
+                                                        if(module.parentNode === this) {
+                                                            this.removeChild(module);}});
+                                                    //Move the new modules to their coordinates and append them to the grid
+                                                    modules = newModules;
+                                                    Module.of((
+                                                        numColumns=Arrays.findLast(
+                                                            Numbers.range(1, 1+modules.length),
+                                                            numColumns=>{
+                                                                return numColumnsToInnerWidth(numColumns)<=width;}),
+                                                        moduleIndexToCoordinates=moduleIndex=>Module.of((
+                                                            rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
+                                                        ) => [
+                                                            numColumnsAndColumnIndexToModuleX(
+                                                                //How many columns are in this row?
+                                                                rowIndex < Math.ceil(modules.length/numColumns)-1 ?  //Not the last row?
+                                                                    numColumns :        //Yes: numColumns
+                                                                    Module.of((         //No: the number of columns on the last row
+                                                                        remainder=modules.length%numColumns
+                                                                    )=> remainder > 0 ? remainder : numColumns),
+                                                                moduleIndex%numColumns),
+                                                            rowIndexToModuleY(rowIndex)])
+                                                    )=> modules.forEach((module, index)=> this.append(
+                                                        module.moveTo(...moduleIndexToCoordinates(index)))));})
+                                            .withMethod("withModules", function(modules) {
+                                                this.modules = modules;
+                                                return this;})
+                                            .withModules(modules))
+                                    ) => ({
+                                        withModule: module => withModulesStep([module]),
+                                        withModules: modules => withModulesStep(modules),
+                                        withoutModules: () => withModulesStep([])}))})})})})})},
             Path: ({
                 withD: (d) => createElement("path")
                     .withAttributes({d: d}) }),
             Rect: ({
                 withX: (x) => ({
-                withY: (y) => ({
-                withWidth: (width) => ({
-                withHeight: (height) => {
-                    const rect = createElement("rect")
-                        .withAttributes({
-                            x: x,
-                            y: y,
-                            width: width,
-                            height: height});
-                    rect.withMethods({
-                        withRx: (rx) => rect.withAttribute("rx", rx),
-                        withRy: (ry) => rect.withAttribute("ry", ry)});
-                    rect.withMethod("withRadius", (r) => rect.withRx(r).withRy(r))
-                    return rect;}})})})}),
+                    withY: (y) => ({
+                        withWidth: (width) => ({
+                            withHeight: (height) => {
+                                const rect = createElement("rect")
+                                    .withAttributes({
+                                        x: x,
+                                        y: y,
+                                        width: width,
+                                        height: height});
+                                rect.withMethods({
+                                    withRx: (rx) => rect.withAttribute("rx", rx),
+                                    withRy: (ry) => rect.withAttribute("ry", ry)});
+                                rect.withMethod("withRadius", (r) => rect.withRx(r).withRy(r))
+                                return rect;}})})})}),
             SVG: {
                 withWidth: (width) => ({
-                withHeight: (height) => createElement("svg")
-                    .withAttributes({
-                        viewBox: `0 0 ${width} ${height}`,
-                        xmlns: "xmlns='http://www.w3.org/2000/svg'",
-                        width: width,
-                        height: height })})},
+                    withHeight: (height) => createElement("svg")
+                        .withAttributes({
+                            viewBox: `0 0 ${width} ${height}`,
+                            xmlns: "xmlns='http://www.w3.org/2000/svg'",
+                            width: width,
+                            height: height })})},
             Text: Module.of((
                 createText = () => createElement("text")
                     .withMethods({
@@ -567,142 +573,142 @@ const ChordJogApp = (() => {
             .withHeight(svgRect.height);
         svgBuilder.TextButton = {
             withDimensions: (x, y, width, height) => ({
-            withText: (text) => ({
-            withClickHandler: (clickHandler) => {
-                let rect = null;
-                const label = SVG.Builder.Text
-                    .withTextContent(text)
-                    .moveTo(.5 * width, .5 * height)
-                    .withClass("text-button-label")
-                    .withAttributes({
-                        textAnchor: "middle",
-                        dominantBaseline: "central",
-                        fontSize: 17,
-                        fontFamily: "Courier New"})
-                    .disableTextSelection();
-                const preview = () => rect.withAttribute("stroke-width", 1.5);
-                const normal = () => rect.withAttribute("stroke-width", 1);
-                const active = () => rect.withAttribute("stroke-width", 2);
-                const eventListeners = Module.of(() => {
-                    let isMouseOver = false,
-                        isMouseDown = false,
-                        mouseUpHandler = undefined;
-                    mouseUpHandler = function () {
-                        isMouseDown = false;
-                        window.removeEventListener("mouseup", mouseUpHandler);
-                        Functions.ifThenElse(isMouseOver,
-                            () => {
-                                preview();
-                                clickHandler();},
-                            () => normal());};
-                    return {
-                        mouseEnter: () => {
-                            isMouseOver = true;
-                            Functions.ifThenElse(isMouseDown,
-                                active,
-                                preview);},
-                        mouseDown: (e) => Functions.ifThen(
-                            e.button === 0,
-                            () => {
-                                isMouseDown = true;
-                                window.addEventListener("mouseup", mouseUpHandler);
-                                active();}),
-                        mouseLeave: () => {
-                            isMouseOver = false;
-                            normal();}};});
-                rect = SVG.Builder.Rect
-                    .withX(0).withY(0)
-                    .withWidth(width).withHeight(height)
-                    .withClass("text-button-outline")
-                    .withAttributes({});
-                return SVG.Builder.G()
-                    .withClass("text-button")
-                    .moveTo(x, y)
-                    .withChild(label)
-                    .withChild(rect)
-                    .withGetter("label", () => label)
-                    .withGetter("rect", () => rect)
-                    .withMethods(Module.of((enabled=false) => ({
-                        enable: function() {
-                            if(enabled === true) {
-                                return;}
-                            enabled = true;
-                            this.withAttributes({
-                                pointerEvents: "all",
-                                cursor: "pointer"
-                            });
-                            label.withoutAttribute("text-decoration");
-                            this.withEventListeners(eventListeners);},
-                        enabled: function() {
-                            this.enable();
-                            return this;},
-                        disable: function() {
-                            if(enabled === false) {
-                                return;}
-                            enabled = false;
-                            this.withAttributes({
-                                cursor: "not-allowed"});
-                            label.withAttribute("text-decoration", "line-through");
-                            this.withoutEventListeners(eventListeners); },
-                        disabled: function() {
-                            this.disable();
-                            return this;}})))
-                    .enabled();}})})};
+                withText: (text) => ({
+                    withClickHandler: (clickHandler) => {
+                        let rect = null;
+                        const label = SVG.Builder.Text
+                            .withTextContent(text)
+                            .moveTo(.5 * width, .5 * height)
+                            .withClass("text-button-label")
+                            .withAttributes({
+                                textAnchor: "middle",
+                                dominantBaseline: "central",
+                                fontSize: 17,
+                                fontFamily: "Courier New"})
+                            .disableTextSelection();
+                        const preview = () => rect.withAttribute("stroke-width", 1.5);
+                        const normal = () => rect.withAttribute("stroke-width", 1);
+                        const active = () => rect.withAttribute("stroke-width", 2);
+                        const eventListeners = Module.of(() => {
+                            let isMouseOver = false,
+                                isMouseDown = false,
+                                mouseUpHandler = undefined;
+                            mouseUpHandler = function () {
+                                isMouseDown = false;
+                                window.removeEventListener("mouseup", mouseUpHandler);
+                                Functions.ifThenElse(isMouseOver,
+                                    () => {
+                                        preview();
+                                        clickHandler();},
+                                    () => normal());};
+                            return {
+                                mouseEnter: () => {
+                                    isMouseOver = true;
+                                    Functions.ifThenElse(isMouseDown,
+                                        active,
+                                        preview);},
+                                mouseDown: (e) => Functions.ifThen(
+                                    e.button === 0,
+                                    () => {
+                                        isMouseDown = true;
+                                        window.addEventListener("mouseup", mouseUpHandler);
+                                        active();}),
+                                mouseLeave: () => {
+                                    isMouseOver = false;
+                                    normal();}};});
+                        rect = SVG.Builder.Rect
+                            .withX(0).withY(0)
+                            .withWidth(width).withHeight(height)
+                            .withClass("text-button-outline")
+                            .withAttributes({});
+                        return SVG.Builder.G()
+                            .withClass("text-button")
+                            .moveTo(x, y)
+                            .withChild(label)
+                            .withChild(rect)
+                            .withGetter("label", () => label)
+                            .withGetter("rect", () => rect)
+                            .withMethods(Module.of((enabled=false) => ({
+                                enable: function() {
+                                    if(enabled === true) {
+                                        return;}
+                                    enabled = true;
+                                    this.withAttributes({
+                                        pointerEvents: "all",
+                                        cursor: "pointer"
+                                    });
+                                    label.withoutAttribute("text-decoration");
+                                    this.withEventListeners(eventListeners);},
+                                enabled: function() {
+                                    this.enable();
+                                    return this;},
+                                disable: function() {
+                                    if(enabled === false) {
+                                        return;}
+                                    enabled = false;
+                                    this.withAttributes({
+                                        cursor: "not-allowed"});
+                                    label.withAttribute("text-decoration", "line-through");
+                                    this.withoutEventListeners(eventListeners); },
+                                disabled: function() {
+                                    this.disable();
+                                    return this;}})))
+                            .enabled();}})})};
         svgBuilder.MouseTrap = {
             withX: x => ({
-            withY: y => ({
-            withWidth: width => ({
-            withHeight: height => svgBuilder.Rect
-                .withX(x)
-                .withY(y)
-                .withWidth(width)
-                .withHeight(height)
-                .withAttributes({
-                    pointerEvents: "fill",
-                    cursor: "pointer",
-                    fill: "none",
-                    stroke: "none"})})})})};
+                withY: y => ({
+                    withWidth: width => ({
+                        withHeight: height => svgBuilder.Rect
+                            .withX(x)
+                            .withY(y)
+                            .withWidth(width)
+                            .withHeight(height)
+                            .withAttributes({
+                                pointerEvents: "fill",
+                                cursor: "pointer",
+                                fill: "none",
+                                stroke: "none"})})})})};
         svgBuilder.Modal = Module.of((
             fillOpacity=.95,
             contentPadding=10
         ) => ({
             withContent: content => ({
-            withContentSize: (width, height) => {
-                let modal = undefined;
-                let onCloseCallback = null;
-                modal = SVG.Builder.G()
-                    .withClass("modal")
-                    .withChild(SVG.Builder.MouseTrap
-                        .withX(0)
-                        .withY(0)
-                        .withWidth(Style.width)
-                        .withHeight(Style.height)
-                        .withClass("modal-backdrop")
-                        .withAttributes({
-                            fill: Style.colors.black,
-                            fillOpacity: fillOpacity})
-                        .withEventListener("mousedown", () => modal.close()))
-                    .withChild(SVG.Builder.G()
-                        .withClass("modal-content-container")
-                        .moveTo(.5 * (Style.width - width), .5 * (Style.height - height))
-                        .withChild(SVG.Builder.Rect
-                            .withX(-contentPadding)
-                            .withY(-contentPadding)
-                            .withWidth(width + 2 * contentPadding)
-                            .withHeight(height + 2 * contentPadding)
-                            .withClass("modal-content-container-background")
-                            .withAttribute("fill", Style.colors.white))
-                        .withChild(content))
-                    .withMethod("close", function(){
-                        this.parentElement.removeChild(modal);
-                        if(onCloseCallback !== null) {
-                            onCloseCallback();}})
-                    .withSetter("onclose", function(callback) {
-                        onCloseCallback = callback; })
-                    .withMethod("withCloseCallback", function(callback) {
-                        this.onclose = callback;
-                        return this;})
-                return modal;}})}));
+                withContentSize: (width, height) => {
+                    let modal = undefined;
+                    let onCloseCallback = null;
+                    modal = SVG.Builder.G()
+                        .withClass("modal")
+                        .withChild(SVG.Builder.MouseTrap
+                            .withX(0)
+                            .withY(0)
+                            .withWidth(Style.width)
+                            .withHeight(Style.height)
+                            .withClass("modal-backdrop")
+                            .withAttributes({
+                                fill: Style.colors.black,
+                                fillOpacity: fillOpacity})
+                            .withEventListener("mousedown", () => modal.close()))
+                        .withChild(SVG.Builder.G()
+                            .withClass("modal-content-container")
+                            .moveTo(.5 * (Style.width - width), .5 * (Style.height - height))
+                            .withChild(SVG.Builder.Rect
+                                .withX(-contentPadding)
+                                .withY(-contentPadding)
+                                .withWidth(width + 2 * contentPadding)
+                                .withHeight(height + 2 * contentPadding)
+                                .withClass("modal-content-container-background")
+                                .withAttribute("fill", Style.colors.white))
+                            .withChild(content))
+                        .withMethod("close", function(){
+                            this.parentElement.removeChild(modal);
+                            if(onCloseCallback !== null) {
+                                onCloseCallback();}})
+                        .withSetter("onclose", function(callback) {
+                            onCloseCallback = callback; })
+                        .withMethod("withCloseCallback", function(callback) {
+                            this.onclose = callback;
+                            return this;})
+                    return modal;}})}));
         return {Builder: svgBuilder};});
 
     //A shape defines the sounding of a guitar as an array of six string actions called its schema.
@@ -760,24 +766,24 @@ const ChordJogApp = (() => {
             StringAction.matches = (stringAction, search) =>
                 search === StringAction.any ||
                 StringAction.equals(stringAction, search) || (
-                    StringAction.isFingered(search) &&
-                    search.finger === Fingers.any &&
-                    StringAction.isFingered(stringAction) &&
-                    stringAction.sounded === search.sounded &&
-                    stringAction.fret === search.fret);
+                StringAction.isFingered(search) &&
+                search.finger === Fingers.any &&
+                StringAction.isFingered(stringAction) &&
+                stringAction.sounded === search.sounded &&
+                stringAction.fret === search.fret);
             return StringAction;});
         const FingerAction = {
             Builder: {
                 withFinger: (finger) => ({
-                atRootFret: (fret) => ({
-                fromString: (fromString) => ({
-                toString: (toString) => ({
-                    finger: finger,
-                    fret: fret,
-                    range: Strings.range(fromString, toString)})})})})},
+                    atRootFret: (fret) => ({
+                        fromString: (fromString) => ({
+                            toString: (toString) => ({
+                                finger: finger,
+                                fret: fret,
+                                range: Strings.range(fromString, toString)})})})})},
             Validations: {
                 lacksRootFret: fingerActions => ! fingerActions.some(fingerAction =>
-                        fingerAction.fret === Frets.roots.first),
+                    fingerAction.fret === Frets.roots.first),
                 usesAFingerMoreThanOnce: fingerActions => Object.values(
                     fingerActions.reduce(
                         (numPerFinger, fingerAction) => {
@@ -814,7 +820,7 @@ const ChordJogApp = (() => {
                     .map((action, index) => ({
                         string: index + 1,
                         action: Shapes.StringAction.isFingerless(action) ||
-                            action === Shapes.StringAction.any ? null : action}))
+                        action === Shapes.StringAction.any ? null : action}))
                     .filter(stringAction => stringAction.action !== null)
                     .reduce(Module.of(
                         ((stringActionToFingerAction = (stringAction) => FingerAction.Builder
@@ -829,10 +835,10 @@ const ChordJogApp = (() => {
                                 candidate => Shapes.StringAction.isFingerless(candidate) ||
                                     candidate.fret <= stringAction.action.fret)) =>
                                 lastRelevantStringAction === undefined ||
-                                    Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
-                                    lastRelevantStringAction.finger !== stringAction.action.finger ||
-                                    lastRelevantStringAction.finger === Fingers.any
-                                ?
+                                Shapes.StringAction.isFingerless(lastRelevantStringAction) ||
+                                lastRelevantStringAction.finger !== stringAction.action.finger ||
+                                lastRelevantStringAction.finger === Fingers.any
+                                    ?
                                     fingerActions.concat(stringActionToFingerAction(stringAction)) :
                                     Arrays.updateItem(
                                         fingerActions,
@@ -847,11 +853,11 @@ const ChordJogApp = (() => {
         return Module.of(() => {
             const Builder = Module.of((
                 withSchemaStep=id=>({
-                withSchema: schema => ({
-                withRange: range => ({
-                    id: id,
-                    schema: schema,
-                    range: range})})})
+                    withSchema: schema => ({
+                        withRange: range => ({
+                            id: id,
+                            schema: schema,
+                            range: range})})})
             ) => ({
                 withId: withSchemaStep,
                 withoutId: () => withSchemaStep(null)}));
@@ -1081,8 +1087,8 @@ const ChordJogApp = (() => {
                     .withClass("root-fret-label")
                     .moveTo(
                         Fretboard.stringToXCoordinate(1) -
-                            FingerIndicator.Style.radius -
-                            RootFretLabel.Style.paddingRight,
+                        FingerIndicator.Style.radius -
+                        RootFretLabel.Style.paddingRight,
                         Fretboard.fretToYCoordinate(Frets.Relative.first))
                     .withSetter("rootFret", function(rootFret) {
                         this.withTextContent(rootFretToLabel(rootFret));})
@@ -1398,7 +1404,7 @@ const ChordJogApp = (() => {
                                     if(region === null) {
                                         //Yes. Show the indicator.
                                         this.show();}}
-                                //The new region is nothing.
+                                    //The new region is nothing.
                                 //Is the old region something?
                                 else if(region !== null) {
                                     //Yes. Hide the indicator.
@@ -1813,16 +1819,16 @@ const ChordJogApp = (() => {
                                 Shapes.StringAction.isFingered(stringAction) &&
                                 stringAction.finger === targetFinger &&
                                 stringAction.fret !== targetFret
-                            ) => targetFinger === Fingers.any ? (   //Is targetFinger *?
+                        ) => targetFinger === Fingers.any ? (   //Is targetFinger *?
                                 //Yes. Only replace the string action at the targetString with unsounded if
                                 //it is a fingered string action && the target finger && not the target fret.
                                 isTargetFingerAndNotTargetFret(state.schema[targetString-1]) ?
                                     Arrays.replaceItem(state.schema, targetString-1, Shapes.StringAction.unsounded) :
                                     state.schema) :
-                                //No. Convert any same-fingered but different-fret string actions to unsounded.
-                                state.schema.map(stringAction => isTargetFingerAndNotTargetFret(stringAction) ?
-                                    Shapes.StringAction.unsounded :
-                                    stringAction)),
+                            //No. Convert any same-fingered but different-fret string actions to unsounded.
+                            state.schema.map(stringAction => isTargetFingerAndNotTargetFret(stringAction) ?
+                                Shapes.StringAction.unsounded :
+                                stringAction)),
                         //Determine which stringAction will be used to substitute others.
                         //This depends on whether the mouse is being dragged and its drag action,
                         //or whether or not the existing string action on the target string
@@ -1923,108 +1929,108 @@ const ChordJogApp = (() => {
                         schema: schema}))}))
             ) => ({
                 withSchema: Schema => ({
-                withPreview: Preview => ({
-                withActiveFingerGetter: activeFingerGetter => Module.of((
-                    withAnyStringActionStep=includeAnyStringAction => Module.of((
-                        dragAction=null,
-                        previousMousePosition=null,
-                        currentMouseTrap=null,  //The mouse trap that the mouse is currently over, or null
-                        mousePositionToState=position => ({
-                            mousePosition: position,
-                            schema: Schema.get().slice(),
-                            activeFinger: activeFingerGetter(),
-                            dragAction: dragAction
-                        }),
-                        createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
-                            mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
-                                mousePositionToState([e.offsetX, e.offsetY]))
-                        ) => ({
-                            mouseenter: function(e) {
-                                currentMouseTrap = this;
-                                const schema = mouseEventToSchemaChange(e).schema;
-                                if(dragAction !== null) {
-                                    Schema.set(schema);}
-                                else {
-                                    Preview.set(schema);}},
-                            mousemove: e => {
-                                previousMousePosition = [e.offsetX, e.offsetY];
-                                const schema = mouseEventToSchemaChange(e).schema;
-                                if(dragAction !== null) {
-                                    Schema.set(schema);}
-                                else {
-                                    Preview.set(schema);}},
-                            mousedown: Module.of((
-                                mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
-                                    mouseUpEventHandler = () => {
-                                        dragAction = null;
-                                        if(currentMouseTrap !== null) {
-                                            Preview.set(Schema.get());}
+                    withPreview: Preview => ({
+                        withActiveFingerGetter: activeFingerGetter => Module.of((
+                            withAnyStringActionStep=includeAnyStringAction => Module.of((
+                                dragAction=null,
+                                previousMousePosition=null,
+                                currentMouseTrap=null,  //The mouse trap that the mouse is currently over, or null
+                                mousePositionToState=position => ({
+                                    mousePosition: position,
+                                    schema: Schema.get().slice(),
+                                    activeFinger: activeFingerGetter(),
+                                    dragAction: dragAction
+                                }),
+                                createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
+                                    mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
+                                        mousePositionToState([e.offsetX, e.offsetY]))
+                                ) => ({
+                                    mouseenter: function(e) {
+                                        currentMouseTrap = this;
+                                        const schema = mouseEventToSchemaChange(e).schema;
+                                        if(dragAction !== null) {
+                                            Schema.set(schema);}
                                         else {
-                                            Preview.set(null);}
-                                        window.removeEventListener("mouseup", mouseUpEventHandler);};
-                                    return mouseUpEventHandler;})
-                            ) => e => {
-                                const schemaChange = mouseEventToSchemaChange(e);
-                                dragAction = schemaChange.change;
-                                Schema.set(schemaChange.schema);
-                                Preview.set(null);
-                                window.addEventListener("mouseup", mouseUpEventHandler)}),
-                            mouseout: () => {
-                                currentMouseTrap = null;
-                                Preview.set(null);}})),
-                        previousFretboardMousePosition=null,
-                        fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
-                            .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                FingerlessIndicators.Style.padding.horizontal)
-                            .withY(ShapeChart.FingerlessIndicator.Style.startY -
-                                FingerlessIndicators.Style.padding.vertical)
-                            .withWidth(ShapeChart.Fretboard.Style.width +
-                                ShapeChart.FingerlessIndicator.Style.diameter +
-                                2 * FingerlessIndicators.Style.padding.horizontal)
-                            .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                ShapeChart.FingerlessIndicator.Style.margin +
-                                FingerlessIndicators.Style.padding.vertical)
-                            .withClass("fingerless-indicators-mouse-trap")
-                            .withEventListeners(createMouseEventListeners(
-                                FingerlessIndicators.mouseTrapStateToSchemaChange)),
-                        fretboardMouseTrap=SVG.Builder.MouseTrap
-                            .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
-                            .withY(ShapeChart.Fretboard.Style.y)
-                            .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
-                            .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
-                            .withClass("fretboard-mouse-trap")
-                            .withEventListeners(createMouseEventListeners(
-                                Fretboard.mouseTrapStateToSchemaChange)),
-                        shapeInputMouseTraps=SVG.Builder.G()
-                            .withClass("shape-input-mouse-traps")
-                            .withChild(fingerlessIndicatorMouseTrap)
-                            .withChild(fretboardMouseTrap)
-                            .withMethod("activeFingerChanged", () => {
-                                if(currentMouseTrap === fretboardMouseTrap) {
-                                    Preview.set(Fretboard
-                                        .mouseTrapStateToSchemaChange(
-                                            mousePositionToState(previousMousePosition))
-                                        .schema)}})
-                    ) => includeAnyStringAction === false ?
-                        shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
-                        shapeInputMouseTraps.withChild( //Do include...
-                            SVG.Builder.MouseTrap
-                                .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                    AnyStringAction.Style.padding.horizontal)
-                                .withY(ShapeChart.Fretboard.Style.y +
-                                    ShapeChart.Fretboard.Style.height)
-                                .withWidth(ShapeChart.Fretboard.Style.width +
-                                    ShapeChart.FingerlessIndicator.Style.diameter +
-                                    2 * AnyStringAction.Style.padding.horizontal)
-                                .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                    ShapeChart.FingerlessIndicator.Style.margin +
-                                    AnyStringAction.Style.padding.vertical)
-                                .withClass("fingerless-indicators-mouse-trap")
-                                .withEventListeners(createMouseEventListeners(
-                                    AnyStringAction.mouseTrapStateToSchemaChange))))
-                ) => ({
-                    withAnyStringAction: () => withAnyStringActionStep(true),
-                    withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
+                                            Preview.set(schema);}},
+                                    mousemove: e => {
+                                        previousMousePosition = [e.offsetX, e.offsetY];
+                                        const schema = mouseEventToSchemaChange(e).schema;
+                                        if(dragAction !== null) {
+                                            Schema.set(schema);}
+                                        else {
+                                            Preview.set(schema);}},
+                                    mousedown: Module.of((
+                                        mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
+                                            mouseUpEventHandler = () => {
+                                                dragAction = null;
+                                                if(currentMouseTrap !== null) {
+                                                    Preview.set(Schema.get());}
+                                                else {
+                                                    Preview.set(null);}
+                                                window.removeEventListener("mouseup", mouseUpEventHandler);};
+                                            return mouseUpEventHandler;})
+                                    ) => e => {
+                                        const schemaChange = mouseEventToSchemaChange(e);
+                                        dragAction = schemaChange.change;
+                                        Schema.set(schemaChange.schema);
+                                        Preview.set(null);
+                                        window.addEventListener("mouseup", mouseUpEventHandler)}),
+                                    mouseout: () => {
+                                        currentMouseTrap = null;
+                                        Preview.set(null);}})),
+                                previousFretboardMousePosition=null,
+                                fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
+                                    .withX(ShapeChart.FingerlessIndicator.Style.startX  -
+                                        FingerlessIndicators.Style.padding.horizontal)
+                                    .withY(ShapeChart.FingerlessIndicator.Style.startY -
+                                        FingerlessIndicators.Style.padding.vertical)
+                                    .withWidth(ShapeChart.Fretboard.Style.width +
+                                        ShapeChart.FingerlessIndicator.Style.diameter +
+                                        2 * FingerlessIndicators.Style.padding.horizontal)
+                                    .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                        ShapeChart.FingerlessIndicator.Style.margin +
+                                        FingerlessIndicators.Style.padding.vertical)
+                                    .withClass("fingerless-indicators-mouse-trap")
+                                    .withEventListeners(createMouseEventListeners(
+                                        FingerlessIndicators.mouseTrapStateToSchemaChange)),
+                                fretboardMouseTrap=SVG.Builder.MouseTrap
+                                    .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
+                                    .withY(ShapeChart.Fretboard.Style.y)
+                                    .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
+                                    .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
+                                    .withClass("fretboard-mouse-trap")
+                                    .withEventListeners(createMouseEventListeners(
+                                        Fretboard.mouseTrapStateToSchemaChange)),
+                                shapeInputMouseTraps=SVG.Builder.G()
+                                    .withClass("shape-input-mouse-traps")
+                                    .withChild(fingerlessIndicatorMouseTrap)
+                                    .withChild(fretboardMouseTrap)
+                                    .withMethod("activeFingerChanged", () => {
+                                        if(currentMouseTrap === fretboardMouseTrap) {
+                                            Preview.set(Fretboard
+                                                .mouseTrapStateToSchemaChange(
+                                                    mousePositionToState(previousMousePosition))
+                                                .schema)}})
+                            ) => includeAnyStringAction === false ?
+                                shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
+                                shapeInputMouseTraps.withChild( //Do include...
+                                    SVG.Builder.MouseTrap
+                                        .withX(ShapeChart.FingerlessIndicator.Style.startX  -
+                                            AnyStringAction.Style.padding.horizontal)
+                                        .withY(ShapeChart.Fretboard.Style.y +
+                                            ShapeChart.Fretboard.Style.height)
+                                        .withWidth(ShapeChart.Fretboard.Style.width +
+                                            ShapeChart.FingerlessIndicator.Style.diameter +
+                                            2 * AnyStringAction.Style.padding.horizontal)
+                                        .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                            ShapeChart.FingerlessIndicator.Style.margin +
+                                            AnyStringAction.Style.padding.vertical)
+                                        .withClass("fingerless-indicators-mouse-trap")
+                                        .withEventListeners(createMouseEventListeners(
+                                            AnyStringAction.mouseTrapStateToSchemaChange))))
+                        ) => ({
+                            withAnyStringAction: () => withAnyStringActionStep(true),
+                            withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
             createShapeInput=(schema, withWildcards) => Module.of((
                 shapeChart = Module.of((
                     anyStringActionStep=ShapeChart.Builder
@@ -2214,21 +2220,7 @@ const ChordJogApp = (() => {
                     .withChild(SVG.Builder.G()
                         .withClass("root-fret-range-ticks")
                         .withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth)
-                        .withChildren(Object.values(rootFretTicks)))
-                    .withMethods(
-                        Module.of((
-                            activeRootFrets=[],
-                            setNewActives=(actives) => {
-                                activeRootFrets.forEach(rootFret =>
-                                    rootFretTicks[rootFret].withAttribute(
-                                        "stroke-width", RootFretRangeStyle.normalStrokeWidth));
-                                activeRootFrets = actives;
-                                activeRootFrets.forEach((rootFret) =>
-                                    rootFretTicks[rootFret].withAttribute(
-                                        "stroke-width", RootFretRangeStyle.activeStrokeWidth));}
-                        ) => ({
-                            activateMinAndMax: (min, max) => setNewActives([min, max]),
-                            activatePivot: pivot => setNewActives([pivot])})))),
+                        .withChildren(Object.values(rootFretTicks)))),
                 rangeLabel = Module.of((
                     createText=()=>SVG.Builder.Text
                         .withoutTextContent()
@@ -2259,6 +2251,12 @@ const ChordJogApp = (() => {
                             return this;},
                         withValue: function(rootFret) {
                             return this.withRange(rootFret, rootFret);}})),
+                mouseTrap = SVG.Builder.MouseTrap
+                    .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
+                    .withY(-.5 * RootFretRangeStyle.height)
+                    .withWidth(width + 2 * RootFretRangeStyle.mouseTrapHorizontalPadding)
+                    .withHeight(RootFretRangeStyle.height)
+                    .withClass("root-fret-range-mouse-trap"),
                 rangeMarkers = Module.of((
                     rootFretToCenter=rootFret=>[rootFretToXCoordinate(rootFret), 0],
                     markerForType=markerType=>SVG.Builder.Circle
@@ -2268,260 +2266,264 @@ const ChordJogApp = (() => {
                         .withAttributes({
                             cursor: "pointer",
                             pointerEvents: "all",
-                            strokeWidth: RootFretRangeStyle.normalStrokeWidth,
                             fill: "none"})
                         .withDataAttribute("markerType", markerType)
+                        .withGetter("type", () => markerType)
                         .withDataAttribute("rootFret", null)
                         .withGetterAndSetter("rootFret",
                             function() {return Number.parseInt(this.dataset.rootFret);},
                             function(rootFret) {this.dataset.rootFret = rootFret;})
-                        .withMethod("atRootFret", function(rootFret) {
-                            const center = rootFretToCenter(rootFret);
-                            return this
-                                .withDataAttribute("rootFret", rootFret)
-                                .withAttributes({
-                                    cx: center[0],
-                                    cy: center[1]});})
-                        .hide()
+                        .withMethods({
+                            atRootFret: function(rootFret) {
+                                const center = rootFretToCenter(rootFret);
+                                return this
+                                    .withDataAttribute("rootFret", rootFret)
+                                    .withAttributes({
+                                        cx: center[0],
+                                        cy: center[1]});},
+                            deactivate: function() {
+                                this.withAttribute("stroke-width", RootFretRangeStyle.normalStrokeWidth);},
+                            deactivated: function() {
+                                this.deactivate();
+                                return this;},
+                            emphasize: function() {
+                                this.withAttribute("stroke-width", RootFretRangeStyle.emphasisStrokeWidth);},
+                            emphasized: function() {
+                                this.emphasize();
+                                return this;},
+                            activate: function() {
+                                this.withAttribute("stroke-width", RootFretRangeStyle.activeStrokeWidth);},
+                            activated: function() {
+                                this.activate();
+                                return this;}})
+                        .deactivated()
+                        .hide(),
+                    min= markerForType("min"),
+                    max= markerForType("max"),
+                    pivot= markerForType("pivot"),
+                    preview= markerForType("preview").withAttributes({
+                        strokeDasharray: "3 4",
+                        pointerEvents: "none"}),
+                    minAndMax=[min, max]
+                ) => ({
+                    min: min,
+                    max: max,
+                    pivot: pivot,
+                    preview: preview,
+                    minAndMax: minAndMax,
+                    minMaxAndPivot: [min, max, pivot],
+                    //preview goes first in all so it is behind others
+                    all:  [preview, min, max, pivot]})),
+                Range = Module.of((
+                    value=undefined,
+                    changeListener=null,
+                    isSingleValue = range => range.min === range.max,
+                    Range= {
+                        setChangeListener: listener => changeListener = listener,
+                        get: () => value,
+                        set: (min, max=min) => {
+                            const range = Frets.Range.create(min, max);
+                            if(value !== undefined && Frets.Range.equals(value, range)) {
+                                return;}
+                            //Is the new range a single value?
+                            if(isSingleValue(range)) {
+                                //Yes.
+                                activeBaseline.hide();
+                                rangeLabel.withValue(range.min);
+                                rangeMarkers.pivot.atRootFret(range.min);
+                                //Was the old range not a single value?
+                                if(value === undefined || ! isSingleValue(value)) {
+                                    //Yes. Swap which markers are visible.
+                                    rangeMarkers.pivot.show();
+                                    rangeMarkers.minAndMax.forEach(rangeMarker => rangeMarker.hide());}}
+                            else {
+                                //No.
+                                activeBaseline.show();
+                                rangeLabel.withRange(range.min, range.max);
+                                activeBaseline.withRange(range.min, range.max);
+                                rangeMarkers.min.atRootFret(range.min);
+                                rangeMarkers.max.atRootFret(range.max);
+                                //Was the old range a single value?
+                                if(value === undefined || isSingleValue(value)) {
+                                    //Yes. Swap which markers are visible.
+                                    rangeMarkers.minAndMax.forEach(rangeMarker => rangeMarker.show());
+                                    rangeMarkers.pivot.hide();}}
+                            value = range;
+                            if(changeListener) {
+                                changeListener(range);}},
+                        isSingleValue: () => isSingleValue(value)}
                 ) => {
-                    const markers = {
-                        min: markerForType("min"),
-                        max: markerForType("max"),
-                        pivot: markerForType("pivot"),
-                        preview: markerForType("preview").withAttributes({
-                            strokeDasharray: "3 4",
-                            pointerEvents: "none"})};
-                    markers.minAndMax = [markers.min, markers.max];
-                    markers.all = [markers.preview,   //preview goes first so it is behind others
-                        markers.min, markers.max, markers.pivot];
-                    return markers;}),
-                mouseTrap = SVG.Builder.MouseTrap
-                    .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
-                    .withY(-.5 * RootFretRangeStyle.height)
-                    .withWidth(width + 2 * RootFretRangeStyle.mouseTrapHorizontalPadding)
-                    .withHeight(RootFretRangeStyle.height)
-                    .withClass("root-fret-range-mouse-trap"),
-                Range = Module.of((value, changeListener=null) => ({
-                    setChangeListener: (listener) => changeListener = listener,
-                    get: () => value,
-                    set: (min, max=min) => {
-                        const range = Frets.Range.create(min, max);
-                        if(value !== undefined && Frets.Range.equals(value, range)) {
-                            return;}
-                        value = range;
-                        if(changeListener) {
-                            changeListener(value);}
-                        if(value.min !== value.max) { //min and max
-                            rangeMarkers.minAndMax.forEach(marker =>
-                                marker.show());
-                            rangeMarkers.pivot.hide();
-                            skeleton.activateMinAndMax(value.min, value.max);
-                            activeBaseline.show();
-                            rangeLabel.withRange(value.min, value.max);
-                            activeBaseline.withRange(value.min, value.max);
-                            rangeMarkers.min.atRootFret(value.min);
-                            rangeMarkers.max.atRootFret(value.max);}
-                        else { //pivot
-                            rangeMarkers.pivot.show();
-                            rangeMarkers.minAndMax.forEach(marker => marker.hide());
-                            skeleton.activatePivot(value.min);
-                            activeBaseline.hide();
-                            rangeLabel.withValue(value.min);
-                            rangeMarkers.pivot.atRootFret(value.min);}}})),
-                thisFunctionShouldNotExist=(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range) => {
-                    const activateMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.activeStrokeWidth)
-                    const emphasizeMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.emphasisStrokeWidth);
-                    const unemphasizeMarker = (marker) => marker.withAttribute(
-                        "stroke-width", RootFretRangeStyle.normalStrokeWidth);
-                    const States = {
-                        extremaInactive: {},
-                        extremumDragging: {},
-                        maxDragging: {},
-                        pivot: {},
-                        pivotInactive: {}};
-                    const mouseEventToRootFret = (e) => xCoordinateToRootFret(
-                        MouseEvents.relativeMousePosition(e, baseline)[0]);
-                    const emphasizeMarkerIfMouseOnRootFret = (marker, mouseEvent,
-                                                              relativeMousePosition=MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)
-                    ) => Functions.ifThenElse(
-                        mouseEventToRootFret(mouseEvent) !== marker.rootFret ||
-                        relativeMousePosition[0] < 0 ||
-                        relativeMousePosition[1] < 0 ||
-                        relativeMousePosition[0] > width ||
-                        relativeMousePosition[1] > RootFretRangeStyle.height,
-                        () => unemphasizeMarker(marker),
-                        () => emphasizeMarker(marker));
-                    let previewRootFret = null;
-                    const setPreviewRootFret = (rootFret) => {
-                        previewRootFret = rootFret;
-                        rangeMarkers.preview.atRootFret(rootFret);};
-                    const inactivateRangeMouseMove = (e, relevantMarkers,
-                                                      rootFret=mouseEventToRootFret(e)
-                    ) => {
-                        relevantMarkers.forEach(marker =>
-                            emphasizeMarkerIfMouseOnRootFret(marker, e));
-                        Functions.ifThen(
-                            rootFret !== previewRootFret,
-                            () => setPreviewRootFret(rootFret))};
-                    const inactiveRangeMouseEnter = (e, relevantMarkers) => {
-                        rangeMarkers.preview.show();
-                        inactivateRangeMouseMove(e, relevantMarkers); };
-                    const inactiveRangeMouseLeave = () => {
-                        rangeMarkers.preview.hide();
-                        rangeMarkers.minAndMax.concat(rangeMarkers.pivot).forEach(marker =>
-                            unemphasizeMarker(marker));};
-                    Objects.using(States.extremaInactive).withFields(Module.of(() => {
-                        let deactivate;
-                        const markerMouseEnter = (marker, rootFret) => {
-                            setPreviewRootFret(rootFret);
-                            emphasizeMarker(marker);};
-                        const markerMouseLeave = (marker) => unemphasizeMarker(marker);
-                        const rangeEventListeners = {
-                            mouseEnter: (e) => inactiveRangeMouseEnter(e, rangeMarkers.minAndMax),
-                            mouseMove: (e) => inactivateRangeMouseMove(e, rangeMarkers.minAndMax),
-                            mouseDown: (e) => {
-                                deactivate();
-                                Range.set(mouseEventToRootFret(e));
-                                States.pivot.activate();},
-                            mouseLeave: inactiveRangeMouseLeave};
-                        const minMarkerEventListeners = {
-                            mouseEnter: () => markerMouseEnter(rangeMarkers.min, rangeMarkers.min.rootFret),
-                            mouseLeave: () => markerMouseLeave(rangeMarkers.min),
-                            mouseDown: () => {
-                                deactivate();
-                                States.extremumDragging.activate().forMin()}};
-                        const maxMarkerEventListeners = {
-                            mouseEnter: () => markerMouseEnter(rangeMarkers.max, rangeMarkers.max.rootFret),
-                            mouseLeave: () => markerMouseLeave(rangeMarkers.max),
-                            mouseDown: () => {
-                                deactivate();
-                                States.extremumDragging.activate().forMax();}};
-                        deactivate = () => {
-                            mouseTrap.withoutEventListeners(rangeEventListeners);
-                            rangeMarkers.min.withoutEventListeners(minMarkerEventListeners);
-                            rangeMarkers.max.withoutEventListeners(maxMarkerEventListeners);};
-                        return {
-                            activate: () => {
-                                mouseTrap.withEventListeners(rangeEventListeners);
-                                rangeMarkers.min.withEventListeners(minMarkerEventListeners);
-                                rangeMarkers.max.withEventListeners(maxMarkerEventListeners);}};}));
-                    Objects.using(States.extremumDragging).withFields(Module.of(() => {
-                        const internalState = Objects.using({
-                            activeRangeMarker: null,
-                            activeRootFret: null,
-                            inactiveRootFret: null,
-                            polarity: null });
-                        let deactivate;
-                        const mouseMoveHandler = (e,
-                                                  rootFret = mouseEventToRootFret(e),
-                                                  getRange = (rootFret) => internalState.polarity === 1 ?
-                                                      [internalState.inactiveRootFret, rootFret] :
-                                                      [rootFret, internalState.inactiveRootFret]
-                        ) => Functions.ifThenElse(
-                            //Did the active marker drag onto or cross the inactive marker?
-                            internalState.polarity * (rootFret - internalState.inactiveRootFret) > 0,
-                            //No.
-                            () => Functions.ifThen(
-                                //Is the mouse over a different root fret than the active markers'?
-                                rootFret !== internalState.activeRootFret,
-                                () => {
-                                    internalState.activeRootFret = rootFret;
-                                    internalState.activeRangeMarker.atRootFret(rootFret);
-                                    Range.set(...getRange(rootFret));}),
-                            //Yes.
-                            () => {
-                                internalState.activeRangeMarker.atRootFret(
-                                    internalState.inactiveRootFret);
-                                Range.set(internalState.inactiveRootFret);
-                                deactivate();
-                                States.pivot.activate();});
-                        const mouseUpHandler = (e) => {
-                            deactivate();
-                            emphasizeMarkerIfMouseOnRootFret(internalState.activeRangeMarker, e);
-                            States.extremaInactive.activate();};
-                        deactivate = () => {
-                            window.removeEventListener("mousemove", mouseMoveHandler);
-                            window.removeEventListener("mouseup", mouseUpHandler);};
-                        const activateExtremum = (activeRangeMarker, inactiveRangeMarker, polarity) => {
-                            activateMarker(activeRangeMarker);
-                            unemphasizeMarker(inactiveRangeMarker);
-                            const activeRootFret = activeRangeMarker.rootFret;
-                            const inactiveRootFret = inactiveRangeMarker.rootFret;
-                            polarity === -1 ?
-                                Range.set(activeRootFret, inactiveRootFret) :
-                                Range.set(inactiveRootFret, activeRootFret);
-                            internalState.withFields({
-                                activeRangeMarker: activeRangeMarker,
-                                activeRootFret: activeRootFret,
-                                inactiveRootFret: inactiveRootFret,
-                                polarity: polarity})};
-                        return {
-                            activate: () => {
-                                window.addEventListener("mousemove", mouseMoveHandler);
-                                window.addEventListener("mouseup", mouseUpHandler);
-                                rangeMarkers.preview.hide();
-                                return {
-                                    forMin: () => activateExtremum(
-                                        rangeMarkers.min, rangeMarkers.max, -1),
-                                    forMax: () => activateExtremum(
-                                        rangeMarkers.max, rangeMarkers.min, 1)};}};}));
-                    Objects.using(States.pivot).withFields(Module.of(() => {
-                        let pivotFret = null;
-                        let deactivate;
-                        const mouseUp=(e) => {
-                            emphasizeMarkerIfMouseOnRootFret(rangeMarkers.pivot, e);
-                            deactivate();
-                            States.pivotInactive.activate();};
-                        const mouseMove = (e, rootFret=mouseEventToRootFret(e)) =>
-                            Functions.ifThen(rootFret !== pivotFret, () => {
-                                deactivate();
-                                Functions.ifThenElse(rootFret < pivotFret,
-                                    () => {
-                                        Range.set(rootFret, pivotFret);
-                                        States.extremumDragging.activate().forMin();},
-                                    () => {
-                                        Range.set(pivotFret, rootFret);
-                                        States.extremumDragging.activate().forMax();})});
-                        deactivate=() => {
-                            window.removeEventListener("mouseup", mouseUp);
-                            window.removeEventListener("mousemove", mouseMove);};
-                        return {
-                            activate: () => {
-                                pivotFret = rangeMarkers.pivot.rootFret;
-                                activateMarker(rangeMarkers.pivot);
-                                rangeMarkers.minAndMax.forEach(rangeMarker =>
-                                    rangeMarker.atRootFret(pivotFret));
-                                rangeMarkers.preview.hide();
-                                rangeLabel.withValue(pivotFret);
-                                window.addEventListener("mouseup", mouseUp);
-                                window.addEventListener("mousemove", mouseMove);}};}));
-                    Objects.using(States.pivotInactive).withFields(Module.of(() => {
-                        let deactivate;
-                        const mouseDown = (e) => {
-                            deactivate();
-                            Range.set(mouseEventToRootFret(e));
-                            States.pivot.activate();};
-                        const pivotMouseEvents = {
-                            mouseEnter: () => emphasizeMarker(rangeMarkers.pivot),
-                            mouseDown: mouseDown,
-                            mouseLeave: () => unemphasizeMarker(rangeMarkers.pivot),};
-                        const rangeMouseEvents = {
-                            mouseEnter: (e) => inactiveRangeMouseEnter(e, [rangeMarkers.pivot]),
-                            mouseDown: mouseDown,
-                            mouseMove: (e) => inactivateRangeMouseMove(e, [rangeMarkers.pivot]),
-                            mouseLeave: inactiveRangeMouseLeave};
-                        deactivate = () => {
-                            mouseTrap.withoutEventListeners(rangeMouseEvents);
-                            rangeMarkers.pivot.withoutEventListeners(pivotMouseEvents);};
-                        return {
-                            activate: () => {
-                                mouseTrap.withEventListeners(rangeMouseEvents);
-                                rangeMarkers.pivot.withEventListeners(pivotMouseEvents);}};}));
-                    States.extremaInactive.activate();
-                },
-                thisCallShouldNotExist=thisFunctionShouldNotExist(rangeMarkers, baseline, activeBaseline, rangeLabel, mouseTrap, Range)
+                    Range.set(range.min, range.max);
+                    return Range;}),
+                States = Module.of((
+                    mouseEventToRootFret = e => xCoordinateToRootFret(
+                        MouseEvents.relativeMousePosition(e, baseline)[0]),
+                    States={ //Placeholder activate methods to be defined later
+                        Inactive: {activate: () => undefined},
+                        Dragging: {activate: marker => undefined}},
+                    setStates=States={
+                        Inactive: Module.of((
+                            visibleRangeMarkers=[],
+                            changeToDraggingState=activeRangeMarker => undefined,
+                            PreviewRootFret=Module.of((
+                                value=null,
+                                EmphasizedMarker=Module.of((
+                                    emphasizedMarker=null,
+                                    unsetEmphasizedMarker=() => {
+                                        if(emphasizedMarker !== null) {
+                                            emphasizedMarker.deactivate();
+                                            emphasizedMarker = null;}}
+                                ) => ({
+                                    unset: unsetEmphasizedMarker,
+                                    atRootFret: rootFret => {
+                                        unsetEmphasizedMarker();
+                                        visibleRangeMarkers.forEach(visibleMarker => Functions.ifThen(
+                                            visibleMarker.rootFret === rootFret,
+                                            () => {
+                                                visibleMarker.emphasize();
+                                                emphasizedMarker = visibleMarker;}));}})),
+                                setPreviewRootFret = rootFret => {
+                                    if(value !== rootFret) {
+                                        EmphasizedMarker.atRootFret(rootFret);
+                                        rangeMarkers.preview.atRootFret(rootFret);
+                                        if(value === null) {
+                                            rangeMarkers.preview.show();}
+                                        if(rootFret === null) {
+                                            rangeMarkers.preview.hide();}
+                                        value = rootFret;}}
+                            ) => ({
+                                set: setPreviewRootFret,
+                                unset: () => setPreviewRootFret(null)})),
+                            mouseTrapEventListeners={
+                                mouseEnter: e => PreviewRootFret.set(mouseEventToRootFret(e)),
+                                mouseMove: e => PreviewRootFret.set(mouseEventToRootFret(e)),
+                                mouseDown: e => {
+                                    Range.set(mouseEventToRootFret(e));
+                                    changeToDraggingState(rangeMarkers.pivot);},
+                                mouseLeave: () => PreviewRootFret.unset()},
+                            markersEventListeners = null
+                        ) => {
+                            changeToDraggingState=activeRangeMarker=>{
+                                PreviewRootFret.unset();
+                                mouseTrap.withoutEventListeners(mouseTrapEventListeners);
+                                visibleRangeMarkers.forEach(marker =>
+                                    marker.withoutEventListeners(markersEventListeners[marker.type]));
+                                States.Dragging.activate(activeRangeMarker);};
+                            return {
+                                activate: () => {
+                                    visibleRangeMarkers = Range.isSingleValue() ?
+                                        [rangeMarkers.pivot] :
+                                        rangeMarkers.minAndMax;
+                                    markersEventListeners=Object.fromEntries(
+                                        visibleRangeMarkers.map(marker => [
+                                            marker.type,
+                                            Module.of((markerRootFret=marker.rootFret) => ({
+                                                mouseEnter: () => PreviewRootFret.set(markerRootFret),
+                                                mouseLeave: () => PreviewRootFret.unset(),
+                                                mouseDown: () => changeToDraggingState(marker)}))]));
+                                    visibleRangeMarkers.forEach(marker =>
+                                        marker.show().withEventListeners(markersEventListeners[marker.type]));
+                                    mouseTrap.withEventListeners(mouseTrapEventListeners);}};}),
+                        Dragging: Module.of((
+                            minMaxAndMouseTrap=rangeMarkers.minAndMax.concat(mouseTrap),
+                            MinDragging=undefined,
+                            MaxDragging=undefined,
+                            ActiveMarker=Module.of((value=null) => ({
+                                get: () => value,
+                                set: activeMarker => {
+                                    if(activeMarker !== value) {
+                                        if (value !== null) {
+                                            value.deactivate();}
+                                        if(activeMarker !== null) {
+                                            activeMarker.activate();}
+                                        value = activeMarker;}}})),
+                            MouseMoveListener=Module.of((
+                                value,
+                                remove=()=>window.removeEventListener("mousemove", value)
+                            ) => ({
+                                get: () => value,
+                                set: listener => {
+                                    if(listener !== value) {
+                                        if(value !== null) {
+                                            remove();}
+                                        window.addEventListener("mousemove", listener);
+                                        value = listener;}},
+                                unset: () => {
+                                    remove();
+                                    value = null;}})),
+                            mouseUpListener=undefined,
+                            setupMouseUpListener= mouseUpListener=e=>{
+                                const relativeMousePosition=MouseEvents.relativeMousePosition(e, mouseTrap);
+                                const activeMarker = ActiveMarker.get();
+                                ActiveMarker.set(null);
+                                if(
+                                    //Is the mouse  over the active marker's root fret
+                                    mouseEventToRootFret(e) === activeMarker.rootFret &&
+                                    //or not within the RootFretInput's bounding box?
+                                    relativeMousePosition[0] >= 0 &&
+                                    relativeMousePosition[1] >= 0 &&
+                                    relativeMousePosition[0] <= width &&
+                                    relativeMousePosition[1] <= RootFretRangeStyle.height) {
+                                    //No. Emphasize the active marker.
+                                    activeMarker.emphasize();}
+                                MouseMoveListener.unset();
+                                window.removeEventListener("mouseup", mouseUpListener);
+                                States.Inactive.activate();},
+                            PivotDragging={
+                                activate: pivotRootFret => {
+                                    ActiveMarker.set(rangeMarkers.pivot.show());
+                                    rangeMarkers.minAndMax.forEach(extremumMarker=>extremumMarker.hide());
+                                    MouseMoveListener.set(e=>{
+                                        const rootFret = mouseEventToRootFret(e);
+                                        if(rootFret > pivotRootFret) {
+                                            rangeMarkers.pivot.deactivated().hide();
+                                            Range.set(pivotRootFret, rootFret);
+                                            MaxDragging.activate();}
+                                        else if (rootFret < pivotRootFret) {
+                                            rangeMarkers.pivot.deactivated().hide();
+                                            Range.set(rootFret, pivotRootFret);
+                                            MinDragging.activate();}});}},
+                            setupMinDragging=MinDragging={
+                                activate: () => {
+                                    const range = Range.get();
+                                    ActiveMarker.set(rangeMarkers.min.show());
+                                    const maxRootFret = range.max;
+                                    rangeMarkers.max.show();
+                                    MouseMoveListener.set(e=>{
+                                        const rootFret = mouseEventToRootFret(e);
+                                        if(rootFret === maxRootFret) {
+                                            Range.set(rootFret);
+                                            PivotDragging.activate(maxRootFret);}
+                                        else if(rootFret > maxRootFret) {
+                                            Range.set(maxRootFret, rootFret);
+                                            MaxDragging.activate();}
+                                        else {
+                                            Range.set(rootFret, maxRootFret);}});}},
+                            setupMaxDragging=MaxDragging = {
+                                activate: () => {
+                                    const range = Range.get();
+                                    ActiveMarker.set(rangeMarkers.max.show());
+                                    const minRootFret = range.min;
+                                    rangeMarkers.min.show();
+                                    MouseMoveListener.set(e=>{
+                                        const rootFret = mouseEventToRootFret(e);
+                                        if(rootFret === minRootFret) {
+                                            Range.set(rootFret);
+                                            PivotDragging.activate(minRootFret);}
+                                        else if(rootFret < minRootFret) {
+                                            Range.set(rootFret, minRootFret);
+                                            MinDragging.activate();}
+                                        else {
+                                            Range.set(minRootFret, rootFret);}});}}
+                        ) => ({
+                            activate: activeMarker => {
+                                window.addEventListener("mouseup", mouseUpListener);
+                                activeMarker === rangeMarkers.min ?
+                                    MinDragging.activate() :
+                                activeMarker === rangeMarkers.max ?
+                                    MaxDragging.activate() :
+                                PivotDragging.activate(activeMarker.rootFret);}}))}
+                ) => States.Inactive.activate())
             ) => SVG.Builder.G()
                 .withClass("root-fret-range-input")
                 .withChild(skeleton)
@@ -2532,11 +2534,10 @@ const ChordJogApp = (() => {
                     .withChildren(rangeMarkers.all))
                 .withGetterAndSetter("range",
                     () => Range.get(),
-                    (range) => Range.set(range.min, range.max))
+                    range => Range.set(range.min, range.max))
                 .withMethod("withRange", function(range) {
                     this.range = range;
                     return this;})
-                .withRange(range)
                 .withMethod("withChangeListener", function(changeListener) {
                     Range.setChangeListener(changeListener);
                     return this;}))})}}));
@@ -2598,8 +2599,8 @@ const ChordJogApp = (() => {
             const saveButton = SVG.Builder.TextButton
                 .withDimensions(
                     ShapeCreatorStyle.Buttons.startX +
-                        2 * ShapeCreatorStyle.Buttons.height +
-                        ShapeCreatorStyle.Buttons.width,
+                    2 * ShapeCreatorStyle.Buttons.height +
+                    ShapeCreatorStyle.Buttons.width,
                     ShapeCreatorStyle.Buttons.y,
                     ShapeCreatorStyle.Buttons.width,
                     ShapeCreatorStyle.Buttons.height)
@@ -2692,7 +2693,7 @@ const ChordJogApp = (() => {
     ) => ({
         new: () => Module.of((
             width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-                (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
+            (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
             ShapeItem=Module.of((
                 shapeChartMarginBottom=3,
                 buttonHeight=18,
@@ -2742,7 +2743,7 @@ const ChordJogApp = (() => {
                 .move(0, ShapeInput.Style.height + topRowMarginBottom),
             shapesPageTopRow=Module.of((
                 filterShapes=shapeFilter=>shapeChartGrid.modules = ShapeItem.shapesToShapeItems(
-                        Shapes.search(shapeFilter)),
+                    Shapes.search(shapeFilter)),
                 shapeInput=ShapeInput.Builder
                     .withWildcards()
                     .blank()
