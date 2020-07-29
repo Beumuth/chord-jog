@@ -902,6 +902,10 @@ const ChordJogApp = (() => {
                 update: shape => {
                     all[shape.id] = shape;
                     saveToLocalStorage();},
+                delete: id => {
+                    all.splice(id, 1);
+                    Numbers.range(id, all.length).forEach(i => all[i].id = i - 1);
+                    saveToLocalStorage();},
                 fromString: shapesFromString,
                 toString: shapesToString,
                 search: schemaQuery => all.filter(shape =>undefined === shape.schema.find((stringAction, index) =>
@@ -1933,108 +1937,109 @@ const ChordJogApp = (() => {
                         schema: schema}))}))
             ) => ({
                 withSchema: Schema => ({
-                    withPreview: Preview => ({
-                        withActiveFingerGetter: activeFingerGetter => Module.of((
-                            withAnyStringActionStep=includeAnyStringAction => Module.of((
-                                dragAction=null,
-                                previousMousePosition=null,
-                                currentMouseTrap=null,  //The mouse trap that the mouse is currently over, or null
-                                mousePositionToState=position => ({
-                                    mousePosition: position,
-                                    schema: Schema.get().slice(),
-                                    activeFinger: activeFingerGetter(),
-                                    dragAction: dragAction
-                                }),
-                                createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
-                                    mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
-                                        mousePositionToState([e.offsetX, e.offsetY]))
-                                ) => ({
-                                    mouseenter: function(e) {
-                                        currentMouseTrap = this;
-                                        const schema = mouseEventToSchemaChange(e).schema;
-                                        if(dragAction !== null) {
-                                            Schema.set(schema);}
-                                        else {
-                                            Preview.set(schema);}},
-                                    mousemove: e => {
-                                        previousMousePosition = [e.offsetX, e.offsetY];
-                                        const schema = mouseEventToSchemaChange(e).schema;
-                                        if(dragAction !== null) {
-                                            Schema.set(schema);}
-                                        else {
-                                            Preview.set(schema);}},
-                                    mousedown: Module.of((
-                                        mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
-                                            mouseUpEventHandler = () => {
-                                                dragAction = null;
-                                                if(currentMouseTrap !== null) {
-                                                    Preview.set(Schema.get());}
-                                                else {
-                                                    Preview.set(null);}
-                                                window.removeEventListener("mouseup", mouseUpEventHandler);};
-                                            return mouseUpEventHandler;})
-                                    ) => e => {
-                                        const schemaChange = mouseEventToSchemaChange(e);
-                                        dragAction = schemaChange.change;
-                                        Schema.set(schemaChange.schema);
-                                        Preview.set(null);
-                                        window.addEventListener("mouseup", mouseUpEventHandler)}),
-                                    mouseout: () => {
-                                        currentMouseTrap = null;
-                                        Preview.set(null);}})),
-                                previousFretboardMousePosition=null,
-                                fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
-                                    .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                        FingerlessIndicators.Style.padding.horizontal)
-                                    .withY(ShapeChart.FingerlessIndicator.Style.startY -
-                                        FingerlessIndicators.Style.padding.vertical)
-                                    .withWidth(ShapeChart.Fretboard.Style.width +
-                                        ShapeChart.FingerlessIndicator.Style.diameter +
-                                        2 * FingerlessIndicators.Style.padding.horizontal)
-                                    .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                        ShapeChart.FingerlessIndicator.Style.margin +
-                                        FingerlessIndicators.Style.padding.vertical)
-                                    .withClass("fingerless-indicators-mouse-trap")
-                                    .withEventListeners(createMouseEventListeners(
-                                        FingerlessIndicators.mouseTrapStateToSchemaChange)),
-                                fretboardMouseTrap=SVG.Builder.MouseTrap
-                                    .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
-                                    .withY(ShapeChart.Fretboard.Style.y)
-                                    .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
-                                    .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
-                                    .withClass("fretboard-mouse-trap")
-                                    .withEventListeners(createMouseEventListeners(
-                                        Fretboard.mouseTrapStateToSchemaChange)),
-                                shapeInputMouseTraps=SVG.Builder.G()
-                                    .withClass("shape-input-mouse-traps")
-                                    .withChild(fingerlessIndicatorMouseTrap)
-                                    .withChild(fretboardMouseTrap)
-                                    .withMethod("activeFingerChanged", () => {
-                                        if(currentMouseTrap === fretboardMouseTrap) {
-                                            Preview.set(Fretboard
-                                                .mouseTrapStateToSchemaChange(
-                                                    mousePositionToState(previousMousePosition))
-                                                .schema)}})
-                            ) => includeAnyStringAction === false ?
-                                shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
-                                shapeInputMouseTraps.withChild( //Do include...
-                                    SVG.Builder.MouseTrap
-                                        .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                            AnyStringAction.Style.padding.horizontal)
-                                        .withY(ShapeChart.Fretboard.Style.y +
-                                            ShapeChart.Fretboard.Style.height)
-                                        .withWidth(ShapeChart.Fretboard.Style.width +
-                                            ShapeChart.FingerlessIndicator.Style.diameter +
-                                            2 * AnyStringAction.Style.padding.horizontal)
-                                        .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                            ShapeChart.FingerlessIndicator.Style.margin +
-                                            AnyStringAction.Style.padding.vertical)
-                                        .withClass("fingerless-indicators-mouse-trap")
-                                        .withEventListeners(createMouseEventListeners(
-                                            AnyStringAction.mouseTrapStateToSchemaChange))))
+                withPreview: Preview => ({
+                withActiveFingerGetter: activeFingerGetter => Module.of((
+                    withAnyStringActionStep=includeAnyStringAction => Module.of((
+                        dragAction=null,
+                        previousMousePosition=null,
+                        currentMouseTrap=null,  //The mouse trap that the mouse is currently over, or null
+                        mousePositionToState=position => ({
+                            mousePosition: position,
+                            schema: Schema.get().slice(),
+                            activeFinger: activeFingerGetter(),
+                            dragAction: dragAction
+                        }),
+                        createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
+                            mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
+                                mousePositionToState([e.offsetX, e.offsetY]))
                         ) => ({
-                            withAnyStringAction: () => withAnyStringActionStep(true),
-                            withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
+                            mouseenter: function(e) {
+                                currentMouseTrap = this;
+                                const schema = mouseEventToSchemaChange(e).schema;
+                                if(dragAction !== null) {
+                                    Schema.set(schema, false);}
+                                else {
+                                    Preview.set(schema);}},
+                            mousemove: e => {
+                                previousMousePosition = [e.offsetX, e.offsetY];
+                                const schema = mouseEventToSchemaChange(e).schema;
+                                if(dragAction !== null) {
+                                    Schema.set(schema, false);}
+                                else {
+                                    Preview.set(schema);}},
+                            mousedown: Module.of((
+                                mouseUpEventHandler = Module.of((mouseUpEventHandler=undefined) => {
+                                    mouseUpEventHandler = () => {
+                                        dragAction = null;
+                                        if(currentMouseTrap !== null) {
+                                            Preview.set(Schema.get());}
+                                        else {
+                                            Preview.set(null);}
+                                        window.removeEventListener("mouseup", mouseUpEventHandler);
+                                        Schema.callChangeListener();};
+                                    return mouseUpEventHandler;})
+                            ) => e => {
+                                const schemaChange = mouseEventToSchemaChange(e);
+                                dragAction = schemaChange.change;
+                                Schema.set(schemaChange.schema, false);
+                                Preview.set(null);
+                                window.addEventListener("mouseup", mouseUpEventHandler);}),
+                            mouseout: () => {
+                                currentMouseTrap = null;
+                                Preview.set(null);}})),
+                        previousFretboardMousePosition=null,
+                        fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
+                            .withX(ShapeChart.FingerlessIndicator.Style.startX  -
+                                FingerlessIndicators.Style.padding.horizontal)
+                            .withY(ShapeChart.FingerlessIndicator.Style.startY -
+                                FingerlessIndicators.Style.padding.vertical)
+                            .withWidth(ShapeChart.Fretboard.Style.width +
+                                ShapeChart.FingerlessIndicator.Style.diameter +
+                                2 * FingerlessIndicators.Style.padding.horizontal)
+                            .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                ShapeChart.FingerlessIndicator.Style.margin +
+                                FingerlessIndicators.Style.padding.vertical)
+                            .withClass("fingerless-indicators-mouse-trap")
+                            .withEventListeners(createMouseEventListeners(
+                                FingerlessIndicators.mouseTrapStateToSchemaChange)),
+                        fretboardMouseTrap=SVG.Builder.MouseTrap
+                            .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
+                            .withY(ShapeChart.Fretboard.Style.y)
+                            .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
+                            .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
+                            .withClass("fretboard-mouse-trap")
+                            .withEventListeners(createMouseEventListeners(
+                                Fretboard.mouseTrapStateToSchemaChange)),
+                        shapeInputMouseTraps=SVG.Builder.G()
+                            .withClass("shape-input-mouse-traps")
+                            .withChild(fingerlessIndicatorMouseTrap)
+                            .withChild(fretboardMouseTrap)
+                            .withMethod("activeFingerChanged", () => {
+                                if(currentMouseTrap === fretboardMouseTrap) {
+                                    Preview.set(Fretboard
+                                        .mouseTrapStateToSchemaChange(
+                                            mousePositionToState(previousMousePosition))
+                                        .schema)}})
+                    ) => includeAnyStringAction === false ?
+                        shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
+                        shapeInputMouseTraps.withChild( //Do include...
+                            SVG.Builder.MouseTrap
+                                .withX(ShapeChart.FingerlessIndicator.Style.startX  -
+                                    AnyStringAction.Style.padding.horizontal)
+                                .withY(ShapeChart.Fretboard.Style.y +
+                                    ShapeChart.Fretboard.Style.height)
+                                .withWidth(ShapeChart.Fretboard.Style.width +
+                                    ShapeChart.FingerlessIndicator.Style.diameter +
+                                    2 * AnyStringAction.Style.padding.horizontal)
+                                .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
+                                    ShapeChart.FingerlessIndicator.Style.margin +
+                                    AnyStringAction.Style.padding.vertical)
+                                .withClass("fingerless-indicators-mouse-trap")
+                                .withEventListeners(createMouseEventListeners(
+                                    AnyStringAction.mouseTrapStateToSchemaChange))))
+                ) => ({
+                    withAnyStringAction: () => withAnyStringActionStep(true),
+                    withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
             createShapeInput=(schema, withWildcards) => Module.of((
                 shapeChart = Module.of((
                     anyStringActionStep=ShapeChart.Builder
@@ -2082,17 +2087,20 @@ const ChordJogApp = (() => {
                 Schema = Module.of((
                     changeListener=undefined,
                     shapeChartSchemaSetter = Object.getOwnPropertyDescriptor(shapeChart, "schema").set,
-                    schemaSetter = schema => {
+                    schemaSetter = (schema, callListener=true) => {
                         if(! Shapes.Schema.equals(schema, shapeChart.schema)) {
                             shapeChartSchemaSetter(schema);
-                            if(changeListener !== undefined) {
+                            if(changeListener !== undefined && callListener === true) {
                                 changeListener(schema);}}}
                 ) => {
                     shapeChart.withSetter("schema", schemaSetter);
                     const Schema = {
                         setChangeListener: (listener) => changeListener = listener,
                         get: () => shapeChart.schema,
-                        set: schemaSetter};
+                        set: schemaSetter,
+                        callChangeListener: () => {
+                            if(changeListener !== undefined) {
+                                changeListener(shapeChart.schema);}}};
                     Schema.set(schema);
                     return Schema;}),
                 mouseTraps = Module.of((
@@ -2811,7 +2819,9 @@ const ChordJogApp = (() => {
                                 SVG.Builder.TextButton
                                     .withDimensions(0, 0, buttonWidth, buttonHeight)
                                     .withText("delete")
-                                    .withClickHandler(() => console.log("delete clicked for shape with id [" + shape.id + "]"))
+                                    .withClickHandler(() => {
+                                        Shapes.delete(shape.id);
+                                        filterShapes(shapeFilterInput.schema);})
                                     .withModification(function() {
                                         this.label.withAttribute("font-size", 14);})])
                             .withClass("shape-item-buttons-container")
