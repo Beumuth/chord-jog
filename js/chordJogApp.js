@@ -899,7 +899,7 @@ const ChordJogApp = (() => {
             ) => (a, b) => a.concat(//Merge a with
                 //Items from b that are not in a
                 b.filter(bShape => undefined===a.find(aShape => equals(aShape, bShape)))))
-        ) => (overwrite=false) => {
+        ) => (uploadCompleteListener, overwrite=false) => {
             const fileInput = document.createElement("input");
             fileInput.type = "file";
             fileInput.accept = ".shapes";
@@ -917,7 +917,8 @@ const ChordJogApp = (() => {
                         overwrite === true ?
                             all = shapes :
                             all = mergeShapesLists(all, shapes);
-                        saveToLocalStorage();}
+                        saveToLocalStorage();
+                        uploadCompleteListener();}
                     else {
                         readNext();}});
                 readNext();});
@@ -2787,10 +2788,12 @@ const ChordJogApp = (() => {
         maxMatches=12
     ) => ({
         new: () => Module.of((
+            shapesPage=undefined,
             width = shapeChartGridMaxColumns*ShapeChart.Style.width +
                 (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
             filterShapes=undefined,
             shapeFilterInput=undefined,
+            refreshShapesList = () => filterShapes(shapeFilterInput.schema),
             ShapeItem=Module.of((
                 shapeChartMarginBottom=3,
                 buttonHeight=18,
@@ -2823,7 +2826,7 @@ const ChordJogApp = (() => {
                                             .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                             .withCloseCallback(() => {
                                                 shapeFilterInput.focus();
-                                                filterShapes(shapeFilterInput.schema)}));})
+                                                refreshShapesList();}));})
                                     .withModification(function() {
                                         this.label.withAttribute("font-size", 14)}),
                                 SVG.Builder.TextButton
@@ -2832,7 +2835,7 @@ const ChordJogApp = (() => {
                                     .withClickHandler(() => {
                                         if(true===confirm("Are you sure you want to delete this shape?")) {
                                             Shapes.delete(shape.id);
-                                            filterShapes(shapeFilterInput.schema);}})
+                                            refreshShapesList();}})
                                     .withModification(function() {
                                         this.label.withAttribute("font-size", 14);})])
                             .withClass("shape-item-buttons-container")
@@ -2863,19 +2866,38 @@ const ChordJogApp = (() => {
                 shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
                     .withChild(shapeFilterInput)
-                    .withChild(SVG.Builder.Text
-                        .withTextContent("filte")
-                        .withClass("shape-filter-label")
-                        .withAttributes({
-                            fontFamily: "monospace",
-                            fontSize: 15,
-                            dominantBaseline: "hanging",
-                            textAnchor: "end"})
-                        .withTextLength(80)
-                        .disableTextSelection()
-                        .moveTo(4, 48)
-                        .rotateTo(270))
-                    .withGetter("shapeInput"),
+                    .withChild(Module.of((
+                        filterLabelPosition=[4,48],
+                        filterLabelTextLength=80,
+                    ) => SVG.Builder.G()
+                        .withClass("filter-label-container")
+                        .withChild(SVG.Builder.Text
+                            .withTextContent("filte")
+                            .withClass("shape-filter-label")
+                            .withAttributes({
+                                fontFamily: "monospace",
+                                fontSize: 15,
+                                dominantBaseline: "hanging",
+                                textAnchor: "end",
+                                cursor: "pointer"})
+                            .withTextLength(filterLabelTextLength)
+                            .disableTextSelection()
+                            .moveTo(...filterLabelPosition)
+                            .rotateTo(270))
+                        .withChild(Module.of((
+                            filterLabelWidth=19,
+                            distanceToTopOfR = 20,
+                            mouseTrapPadding={
+                                vertical: 4,
+                                horizontal: 0}
+                        ) => SVG.Builder.MouseTrap
+                            .withX(filterLabelPosition[0] - mouseTrapPadding.horizontal)
+                            .withY(filterLabelPosition[1] - mouseTrapPadding.vertical - distanceToTopOfR)
+                            .withWidth(filterLabelWidth + 2 * mouseTrapPadding.horizontal)
+                            .withHeight(filterLabelTextLength + 2 * mouseTrapPadding.vertical + distanceToTopOfR)
+                            .withClass("filter-label-mouse-trap")
+                            .withEventListener("mousedown",
+                                () => shapeFilterInput.schema = Shapes.Schema.allAnyStringAction))))),
                 shapesButtonContainer=Module.of((
                     buttonWidth=width - ShapeInput.Style.width - shapeFilterMarginRight - ShapeChart.FingerIndicator.Style.radius,
                     numButtons=3,
@@ -2891,11 +2913,11 @@ const ChordJogApp = (() => {
                                 .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                 .withCloseCallback(() => {
                                     shapeFilterInput.focus();
-                                    filterShapes(shapeFilterInput.schema);}));}),
+                                    refreshShapesList();}));}),
                     downloadShapesButton=SVG.Builder.TextButton
                         .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
                         .withText("Download")
-                        .withClickHandler(() => console.log("Download clicked")),
+                        .withClickHandler(Shapes.download),
                     uploadShapesButtonContainer=Module.of((
                         nonInteractiveToInteractiveWidthRatio=1/3,
                         medianWidth=18,
@@ -2947,12 +2969,12 @@ const ChordJogApp = (() => {
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, 0, optionWidth, optionHeight)
                                 .withText("Append")
-                                .withClickHandler(() => console.log("Append clicked"))
+                                .withClickHandler(() => Shapes.upload(refreshShapesList))
                                 .withClass("upload-and-append-button"))
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, optionHeight, optionWidth, optionHeight)
                                 .withText("Replace")
-                                .withClickHandler(() => console.log("Replace clicked"))
+                                .withClickHandler(() => Shapes.upload(refreshShapesList, true))
                                 .withClass("upload-and-replace-button")))))
                 ) => SVG.Builder.G()
                     .withClass("shapes-button-actions-container")
@@ -2963,13 +2985,12 @@ const ChordJogApp = (() => {
             ) => SVG.Builder.G()
                 .withClass("shape-page-top-row")
                 .withChild(shapesFilterContainer)
-                .withChild(shapesButtonContainer))
-        ) => {
-            shapesPage = SVG.Builder.G()
-                .withClass("shape-search")
+                .withChild(shapesButtonContainer)),
+            setupShapesPage=shapesPage=SVG.Builder.G()
+                .withClass("shapes-page")
                 .withChild(shapesPageTopRow)
-                .withChild(shapeChartGrid);
-            return shapesPage;})}));
+                .withChild(shapeChartGrid)
+        ) => shapesPage)}));
     return {
         create: () => SVG.Builder.SVG
             .withWidth(Style.width)
