@@ -13,12 +13,81 @@ const ChordJogApp = (() => {
             superLight: "#F6F6F6",
             white: "#ffffff"}};
     Style.stroke.halfWidth = Style.stroke.width * .5;
-    Style.textColor = Style.colors.heavy;
+    Style.textColor = Style.colors.superHeavy;
 
     /**
      * A wrapper for the Module pattern
      */
-    const Module = {of: (f, ...args) => f.apply(undefined, args)};
+    const Module = {
+        of: (f, ...args) => f.apply(undefined, args)};
+    const Param=Module.of((
+        Validation={
+            new: () => ({
+                withName: name => ({
+                withCondition: condition => ({
+                withReason: reason => ({
+                    name: name,
+                    condition: condition,
+                    reason: reason})})})})},
+        sameAsBeforeValidation=Validation.new()
+            .withName("sameAsBefore")
+            .withCondition((newValue, oldValue) => newValue === oldValue)
+            .withReason("The previous value is the same as the current")
+    ) => ({
+        Validation: Validation,
+        sameAsBeforeValidation: sameAsBeforeValidation,
+        new: (initialValue=undefined)=>Module.of((
+            value=initialValue,
+            validations=[sameAsBeforeValidation]
+,            observers=[],
+            param=undefined,
+            defineParam=param={
+                get: () => value,
+                set: newValue => {
+                    const failValidation = validations.find(validation=>validation.condition(newValue, value));
+                    return failValidation===undefined ? (
+                        oldValue = value,
+                        value = newValue,
+                        observers.forEach(observer => observer(value, oldValue)),
+                        true) : failValidation.reason;},
+                withValue: newValue => {
+                    param.set(newValue);
+                    return param;},
+                addValidation: validation => validations.push(validation),
+                addValidations: validations => validations.concat(validations),
+                withValidation: validation => {
+                    param.addValidation(validation);
+                    return param;},
+                withValidations: validations => {
+                    param.addValidations(validations);
+                    return param;},
+                removeValidation: validation => Arrays.removeItem(validations, validation),
+                removeValidations: validationsToRemove => validationsToRemove.forEach(validation=>
+                    Arrays.removeItem(validations, validation)),
+                withoutValidation: validation => {
+                    param.removeValidation(validation);
+                    return param;},
+                withoutValidations: validations => {
+                    param.removeValidations(validations);
+                    return param;},
+                addObserver: observer => observers.push(observer),
+                addObservers: observersToAdd => observers=observers.concat(observersToAdd),
+                withObserver: observer => {
+                    param.addObserver(observer);
+                    return param;},
+                withObservers: observers => {
+                    param.addObservers(observers);
+                    return param;},
+                removeObserver: observer => Arrays.removeItem(observers, observer),
+                removeObservers: observersToRemove => observersToRemove.forEach(observer=>
+                    Arrays.removeItem(observers, observer)),
+                withoutObserver: observer => {
+                    param.removeObserver(observer);
+                    return param;},
+                withoutObservers: observers => {
+                    param.removeObservers(observers);
+                    return param;}}
+        ) => param)}));
 
     const Functions = {
         ifThen: (condition, then) => condition === true ? then() : undefined,
@@ -37,11 +106,23 @@ const ChordJogApp = (() => {
                     get: getter,
                     configurable: true});
                 return this; },
+            withGetters: function(getters) {
+                Object.entries(getters).forEach(getter =>
+                    Object.defineProperty(this, getter[0],{
+                        get: getter[1],
+                        configurable: true}));
+                return this;},
             withSetter: function(key, setter) {
                 Object.defineProperty(this, key, {
                     set: setter,
                     configurable: true});
                 return this; },
+            withSetters: function(setters) {
+                Object.entries(setters).forEach(setter =>
+                    Object.defineProperty(this, setter[0],{
+                        set: setter[1],
+                        configurable: true}));
+                return this;},
             withGetterAndSetter: function(key, getter, setter) {
                 Object.defineProperty(this, key, {
                     get: getter,
@@ -49,17 +130,56 @@ const ChordJogApp = (() => {
                     configurable: true});
                 return this; },
             withGettersAndSetters: function(gettersAndSetters) {
-                gettersAndSetters.forEach(property =>
-                    Object.defineProperty(this, property.key, {
-                        get: property.get,
-                        set: property.set,
+                Object.entries(gettersAndSetters).forEach(entry =>
+                    Object.defineProperty(this, entry[0], {
+                        get: entry[1].get,
+                        set: entry[1].set,
                         configurable: true}));
                 return this;},
-            withField(key, value=undefined) {
+            withField: function(key, value=undefined) {
                 this[key] = value;
                 return this;},
-            withFields(fields) {
-                Object.keys(fields).forEach(key => this[key] = fields[key]);
+            withFields: function(fields) {
+                Object.entries(fields).forEach(field => this[field[0]] = field[1]);
+                return this;},
+            withParam: function(key, param=Param.new()) {
+                return this.withField(key[0].toUpperCase() + key.substr(1), param)
+                    .withGetterAndSetter(key[0].toLowerCase() + key.substr(1),
+                        function() {
+                            return param.get();},
+                        function(value) {
+                            return param.set(value);})
+                    .withMethod("with" + key[0].toUpperCase() + key.substr(1), function(value) {
+                        param.set(value);
+                        return this;})},
+            withParams: function(params) {
+                Array.isArray(params) ?
+                    params.forEach(this.withParam) :
+                    Object.entries(params).forEach(param=>this.withParam(param[0], param[1]));
+                return this;},
+            withListener: Module.of((
+                addListener=(object, paramKey, listener)=>object[paramKey[0].toUpperCase() + paramKey.substr(1)]
+                    .addObserver(listener)
+            ) => function(paramKey, listener) {
+                Array.isArray(listener) ?
+                    listener.forEach(individualListener=>addListener(this, paramKey, individualListener)) :
+                    addListener(this, paramKey, listener);
+                return this;}),
+            withListeners: function(paramListeners) {
+                Object.entries(paramListeners)
+                    .forEach(paramListener => this.withListener(paramListener[0], paramListener[1]));
+                return this;},
+            withValidation: Module.of((
+                addValidation=(object, paramKey, validation)=>object[paramKey[0].toUpperCase() + paramKey.substr(1)]
+                    .addObserver(validation)
+            ) => function(paramKey, validation) {
+                Array.isArray(validation) ?
+                    validation.forEach(individualValidation=>addValidation(this, paramKey, individualValidation)) :
+                    addValidation(this, paramKey, validation);
+                return this;}),
+            withValidations: function(paramValidations) {
+                Object.entries(paramValidations)
+                    .forEach(paramValidation => this.withValidation(paramValidation[0], paramValidation[1]));
                 return this;},
             withProperty: function (key, property) {
                 Object.defineProperty(this, key, property);
@@ -83,7 +203,8 @@ const ChordJogApp = (() => {
         const objects = {
             isNil: Module.of((nils = [null, undefined]) =>
                 (object) => nils.includes(object)),
-            using: (object) => helpers.withMethods.bind(object)(helpers),
+            using: (object) => helpers
+                .withMethods.bind(object)(helpers),
             withField: (object, key, value) => {
                 object[key] = value;
                 return object;},
@@ -92,6 +213,7 @@ const ChordJogApp = (() => {
                 return object;}};
         objects.new = () => objects.using({});
         return objects;});
+
     const Numbers = {
         goldenRatio: (1+Math.sqrt(5))/2,
         range: (fromInclusive, toExclusive) => {
@@ -99,6 +221,8 @@ const ChordJogApp = (() => {
             for(let i = fromInclusive; i < toExclusive; ++i) {
                 range.push(i);}
             return range;},
+        clampLower: (value, fromInclusive) => value < fromInclusive ? fromInclusive : value,
+        clampUpper: (value, toInclusive) => value > toInclusive ? toInclusive : value,
         clamp: (value, fromInclusive, toInclusive) =>
             value < fromInclusive ? fromInclusive :
                 value > toInclusive ? toInclusive :
@@ -107,6 +231,10 @@ const ChordJogApp = (() => {
         replaceItem: (array, index, replacement) => {
             array[index] = replacement;
             return array;},
+        removeItem: (array, item) => {
+            const index = array.indexOf(item);
+            if(index !== -1) {
+                array.splice(index, 1);}},
         updateItem: (array, index, modification) => {
             modification(array[index]);
             return array;},
@@ -119,7 +247,19 @@ const ChordJogApp = (() => {
                 if(predicate(array[i])) {
                     return i;}}
             return undefined; },
-        last: (array) => array[array.length - 1]};
+        last: (array) => array[array.length - 1],
+        multiSwap: (array, swapPairs) => {
+            swapPairs.forEach(swapPair => {
+                const placeholder = array[swapPair[0]];
+                array[swapPair[0]] = array[swapPair[1]];
+                array[swapPair[1]] = placeholder;});
+            return array;},
+        swap: (array, indexA, indexB) => {
+            const placeholder = array[indexA];
+            array[indexA] = array[indexB];
+            array[indexB] = placeholder;
+            return array;},
+        same: (a, b, comparator=(x,y)=>x===y) => a.length === b.length && a.every((x,i)=>comparator(x,b[i]))};
 
     const KeyboardCommands = Module.of(() => {
         const keyCommands = {};
@@ -150,6 +290,17 @@ const ChordJogApp = (() => {
                 k = Numbers.clamp((px*ux + py*uy) / (ux*ux + uy*uy), 0, 1)
             //proj(p, u) = k*u
             return [segment[0][0] + k * ux, segment[0][1] + k * uy]; }};
+
+    const Vector=Module.of((
+        length=x=>Math.sqrt(x[0]*x[0]+x[1]*x[1]),
+        multiply=(x, k) => [k*x[0],k*x[1]]
+    ) => ({
+        add: (a,b)=>[a[0]+b[0], a[1]+b[1]],
+        minus: (a,b)=>[a[0]-b[0], a[1]-b[1]],
+        multiply: multiply,
+        length: length,
+        norm: x=>multiply(x, 1/length(x)),
+        dot: (a,b)=>a[0]*b[0] + a[1]*b[1]}));
 
     const AffineTransformations = Module.of(() => {  //for 2d space
         const indices = [0, 1, 2];
@@ -377,13 +528,17 @@ const ChordJogApp = (() => {
                             transformAttribute.slice(indexArgsEnd));};
                     return Module.of((x=0, y=0, sx=1, sy=1, rotation=0) => ({
                         move: function(dx, dy) {
-                            x += dx * 1 / sx;
-                            y += dy * 1 / sy;
-                            updateTransform(this, "translate", [x, y]);
+                            return this.moveTo(x + dx, y + dy);},
+                        moveTo: function(newX, newY) {
+                            x = newX;
+                            y = newY;
+                            updateTransform(this, "translate", [x/sx, y/sy]);
                             return this;},
-                        moveTo: function(x, y) {
+                        xTo: function(x) {
+                            return this.moveTo(x, y);},
+                        yTo: function(y) {
                             const boundingClientRect = this.getBoundingClientRect();
-                            return this.move(x - boundingClientRect.x, y - boundingClientRect.y);},
+                            return this.move(x, y - boundingClientRect.y);},
                         rotateTo: function(degrees, origin=[0,0]) {
                             rotation = degrees % 360;
                             updateTransform(this, "rotate", [rotation, origin[0], origin[1]]);
@@ -396,9 +551,24 @@ const ChordJogApp = (() => {
                             updateTransform(this, "scale", [sx, sy]);
                             return this;}}));}))
                 .withField("eventListeners", {});};
+        const textAlignmentMethods = {
+            leftAligned: function() {
+                return this.withAttribute("text-anchor", "start");},
+            centerAlignedHorizontal: function() {
+                return this.withAttribute("text-anchor", "middle");},
+            rightAligned: function() {
+                return this.withAttribute("text-anchor", "end");},
+            topAligned: function() {
+                return this.withAttribute("dominant-baseline", "baseline");},
+            centerAlignedVertical: function() {
+                return this.withAttribute("dominant-baseline", "middle");},
+            bottomAligned: function() {
+                return this.withAttribute("dominant-baseline", "hanging");},
+            centerAlignedBoth: function() {
+                return this.centerAlignedHorizontal().centerAlignedVertical();}};
         const svgBuilder = {
             element: createElement,
-            G: () => createElement("g"),
+            G: () => createElement("g").withMethods(textAlignmentMethods),
             Circle: Module.of((
                 createCircle=()=>createElement("circle")
                     .withGetterAndSetter("centerX",
@@ -444,14 +614,14 @@ const ChordJogApp = (() => {
             ) => ({
                 withoutCenter: () => withCenterStep([0, 0]),
                 withCenter: center => withCenterStep(center)})),
-            Ellipse: ({
+            Ellipse: {
                 withCenter: (c) => ({
                 withRadius: (r) => createElement("ellipse")
                     .withAttributes({
                         cx: c[0],
                         cy: c[1],
                         rx: r instanceof Array ? r[0] : r,
-                        ry: r instanceof Array ? r[1] : r }) }) }),
+                        ry: r instanceof Array ? r[1] : r})})},
             Line: Module.of(
                 (createLine = () =>
                     createElement("line").withMethod("withEndpoints",
@@ -464,6 +634,91 @@ const ChordJogApp = (() => {
                 ) => ({
                     withEndpoints: (p1, p2) => createLine().withEndpoints(p1, p2),
                     withoutEndpoints: () => createLine()})),
+            Indicator: Module.of((
+                defaults={
+                    content: null,
+                    headWidth: 10,
+                    headHeight: 20,
+                    headNudge: 0,
+                    earWidth: 25,
+                    footWidth: 6,
+                    footHeight: 13,
+                    footSlenderness: 4},
+                IndicatorPath={
+                    withHead: (width, height, nudge) => Module.of((head={
+                        x1: -.5*width + nudge,
+                        width: width,
+                        height: height,
+                        nudge: nudge}
+                    ) => ({
+                    withEarWidth: earWidth => ({
+                    withFoot: (width, height, slenderness) => Module.of((foot={
+                        x1: Numbers.clamp(-.5 * width, head.x1, head.x1 + head.width - width),
+                        width: width,
+                        height: height,
+                        slenderness: slenderness},
+                    ) => `M 0 0
+                        Q ${-.5 * foot.width * foot.slenderness} ${-foot.height} ${foot.x1} ${-foot.height}
+                        L ${head.x1} ${-foot.height}
+                        a ${earWidth} ${.5*head.height} 0 1 1 0 ${-head.height}
+                        l ${head.width} 0
+                        a ${earWidth} ${.5*head.height} 0 1 1 0 ${head.height}
+                        L ${foot.x1 + foot.width} ${-foot.height}
+                        Q ${.5 * foot.width * foot.slenderness} ${-foot.height} 0 0`)})}))},
+            ) => () => SVG.Builder.G()
+                .withClass("indicator")
+                .withModification(function() {
+                    const indicator = this;
+                    indicator
+                        .withParams(Module.of((
+                            drawObserver=() => indicator.outline.redraw(),
+                            repositionContentObserver=()=>indicator.contentContainer.reposition(),
+                            bothObservers=[drawObserver, repositionContentObserver]
+                        ) => ({
+                            content: Param.new(defaults.content).withObserver((newContent, oldContent) => {
+                                if(oldContent !== null) {
+                                    indicator.contentContainer.withoutChild(oldContent);}
+                                if(newContent !== null) {
+                                    indicator.contentContainer.withChild(newContent);}}),
+                            headWidth: Param.new(defaults.headWidth).withObserver(drawObserver),
+                            headHeight: Param.new(defaults.headHeight).withObservers(bothObservers),
+                            headNudge: Param.new(defaults.headNudge).withObservers(bothObservers),
+                            earWidth: Param.new(defaults.earWidth).withObserver(drawObserver),
+                            footWidth: Param.new(defaults.footWidth).withObserver(drawObserver),
+                            footHeight: Param.new(defaults.footHeight).withObservers(bothObservers),
+                            footSlenderness: Param.new(defaults.footSlenderness).withObserver(drawObserver)})))
+                        .withFields({
+                            contentContainer: SVG.Builder.G()
+                                .withClass("content-container")
+                                .withMethods({
+                                    reposition: function() {
+                                        this.moveTo(
+                                            indicator.headNudge,
+                                            -indicator.footHeight - .5 * indicator.headHeight)},
+                                    repositioned: function() {
+                                        this.reposition();
+                                        return this;}})
+                                .repositioned(),
+                            outline: SVG.Builder.Path()
+                                .withClass("marker-outline")
+                                .withMethods({
+                                    redraw: function() {
+                                        this.d=IndicatorPath
+                                            .withHead(
+                                                indicator.headWidth,
+                                                indicator.headHeight,
+                                                indicator.headNudge)
+                                            .withEarWidth(indicator.earWidth)
+                                            .withFoot(
+                                                indicator.footWidth,
+                                                indicator.footHeight,
+                                                indicator.footSlenderness);},
+                                    redrawn: function() {
+                                        this.redraw();
+                                        return this;}})
+                                .redrawn()})
+                        .withChildren([indicator.contentContainer, indicator.outline])
+                        .withGetter("height", ()=> indicator.headHeight + indicator.footHeight)})),
             ModularGrid: {
                 withX: x => ({
                 withY: y => ({
@@ -517,9 +772,223 @@ const ChordJogApp = (() => {
                     withModule: module => withModulesStep([module]),
                     withModules: modules => withModulesStep(modules),
                     withoutModules: () => withModulesStep([])}))})})})})})},
-            Path: ({
-                withD: (d) => createElement("path")
-                    .withAttributes({d: d}) }),
+            NumberLine: Module.of((
+                LabelModes=Module.of((
+                    LabelModeBuilder = {
+                        withTickEndsGenerator: tickEndsGenerator => ({
+                        withInitializer: initializer => ({
+                            tickEndsGenerator: tickEndsGenerator,
+                            initialize: initializer})})}
+                ) => ({
+                    none: LabelModeBuilder
+                        .withTickEndsGenerator(()=>()=>[0,0])
+                        .withInitializer(labels=>labels.forEach(label=>label.hide())),
+                    firstAndLast: LabelModeBuilder
+                        .withTickEndsGenerator((longTickEnd, range) => Module.of((
+                            firstAndLast=[0,range.max-range.min]
+                        ) => index => firstAndLast.includes(index) ? longTickEnd : [0,0]))
+                        .withInitializer(labels=>{
+                            labels[0].show();
+                            labels[labels.length-1].show();
+                            labels.slice(1,labels.length-1).forEach(label=>label.hide());}),
+                    majorMinor: Module.of((
+                        minorTickScaling=.25,
+                        majorIndicesOfRange=range => Module.of((
+                            indexFirstFactorOfTen=(10-range.min)%10,
+                        ) => Numbers
+                            .range(0, Math.floor((10+range.max-range.min-indexFirstFactorOfTen)/10))
+                            .map(i=>indexFirstFactorOfTen+10*i))
+                    ) => LabelModeBuilder
+                        .withTickEndsGenerator((longTickEnd, range) => Module.of((
+                            majorTickIndices=majorIndicesOfRange(range),
+                            minorTickEnd=Vector.multiply(longTickEnd, minorTickScaling)
+                        ) => index=>majorTickIndices.includes(index) ? longTickEnd : minorTickEnd))
+                        .withInitializer((labels, range)=>Module.of((
+                            majorIndices=majorIndicesOfRange(range)
+                        ) => labels.forEach((label, i) => majorIndices.includes(i) ? label.show() : label.hide())))),
+                    all: LabelModeBuilder
+                        .withTickEndsGenerator(longTickEnd=>()=>longTickEnd)
+                        .withInitializer(labels=>labels.forEach(label=>label.show()))})),
+                LabelOrientations={
+                    front: "front",
+                    behind: "behind"},
+                Calculators = Module.of((
+                    rangeLength=range => 1+range.max-range.min,
+                ) => ({
+                    AutoModeDecider: Module.of((
+                        spacePerDigit = 9
+                    ) => ({
+                        withRange: range => Module.of((
+                            numValues=rangeLength(range),
+                            maxAbsValue = Math.max(Math.abs(range.min), Math.abs(range.max)),
+                            tickDistanceThreshold= spacePerDigit * (
+                                maxAbsValue < 10 ? 1 :
+                                maxAbsValue < 100 ? 2 : 3)
+                        ) => ({
+                        withLineLength: lineLength =>
+                            lineLength / numValues >= tickDistanceThreshold ? LabelModes.all :
+                            lineLength < 2 * tickDistanceThreshold ? LabelModes.none :
+                            lineLength < 3 * tickDistanceThreshold ? LabelModes.firstAndLast :
+                            numValues < 15 ? LabelModes.firstAndLast :
+                            lineLength < (1/10)*numValues * tickDistanceThreshold ?
+                                LabelModes.firstAndLast :
+                                LabelModes.majorMinor}))})),
+                    Line: {
+                        withStart: start => ({
+                        withEnd: end => Vector.minus(end, start)})},
+                    LineLength: {
+                        withLine: line => Vector.length(line)},
+                    Normal: {
+                        withLine: line => ({
+                        withLabelOrientation: labelOrientation =>
+                            Arrays.same(line, [0,0]) ? [0,0] :
+                            Module.of((
+                                norm=Vector.norm([line[1], -line[0]])
+                            ) => Vector.multiply(
+                                norm,
+                                (line[1]-line[0] < 0 ? 1 : -1) *
+                                (Math.abs(line[1]/line[0]) <= 1 ? 1 : -1) *
+                                (labelOrientation === LabelOrientations.front ? -1 : 1)))})},
+                    RangeLength: {withRange: rangeLength}})),
+                defaults = Module.of((
+                    defaults={
+                        range: {
+                            min: 0,
+                            max: 110},
+                        start: [200, 200],
+                        end: [300, 300],
+                        tickLength: 20,
+                        labelMargin: 10,
+                        labelOrientation: LabelOrientations.behind,
+                        labelMode: "auto"},
+                    defaultLine=Calculators.Line.withStart(defaults.start).withEnd(defaults.end)
+                ) => Objects.withFields(defaults, {
+                    line: defaultLine,
+                    lineLength: Calculators.LineLength.withLine(defaultLine),
+                    normal: Calculators.Normal.withLine(defaultLine).withLabelOrientation(defaults.labelOrientation),
+                    rangeLength: Calculators.RangeLength.withRange(defaults.range)}))
+            ) => () => SVG.Builder.G()
+                .withClass("number-line")
+                .withField("rangeLength", defaults.rangeLength)
+                .withAttribute("font-family", "Courier New")
+                .withModification(function() {
+                    const numberLine = this;
+                    const baseline = SVG.Builder.Line
+                        .withEndpoints(defaults.start, defaults.end)
+                        .withClass("number-line-baseline");
+                    numberLine.withChild(baseline);
+                    const getLabelMode=()=>numberLine.labelMode==="auto" ?
+                        Calculators.AutoModeDecider
+                            .withRange(numberLine.range)
+                            .withLineLength(numberLine.lineLength) :
+                        LabelModes[numberLine.labelMode];
+                    const initializeLabelMode = Module.of((
+                        previousLabelMode = undefined
+                    )=>()=>{
+                        const currentLabelMode = getLabelMode();
+                        if(currentLabelMode !== previousLabelMode) {
+                            previousLabelMode = currentLabelMode;
+                            currentLabelMode.initialize(numberLine.labels, numberLine.range);}});
+                    const updateLine=()=>{
+                        numberLine.line = Calculators.Line
+                            .withStart(numberLine.start)
+                            .withEnd(numberLine.end);
+                        baseline.withEndpoints(numberLine.start, numberLine.end);};
+                    const updateNormal=()=>numberLine.normal=Calculators.Normal
+                        .withLine(numberLine.line)
+                        .withLabelOrientation(numberLine.labelOrientation);
+                    const updateTickEnds=()=>Module.of((
+                        tickEnds=getLabelMode().tickEndsGenerator(
+                            Vector.multiply(numberLine.normal, -numberLine.tickLength),
+                            numberLine.range)
+                    ) => numberLine.ticks.forEach((tick, index)=>Module.of((
+                        tickEnd=tickEnds(index)
+                    ) => tick.withAttributes({
+                        x2: tickEnd[0],
+                        y2: tickEnd[1]}))));
+                    const updateLabelPositions=()=>Module.of((
+                        labelPosition=Vector.multiply(
+                            numberLine.normal,
+                            -(numberLine.labelMargin+numberLine.tickLength))
+                    ) => numberLine.labels.forEach(label => label.moveTo(...labelPosition)));
+                    const updateLabelGroupPositions=()=>numberLine.labelGroups.forEach((labelGroup, index) =>
+                        labelGroup.moveTo(...numberLine.positionOfIndex(index)));
+                    let labelGroups = [];
+                    const recreateLabelGroups = () => {
+                        numberLine.withoutChildren(labelGroups);
+                        labelGroups = Numbers
+                            .range(numberLine.range.min, 1+numberLine.range.max)
+                            .map(value=>Module.of(() => {
+                                const tick = SVG.Builder.Line.withEndpoints([0, 0], [0, 0]).withClass("number-line-tick");
+                                const label = SVG.Builder.Text
+                                    .withTextContent(value)
+                                    .withClass("number-line-label")
+                                    .centerAlignedBoth();
+                                return SVG.Builder.G()
+                                    .withClass("number-line-label-group")
+                                    .withChild(tick)
+                                    .withChild(label)
+                                    .withGetters(({
+                                        tick: () => tick,
+                                        label: () => label}));}));
+                        numberLine.withChildren(labelGroups);
+                        updateLabelGroupPositions();
+                        updateTickEnds();
+                        updateLabelPositions();
+                        initializeLabelMode();};
+                    return numberLine
+                        .withParams({
+                            start: Param.new(defaults.start).withObserver(updateLine),
+                            end: Param.new(defaults.end).withObserver(updateLine),
+                            line: Param.new(defaults.line).withObservers([
+                                line=>numberLine.lineLength=Calculators.LineLength.withLine(line),
+                                updateNormal]),
+                            lineLength: Param.new(defaults.lineLength).withObservers([
+                                updateLabelGroupPositions,
+                                updateTickEnds,
+                                () => numberLine.labelMode === "auto" ? initializeLabelMode() : undefined]),
+                            normal: Param.new(defaults.normal).withObservers([
+                                updateTickEnds,
+                                updateLabelPositions]),
+                            labelOrientation: Param.new(defaults.labelOrientation).withObserver(updateNormal),
+                            tickLength: Param.new(defaults.tickLength).withObservers([
+                                updateTickEnds,
+                                updateLabelPositions]),
+                            labelMode: Param.new(defaults.labelMode).withObservers([
+                                updateTickEnds,
+                                initializeLabelMode]),
+                            labelMargin: Param.new(defaults.labelMargin).withObserver(updateLabelPositions),
+                            range: Param.new(defaults.range).withObservers([
+                                range=>numberLine.rangeLength=Calculators.RangeLength.withRange(range),
+                                recreateLabelGroups])})
+                        .withGetters({
+                            labelGroups: () => labelGroups,
+                            ticks: () => labelGroups.map(labelGroup=>labelGroup.tick),
+                            labels: () => labelGroups.map(labelGroup=>labelGroup.label)})
+                        .withMethods(Module.of((
+                            indexOfValue = value => value < numberLine.range.min || value > numberLine.range.max ?
+                                undefined : value - numberLine.range.min,
+                            tOfIndex = index => Module.of((
+                                rangeLength=numberLine.rangeLength
+                            ) => rangeLength<= 2 ? (index+1)/(rangeLength+1) : index/(rangeLength-1)),
+                            positionOfT=t=>Vector.add(numberLine.start, Vector.multiply(numberLine.line, t)),
+                            positionOfIndex = index => positionOfT(tOfIndex(index))
+                        ) => ({
+                            indexOfValue: indexOfValue,
+                            tOfIndex: tOfIndex,
+                            tOfValue: value => tOfIndex(indexOfValue(value)),
+                            positionOfT: positionOfT,
+                            positionOfIndex: positionOfIndex,
+                            positionOfValue: value => positionOfIndex(indexOfValue(value))})))
+                        .withModification(recreateLabelGroups);})),
+            Path: () => createElement("path")
+                .withAttributes({d: null})
+                .withGetterAndSetter("d",
+                    function() {return this.getAttribute("d");},
+                    function(d) {this.setAttribute("d", d);})
+                .withMethod("withD", function(d) {
+                    this.d = d;
+                    return this;}),
             Rect: ({
                 withX: (x) => ({
                 withY: (y) => ({
@@ -546,11 +1015,12 @@ const ChordJogApp = (() => {
                         height: height })})},
             Text: Module.of((
                 createText = () => createElement("text")
+                    .withMethods(textAlignmentMethods)
                     .withMethods({
                         withTextContent: function(textContent) {
                             this.textContent = textContent;
                             return this;},
-                        withoutTextcontent: function() {
+                        withoutTextContent: function() {
                             this.textContent = null;
                             return this;},
                         withTextLength: function(value) {
@@ -563,6 +1033,7 @@ const ChordJogApp = (() => {
                             this.setAttribute("lengthAdjust", "spacingAndGlyphs");
                             return this; }})
                     .withAttributes({
+                        stroke: "none",
                         fill: Style.textColor})) => ({
                 withTextContent: (textContent) => createText().withTextContent(textContent),
                 withoutTextContent: () => createText()}))};
@@ -573,19 +1044,17 @@ const ChordJogApp = (() => {
             .withHeight(svgRect.height);
         svgBuilder.TextButton = {
             withDimensions: (x, y, width, height) => ({
-            withText: (text) => ({
-            withClickHandler: (clickHandler) => {
+            withText: text => ({
+            withClickListener: listener => {
                 let rect = null;
                 const label = SVG.Builder.Text
                     .withTextContent(text)
                     .moveTo(.5 * width, .5 * height)
                     .withClass("text-button-label")
+                    .centerAlignedBoth()
                     .withAttributes({
-                        textAnchor: "middle",
-                        dominantBaseline: "central",
                         fontSize: 17,
-                        fontFamily: "Courier New"})
-                    .disableTextSelection();
+                        fontFamily: "Courier New"});
                 const preview = () => rect.withAttribute("stroke-width", 1.5);
                 const normal = () => rect.withAttribute("stroke-width", 1);
                 const active = () => rect.withAttribute("stroke-width", 2);
@@ -599,7 +1068,7 @@ const ChordJogApp = (() => {
                         Functions.ifThenElse(isMouseOver,
                             () => {
                                 preview();
-                                clickHandler();},
+                                listener();},
                             () => normal());};
                     return {
                         mouseEnter: () => {
@@ -655,19 +1124,368 @@ const ChordJogApp = (() => {
                             return this;}})))
                     .enabled();}})})};
         svgBuilder.MouseTrap = {
-            withX: x => ({
-            withY: y => ({
-            withWidth: width => ({
-            withHeight: height => svgBuilder.Rect
+            withDimensions: (x, y, width, height) => svgBuilder.Rect
                 .withX(x)
                 .withY(y)
                 .withWidth(width)
                 .withHeight(height)
+                .withClass("mouse-trap")
                 .withAttributes({
                     pointerEvents: "fill",
                     cursor: "pointer",
                     fill: "none",
-                    stroke: "none"})})})})};
+                    stroke: "none"})};
+
+        svgBuilder.ActionText = Module.of((
+            Style={
+                font: "monospace",
+                fontSize: 15},
+            withTextStep = text => ({
+                withSize: (width, height) => Module.of((
+                    clickCallback=undefined,
+                    label=svgBuilder.Text
+                        .withTextContent(text)
+                        .withClass("action-text-label")
+                        .centerAlignedBoth()
+                        .withAttributes({
+                            fontFamily: Style.font,
+                            fontSize: Style.fontSize}),
+                    mouseTrap=svgBuilder.MouseTrap
+                        .withDimensions(-.5*width , -.5*height, width, height)
+                        .withClass("action-text-mouse-trap")
+                        .withEventListeners(Module.of((
+                            isInside = false,
+                            isMouseDown = false,
+                            inactivateLabel=()=>label.withAttributes({
+                                textDecoration: "none"}),
+                            previewLabel=()=>label.withAttribute("text-decoration", "underline dashed"),
+                            activateLabel=()=> label.withAttributes({
+                                textDecoration: "underline solid"}),
+                            mouseUpListener = undefined,
+                            defineMouseUpHandler=mouseUpListener = () => {
+                                isMouseDown = false;
+                                inactivateLabel();
+                                window.removeEventListener("mouseup", mouseUpListener);
+                                if(isInside === true) {
+                                    previewLabel();
+                                    clickCallback();}
+                                else {
+                                    inactivateLabel();}}
+                        ) => ({
+                            mouseEnter: () => {
+                                isInside = true;
+                                if(isMouseDown === false) {
+                                    previewLabel();}
+                                else {
+                                    activateLabel();}},
+                            mouseDown: () => {
+                                isMouseDown = true;
+                                activateLabel();
+                                window.addEventListener("mouseup", mouseUpListener);},
+                            mouseLeave: () => {
+                                isInside = false;
+                                if(isMouseDown === false) {
+                                    inactivateLabel();}
+                                else {
+                                    previewLabel();}}})))
+                ) => svgBuilder.G()
+                    .withClass("action-text")
+                    .withChild(label)
+                    .withChild(mouseTrap)
+                    .withGetters(({
+                        label: () => label,
+                        mouseTrap: () => mouseTrap}))
+                    .withSetter("onclick", callback => clickCallback = callback)
+                    .withMethod("withClickListener", function(listener) {
+                        this.onclick = listener;
+                        return this;}))})
+        ) => ({
+            withText: withTextStep,
+            withoutText: withTextStep(null)}));
+
+
+        svgBuilder.NumberSlider = Module.of((
+            tickRadius = 5,
+            markerRadius = 11,
+            mouseTrapPadding={minor: 5, major: 15},
+            markerStrokeWidths = {
+                normal: 1,
+                emphasized: 1.5,
+                active: 2},
+            tickDistanceThreshold=25, //The minimum tick distance until major/minor labelling is switched to
+            //t∈[0,1] represents a position along the number slider,
+            //  where 0 is the 'start' position, 1 is the 'end' position,
+            //  and values between 0 and 1 range smoothly along the line segment
+            numItemsToIndexToTMapper=n=>[1,2].includes(n) ?
+                Module.of((divisor=(1/n+1)) => i => (i+1)*divisor) :
+                Module.of((divisor=(1/(n-1))) => i => i * divisor)
+        ) => ({
+            Style: {
+                mouseTrapPadding: mouseTrapPadding},
+            withRange: (fromInclusive, toInclusive) => Module.of((
+                values=Numbers.range(fromInclusive, toInclusive + 1),
+                indexToTMapper=numItemsToIndexToTMapper(values.length)
+            ) => Module.of((
+                NextStep = {
+                    withLength: length => ({
+                    withIsHorizontal: isHorizontal => Module.of((
+                        tickDistance=values.length === 1 ? length : length / (values.length-1),
+                        valuesInfo=Object.fromEntries(
+                            values.map((value, index) => [
+                                value,
+                                Module.of((t=indexToTMapper(index)) => ({
+                                    index: index,
+                                    t: t,
+                                    coordinate: length * t}))])),
+                        moveElementToValue = isHorizontal === true ?
+                            (element, value) => element.moveTo(valuesInfo[value].coordinate, 0) :
+                            (element, value) => element.yTo(valuesInfo[value].coordinate),
+                        tickGroups=Module.of((
+                            valueToIsMajorTick=tickDistance >= tickDistanceThreshold ?
+                                () => true :
+                                value => 0 === value % 10,
+                            valueToTickGroup=Module.of((
+                                valueToTickMark=Module.of((
+                                    TickBuilder={
+                                        withValue: value => ({
+                                            withLine: line => line
+                                                .withClass("number-slider-tick")
+                                                .withDataAttribute("value", value)})}
+                                ) => value => TickBuilder
+                                    .withValue(value)
+                                    .withLine(isHorizontal === true ?
+                                        SVG.Builder.Line
+                                            .withEndpoints([0, -tickRadius], [0, tickRadius])
+                                            .xTo(valuesInfo[value].coordinate) :
+                                        SVG.Builder.Line
+                                            .withEndpoints([-tickRadius, 0], [tickRadius, 0])
+                                            .yTo(valuesInfo[value].coordinate))),
+                                valueToLabel=Module.of((
+                                    LabelStyle={
+                                        Small: {
+                                            fontSize: 11,
+                                            fill: Style.colors.heavy},
+                                        Large: {
+                                            fontSize: 16,
+                                            fill: Style.colors.black}}
+                                ) => value => SVG.Builder.Text
+                                    .withTextContent(value)
+                                    .withClass(`number-slider-label`)
+                                    .centerAlignedBoth()
+                                    .hide()
+                                    .withMethods({
+                                        withLargeText: function() {
+                                            return this.withAttributes(LabelStyle.Large);},
+                                        withSmallText: function() {
+                                            return this.withAttributes(LabelStyle.Small);}}))
+                            ) => value=>SVG.Builder.G()
+                                .withClass("number-slider-tick-group")
+                                .withChild(valueToTickMark(value))
+                                .withChild(valueToLabel(value)))
+                        ) => SVG.Builder.G()
+                            .withClass("number-slider-tick-groups")
+                            .withChildren(values.map(valueToTickGroup))),
+                        createMarker=()=> SVG.Builder.Circle
+                            .withCenter([0,0])
+                            .withRadius(markerRadius)
+                            .withAttribute("stroke-width", markerStrokeWidths.normal),
+                        IndicationBuilder={
+                            withMarker: marker => Module.of((
+                                value=undefined,
+                                changeListener=undefined,
+                                otherGetter=undefined,
+                                Indication=undefined,
+                                setupIndication=Indication={
+                                    get: () => value,
+                                    set: Module.of((
+                                        valueIndicesPlusOrMinusOne = valueIndex => {
+                                            const valueIndices = [valueIndex];
+                                            if(valueIndex > 0) {
+                                                valueIndices.unshift(valueIndex -1 );}
+                                            if(valueIndex < values.length - 1) {
+                                                valueIndices.push(valueIndex + 1);}
+                                            return valueIndices;},
+                                        formatLabelsForTargetIndex = index => {
+
+                                        }
+                                    ) => newValue => {
+                                        //Do nothing if same
+                                        if(newValue === value) {
+                                            return;}
+
+                                        const previousValueIndex = Objects.isNil(value) ?
+                                            undefined :
+                                            valuesInfo[value].index;
+                                        const otherValue = otherGetter();
+                                        const otherValueIndex = Objects.isNil(otherValue) ?
+                                            undefined :
+                                            valuesInfo[otherValue].index;
+                                        const otherIndexRange = Objects.isNil(otherValue) ?
+                                            [] : valueIndicesPlusOrMinusOne(otherValueIndex);
+
+                                        //Was the value something?
+                                        if(! Objects.isNil(value)) {
+                                            //Yes. Hide all of the previous labels.
+                                        }
+                                        else {
+                                            //No. Show the marker.
+                                            marker.show();}
+
+                                        //Is selected nothing?
+                                        if(newValue === null) {
+                                            //Yes.
+                                            marker.hide();}
+                                        else {
+                                            //No, it is something.
+                                            moveElementToValue(marker, newValue);
+
+                                            //Is the selected value the other value?
+                                            if(newValue !== otherValue) {
+                                                //No. show the preview labels underneath the selected value.
+                                                formatLabelsForTargetIndex(valuesInfo[newValue].index);}}
+                                        if(otherValueIndex !== undefined) {
+                                            formatLabelsForTargetIndex(otherValueIndex);}
+                                        value=newValue;
+                                        //Call changeListener if defined
+                                        if(undefined !== changeListener) {
+                                            changeListener(newValue);}}),
+                                    getMarker: () => marker,
+                                    setChangeListener: listener => changeListener = listener,
+                                    withOtherGetter: getter => {
+                                        otherGetter = getter;
+                                        return Indication;}}
+                            ) => Indication)},
+                        Selected=IndicationBuilder
+                            .withMarker(createMarker()
+                                .withClass("number-slider-selected-marker")),
+                        Preview=IndicationBuilder
+                            .withMarker(createMarker()
+                                .withClass("number-slider-preview-marker")
+                                .withAttribute("stroke-dasharray", "4 5")
+                                .hide())
+                            .withOtherGetter(Selected.get),
+                        setSelectedOtherGetter=Selected.withOtherGetter(Preview.get)
+                    ) => svgBuilder.G()
+                        .withClass("number-slider")
+                        .withChild(SVG.Builder.Line
+                            .withEndpoints([0,0], isHorizontal === true ? [length, 0] : [0, length])
+                            .withClass("number-slider-baseline"))
+                        .withChild(tickGroups)
+                        .withChild(SVG.Builder.G()
+                            .withClass("number-slider-markers")
+                            .withChild(Preview.getMarker())
+                            .withChild(Selected.getMarker()))
+                        .withChild(Module.of((
+                            mouseTrap=undefined,
+                            setupMouseTrap=mouseTrap=svgBuilder.MouseTrap
+                                .withDimensions(...Module.of((
+                                    horizontalDimensions = [
+                                        -mouseTrapPadding.minor,
+                                        -mouseTrapPadding.major,
+                                        2 * mouseTrapPadding.minor + length,
+                                        2 * mouseTrapPadding.major]
+                                ) => isHorizontal === true ?
+                                    horizontalDimensions :
+                                    Arrays.multiSwap(horizontalDimensions, [[0,1],[2,3]])))
+                                .withClass("number-slider-mouse-trap")
+                                .withEventListeners(Module.of((
+                                    isDragging = false,
+                                    isMouseInside = false,
+                                    targetValue = Module.of((
+                                        previousValue=undefined
+                                    ) => value => {
+                                        if(value === previousValue) {
+                                            return;}
+                                        //Is dragging happening?
+                                        if(isDragging===true) {
+                                            //Yes. Set the selected value.
+                                            Selected.set(value);}
+                                        else {
+                                            //No. Set the preview.
+                                            Preview.set(value);
+                                            //Emphasize or unemphasize the selected marker if needed
+                                            const selectedValue = Selected.get();
+                                            //Is the target value the selected value?
+                                            if(value === selectedValue) {
+                                                //Yes
+                                                Selected.getMarker()
+                                                    .withAttribute("stroke-width", markerStrokeWidths.emphasized)}
+                                            //Is the previous value the selected value?
+                                            else if(previousValue === selectedValue) {
+                                                //Yes.
+                                                Selected.getMarker()
+                                                    .withAttribute("stroke-width", markerStrokeWidths.normal)}}}),
+                                    mouseEventToValue=Module.of((
+                                        relevantMouseEventCoordinate = mouseEvent =>
+                                            MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)[
+                                                isHorizontal === true ? 0 : 1],
+                                        mouseEventToTValue = e => Numbers.clamp(
+                                            relevantMouseEventCoordinate(e) / length,
+                                            0,
+                                            1),
+                                        ValueDistance = {
+                                            withValue: value => ({
+                                                withTDistance: t => ({
+                                                    value: value,
+                                                    tDistance: t})})}
+                                    ) => mouseEvent => Module.of((
+                                        tValue = mouseEventToTValue(mouseEvent),
+                                    ) => values
+                                        .reduce(
+                                            (closestValue, currentValue) => Module.of((
+                                                currentTDistance = Math.abs(valuesInfo[currentValue].t - tValue)
+                                            ) => currentTDistance >= closestValue.tDistance ?
+                                                    closestValue :
+                                                    ValueDistance
+                                                        .withValue(currentValue)
+                                                        .withTDistance(currentTDistance)),
+                                            ValueDistance
+                                                .withValue(null)
+                                                .withTDistance(Number.MAX_VALUE))
+                                        .value)),
+                                    mouseMoveListener = e => targetValue(mouseEventToValue(e)),
+                                ) => ({
+                                    mouseEnter: e => {
+                                        isMouseInside = true;
+                                        targetValue(mouseEventToValue(e));},
+                                    mouseMove: mouseMoveListener,
+                                    mouseDown: Module.of((
+                                        mouseUpListener=undefined,
+                                        setupMouseUpListener=mouseUpListener = function(e) {
+                                            isDragging = false;
+                                            window.removeEventListener("mouseup", mouseUpListener);
+                                            window.removeEventListener("mousemove", mouseMoveListener);
+                                            mouseTrap.withEventListener("mousemove", mouseMoveListener);
+                                            targetValue(isMouseInside ? mouseEventToValue(e) : null);}
+                                    ) => e => {
+                                        targetValue(null);
+                                        isDragging = true;
+                                        mouseTrap.withoutEventListener("mousemove", mouseMoveListener);
+                                        window.addEventListener("mousemove", mouseMoveListener);
+                                        window.addEventListener("mouseup", mouseUpListener);
+                                        targetValue(mouseEventToValue(e));}),
+                                    mouseLeave: () => {
+                                        isMouseInside = false;
+                                        if(! isDragging) {
+                                            targetValue(null);}}})))
+                            ) => mouseTrap))
+                            .withGetterAndSetter("value", Selected.get, Selected.set)
+                            .withMethod("withValue", function(value) {
+                                this.value = value;
+                                return this;})
+                            .withMethod("withoutValue", function() {
+                                this.value = null;
+                                return this;})
+                            .withoutValue()
+                            .withMethod("withChangeListener", function(listener) {
+                                Selected.setChangeListener(listener);
+                                return this;}))})}
+            ) => ({
+                verticallyAligned: ({
+                    withHeight: height => NextStep.withLength(height).withIsHorizontal(false)}),
+                horizontallyAligned: ({
+                    withWidth: width => NextStep.withLength(width).withIsHorizontal(true)})})))}));
+
         svgBuilder.Modal = Module.of((
             fillOpacity=.95,
             contentPadding=10
@@ -679,10 +1497,7 @@ const ChordJogApp = (() => {
                 modal = SVG.Builder.G()
                     .withClass("modal")
                     .withChild(SVG.Builder.MouseTrap
-                        .withX(0)
-                        .withY(0)
-                        .withWidth(Style.width)
-                        .withHeight(Style.height)
+                        .withDimensions(0, 0, Style.width, Style.height)
                         .withClass("modal-backdrop")
                         .withAttributes({
                             fill: Style.colors.black,
@@ -938,14 +1753,13 @@ const ChordJogApp = (() => {
                     withCenter: center => SVG.Builder.Text
                         .withTextContent("*")
                         .withClass("any-action-indicator")
+                        .centerAlignedBoth()
                         .withAttributes({
                             fontFamily: "Courier New",
-                            fontSize: 14,
-                            dominantBaseline: "central",
-                            textAnchor: "middle"})
+                            fontSize: 14})
                         .moveTo(center[0], center[1] + textYOffset)})),
                 DeadStringBuilder = {
-                    withCenter: center => SVG.Builder.Path
+                    withCenter: center => SVG.Builder.Path()
                         .withD(
                             `M
                                 ${center[0] - FingerlessIndicatorStyle.radius * halfRoot2},
@@ -1061,7 +1875,10 @@ const ChordJogApp = (() => {
                         .withDataAttribute("aboveFret", belowFret - 1)
                         .withDataAttribute("belowFret", belowFret)})})};
         FingerIndicator.Builder = {
-            forFingerAction: (fingerAction) => SVG.Builder
+            forFingerAction: fingerAction => Module.of((
+                startX=Fretboard.stringToXCoordinate(fingerAction.range.min),
+                width=Fretboard.stringToXCoordinate(fingerAction.range.max) - startX
+            ) => SVG.Builder
                 .G()
                 .withClass("finger-indicator")
                 .withDataAttributes({
@@ -1070,31 +1887,29 @@ const ChordJogApp = (() => {
                     minString: fingerAction.range.min,
                     maxString: fingerAction.range.max})
                 .withAttribute("stroke", Style.colors.superHeavy)
+                .moveTo(startX + .5 * width, Fretboard.fretToYCoordinate(fingerAction.fret))
                 .withChild(SVG.Builder.Rect
-                    .withX(Fretboard.stringToXCoordinate(fingerAction.range.min) - FingerIndicator.Style.radius)
-                    .withY(Fretboard.fretToYCoordinate(fingerAction.fret) - FingerIndicator.Style.radius)
-                    .withWidth(FingerIndicator.Style.diameter +
-                        Fretboard.Style.stringSpacing * (fingerAction.range.max - fingerAction.range.min))
+                    .withX(-(.5*width + FingerIndicator.Style.radius))
+                    .withY( -FingerIndicator.Style.radius)
+                    .withWidth(FingerIndicator.Style.diameter + width)
                     .withHeight(FingerIndicator.Style.diameter)
                     .withRadius(FingerIndicator.Style.radius)
                     .withClass("finger-indicator-outline")
                     .withAttribute("fill", Style.colors.superHeavy))
                 .withChild(SVG.Builder.Text
                     .withTextContent(fingerAction.finger)
+                    .centerAlignedBoth()
                     .withAttributes({
-                        x: Module.of(() => {
-                            const min = Fretboard.stringToXCoordinate(fingerAction.range.min);
-                            return min + .5 * (Fretboard.stringToXCoordinate(fingerAction.range.max) - min);}),
-                        y: Fretboard.fretToYCoordinate(fingerAction.fret) + (
-                            fingerAction.finger === Fingers.any ?
-                                FingerIndicator.Style.anyFingerTextYOffset :
-                                0),
                         fontFamily: FingerIndicator.Style.font,
-                        dominantBaseline: "central",
-                        textAnchor: "middle",
                         stroke: "none",
                         fill: Style.colors.superLight,
-                        fontSize: 17}))};
+                        fontSize: 17})
+                    .move(0, fingerAction.finger !== Fingers.any ? 1.25 : 5)))};
+
+        RootFretLabel.Style.x = Fretboard.stringToXCoordinate(1) -
+            FingerIndicator.Style.radius -
+            RootFretLabel.Style.paddingRight;
+        RootFretLabel.Style.y = Fretboard.fretToYCoordinate(Frets.Relative.first);
         RootFretLabel.Builder = Module.of(() => {
             const rootFretToLabel = (rootFret) =>
                 rootFret === undefined ? "" :
@@ -1104,16 +1919,12 @@ const ChordJogApp = (() => {
                 const label = SVG.Builder.Text
                     .withoutTextContent(text)
                     .withClass("root-fret-label")
-                    .moveTo(
-                        Fretboard.stringToXCoordinate(1) -
-                        FingerIndicator.Style.radius -
-                        RootFretLabel.Style.paddingRight,
-                        Fretboard.fretToYCoordinate(Frets.Relative.first))
+                    .moveTo(RootFretLabel.Style.x, RootFretLabel.Style.y)
                     .withSetter("rootFret", function(rootFret) {
                         this.withTextContent(rootFretToLabel(rootFret));})
+                    .centerAlignedVertical()
+                    .rightAligned()
                     .withAttributes({
-                        dominantBaseline: "central",
-                        textAnchor: "end",
                         fontFamily: RootFretLabel.Style.fontFamily,
                         fontSize: RootFretLabel.Style.fontSize})
                     .withTextLength(RootFretLabel.Style.textLength)
@@ -1129,9 +1940,9 @@ const ChordJogApp = (() => {
         const SkeletonBuilder = Module.of((
             createSkeleton=() => SVG.Builder.G()
                 .withClass("shape-chart-skeleton")
-                .withAttribute("stroke", Style.colors.light)
                 .withChild(SVG.Builder.G()
                     .withClass("fingerless-indicators")
+                    .withAttribute("stroke", Style.colors.medium)
                     .withChildren(Strings.all
                         .map(string => FingerlessIndicator.Builder.forString(string).topOnly)
                         .map(fingerIndicatorBuilder => [
@@ -1140,6 +1951,7 @@ const ChordJogApp = (() => {
                         .flat()))
                 .withChild(SVG.Builder.G()
                     .withClass("fretboard")
+                    .withAttribute("stroke", Style.colors.heavy)
                     .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                         .forString(string)
                         .toFret(Frets.Relative.last)))
@@ -1181,7 +1993,9 @@ const ChordJogApp = (() => {
                             .reduce((a, b) => a >= b ? a : b);
                 const meat = SVG.Builder
                     .G()
-                    .withAttribute("stroke", Style.colors.heavy)
+                    .withAttributes({
+                        stroke: Style.colors.superHeavy,
+                        strokeWidth: 1.25})
                     .withClass("shape-chart-meat");
                 if(maxFret !== undefined) {meat
                     //Active strings
@@ -1247,6 +2061,8 @@ const ChordJogApp = (() => {
                 Style: FingerIndicator.Style},
             FingerlessIndicator: {
                 Style: FingerlessIndicator.Style},
+            RootFretLabel: {
+                Style: RootFretLabel.Style},
             Builder: Module.of((
                 buildStep = (schema, rootFret, includeAnyStringAction) => Module.of((
                     shapeChartMeat = MeatBuilder.forSchema(schema),
@@ -1267,7 +2083,6 @@ const ChordJogApp = (() => {
                             rootFretLabel.rootFret = value;}}))
                 ) => SVG.Builder.G()
                     .withClass("shape-chart")
-                    .disableTextSelection()
                     .withChild(includeAnyStringAction === true ?
                         SkeletonBuilder.withAnyStringAction() :
                         SkeletonBuilder.withoutAnyStringAction())
@@ -1473,7 +2288,7 @@ const ChordJogApp = (() => {
                                     null},
                         ) => SVG.Builder.G()
                             .withClass("finger-input")
-                            .withChild(SVG.Builder.Path //hand-outline
+                            .withChild(SVG.Builder.Path() //hand-outline
                                 .withD(
                                     `M
                                     90.24086,	287.90208
@@ -1713,10 +2528,7 @@ const ChordJogApp = (() => {
                             .withChild(selectedIndicator)
                             .withChild(previewIndicator)
                             .withChild(SVG.Builder.MouseTrap
-                                .withX(0)
-                                .withY(0)
-                                .withWidth(FingerInputStyle.baseWidth)
-                                .withHeight(FingerInputStyle.baseHeight)
+                                .withDimensions(0, 0, FingerInputStyle.baseWidth, FingerInputStyle.baseHeight)
                                 .withClass("finger-input-mouse-trap")
                                 .withEventListeners({
                                     mouseMove: e => Preview.set(mouseEventToClosestRegionValue(e)),
@@ -1744,8 +2556,7 @@ const ChordJogApp = (() => {
                                     this.unfocus();
                                     return this;}})))
                             .scale(FingerInputStyle.scale)
-                            .withAttribute("stroke-width", FingerInputStyle.strokeWidth)
-                            .disableTextSelection())})}))}))
+                            .withAttribute("stroke-width", FingerInputStyle.strokeWidth))})}))}))
         ) => Module.of((
             fingersKeyMap={
                 1: Fingers.index,
@@ -2000,24 +2811,26 @@ const ChordJogApp = (() => {
                                 Preview.set(null);}})),
                         previousFretboardMousePosition=null,
                         fingerlessIndicatorMouseTrap=SVG.Builder.MouseTrap
-                            .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                FingerlessIndicators.Style.padding.horizontal)
-                            .withY(ShapeChart.FingerlessIndicator.Style.startY -
-                                FingerlessIndicators.Style.padding.vertical)
-                            .withWidth(ShapeChart.Fretboard.Style.width +
+                            .withDimensions(
+                                ShapeChart.FingerlessIndicator.Style.startX  -
+                                    FingerlessIndicators.Style.padding.horizontal,
+                                ShapeChart.FingerlessIndicator.Style.startY -
+                                    FingerlessIndicators.Style.padding.vertical,
+                                ShapeChart.Fretboard.Style.width +
+                                    ShapeChart.FingerlessIndicator.Style.diameter +
+                                    2 * FingerlessIndicators.Style.padding.horizontal,
                                 ShapeChart.FingerlessIndicator.Style.diameter +
-                                2 * FingerlessIndicators.Style.padding.horizontal)
-                            .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                ShapeChart.FingerlessIndicator.Style.margin +
-                                FingerlessIndicators.Style.padding.vertical)
+                                    ShapeChart.FingerlessIndicator.Style.margin +
+                                    FingerlessIndicators.Style.padding.vertical)
                             .withClass("fingerless-indicators-mouse-trap")
                             .withEventListeners(createMouseEventListeners(
                                 FingerlessIndicators.mouseTrapStateToSchemaChange)),
                         fretboardMouseTrap=SVG.Builder.MouseTrap
-                            .withX(ShapeChart.Fretboard.Style.x - Fretboard.Style.padding)
-                            .withY(ShapeChart.Fretboard.Style.y)
-                            .withWidth(ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding)
-                            .withHeight(ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
+                            .withDimensions(
+                                ShapeChart.Fretboard.Style.x - Fretboard.Style.padding,
+                                ShapeChart.Fretboard.Style.y,
+                                ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding,
+                                ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
                             .withClass("fretboard-mouse-trap")
                             .withEventListeners(createMouseEventListeners(
                                 Fretboard.mouseTrapStateToSchemaChange)),
@@ -2035,16 +2848,17 @@ const ChordJogApp = (() => {
                         shapeInputMouseTraps :          //Do not include 'any string action' mouse trap
                         shapeInputMouseTraps.withChild( //Do include...
                             SVG.Builder.MouseTrap
-                                .withX(ShapeChart.FingerlessIndicator.Style.startX  -
-                                    AnyStringAction.Style.padding.horizontal)
-                                .withY(ShapeChart.Fretboard.Style.y +
-                                    ShapeChart.Fretboard.Style.height)
-                                .withWidth(ShapeChart.Fretboard.Style.width +
+                                .withDimensions(
+                                    ShapeChart.FingerlessIndicator.Style.startX  -
+                                        AnyStringAction.Style.padding.horizontal,
+                                    ShapeChart.Fretboard.Style.y +
+                                        ShapeChart.Fretboard.Style.height,
+                                    ShapeChart.Fretboard.Style.width +
+                                        ShapeChart.FingerlessIndicator.Style.diameter +
+                                        2 * AnyStringAction.Style.padding.horizontal,
                                     ShapeChart.FingerlessIndicator.Style.diameter +
-                                    2 * AnyStringAction.Style.padding.horizontal)
-                                .withHeight(ShapeChart.FingerlessIndicator.Style.diameter +
-                                    ShapeChart.FingerlessIndicator.Style.margin +
-                                    AnyStringAction.Style.padding.vertical)
+                                        ShapeChart.FingerlessIndicator.Style.margin +
+                                        AnyStringAction.Style.padding.vertical)
                                 .withClass("fingerless-indicators-mouse-trap")
                                 .withEventListeners(createMouseEventListeners(
                                     AnyStringAction.mouseTrapStateToSchemaChange))))
@@ -2063,8 +2877,7 @@ const ChordJogApp = (() => {
                     .withClass("preview-meat-container")
                     .withAttributes({
                         fillOpacity: .4,
-                        strokeOpacity: .5})
-                    .disableTextSelection(),
+                        strokeOpacity: .5}),
                 fingerInput = withWildcards === true ?
                     FingerInput.Builder.withWildcard() :
                     FingerInput.Builder.withoutWildcard(),
@@ -2247,10 +3060,10 @@ const ChordJogApp = (() => {
                 rangeLabel = Module.of((
                     createText=()=>SVG.Builder.Text
                         .withoutTextContent()
+                        .centerAlignedHorizontal()
                         .withAttributes({
                             fontFamily: RootFretRangeStyle.rangeLabelFont,
-                            fontSize: RootFretRangeStyle.rangeLabelFontSize,
-                            textAnchor: "middle"}),
+                            fontSize: RootFretRangeStyle.rangeLabelFontSize}),
                     expressionText=createText()
                         .withTextContent("<= r <=")
                         .withClass("root-fret-range-input-label-min"),
@@ -2263,7 +3076,6 @@ const ChordJogApp = (() => {
                 ) => SVG.Builder.G()
                     .withClass("root-fret-range-input-label")
                     .withChildren([minText, expressionText, maxText])
-                    .disableTextSelection()
                     .moveTo(
                         .5 * width,
                         RootFretRangeStyle.skeletonHeight + RootFretRangeStyle.rangeLabelMarginTop)
@@ -2275,10 +3087,11 @@ const ChordJogApp = (() => {
                         withValue: function(rootFret) {
                             return this.withRange(rootFret, rootFret);}})),
                 mouseTrap = SVG.Builder.MouseTrap
-                    .withX(-RootFretRangeStyle.mouseTrapHorizontalPadding)
-                    .withY(-.5 * RootFretRangeStyle.height)
-                    .withWidth(width + 2 * RootFretRangeStyle.mouseTrapHorizontalPadding)
-                    .withHeight(RootFretRangeStyle.height)
+                    .withDimensions(
+                        -RootFretRangeStyle.mouseTrapHorizontalPadding,
+                        -.5 * RootFretRangeStyle.height,
+                        width + 2 * RootFretRangeStyle.mouseTrapHorizontalPadding,
+                        RootFretRangeStyle.height)
                     .withClass("root-fret-range-mouse-trap"),
                 rangeMarkers = Module.of((
                     rootFretToCenter=rootFret=>[rootFretToXCoordinate(rootFret), 0],
@@ -2690,7 +3503,7 @@ const ChordJogApp = (() => {
                         ShapeFormStyle.Buttons.width,
                         ShapeFormStyle.Buttons.height)
                     .withText("Save")
-                    .withClickHandler(() => {
+                    .withClickListener(() => {
                         save();
                         reset();})
                     .withClass("shape-form-save-button"),
@@ -2698,12 +3511,11 @@ const ChordJogApp = (() => {
                     .withoutTextContent()
                     .withClass("shape-form-output")
                     .moveTo(ShapeFormStyle.ErrorMessage.x, ShapeFormStyle.ErrorMessage.y)
+                    .centerAlignedHorizontal()
+                    .bottomAligned()
                     .withAttributes({
                         fontSize: ShapeFormStyle.ErrorMessage.fontSize,
-                        fontFamily: ShapeFormStyle.ErrorMessage.fontFamily,
-                        textAnchor: "middle",
-                        dominantBaseline: "hanging"})
-                    .disableTextSelection(),
+                        fontFamily: ShapeFormStyle.ErrorMessage.fontFamily}),
                 shapeValidations=ShapeValidations.common,
                 schemaChangeListener=Module.of((
                     invalidSaveButtonEventListeners = {
@@ -2748,7 +3560,7 @@ const ChordJogApp = (() => {
                                 ShapeFormStyle.Buttons.width,
                                 ShapeFormStyle.Buttons.height)
                             .withText("Reset")
-                            .withClickHandler(reset)
+                            .withClickListener(reset)
                             .withClass("shape-form-reset-button"))
                         .withChild(saveButton)
                         .withChild(errorMessage),
@@ -2783,7 +3595,7 @@ const ChordJogApp = (() => {
         topRowMarginBottom=10,
         shapeChartGridPadding= {
             horizontal: 5,
-            vertical: 10},
+            vertical: 5},
         shapeChartGridMaxColumns=4,
         maxMatches=12
     ) => ({
@@ -2795,31 +3607,41 @@ const ChordJogApp = (() => {
             shapeFilterInput=undefined,
             refreshShapesList = () => filterShapes(shapeFilterInput.schema),
             ShapeItem=Module.of((
-                shapeChartMarginBottom=3,
-                buttonHeight=18,
-                buttonWidth=65,
-                buttonPadding=8,
-                buttonContainerWidth = 2*buttonWidth + buttonPadding
+                deleteButtonHeight=65,
+                editButtonHeight=40,
+                moduleHeight=deleteButtonHeight-10,
+                buttonWidth=18,
+                buttonPadding=3,
+                buttonsContainerOffsetX=-3,
+                buttonsContainerOffsetY=45
             ) => ({
                 Style: {
                     width: ShapeChart.Style.width,
-                    height: ShapeChart.Style.height + shapeChartMarginBottom + buttonHeight},
+                    height: ShapeChart.Style.height},
                 shapesToShapeItems: shapes => shapes
                     .slice(0, maxMatches)
                     .map(shape=>Module.of((
-                        buttonsContainer=SVG.Builder.ModularGrid
-                            .withX(ShapeChart.Fretboard.Style.x - .5 * (
-                                buttonContainerWidth - ShapeChart.Fretboard.Style.width))
-                            .withY(ShapeChart.Style.height + shapeChartMarginBottom)
-                            .withWidth(buttonContainerWidth)
+                        buttonsContainer= SVG.Builder.ModularGrid
+                            .withX(ShapeChart.RootFretLabel.Style.x + buttonsContainerOffsetX)
+                            .withY(ShapeChart.RootFretLabel.Style.y + buttonsContainerOffsetY)
+                            .withWidth(buttonWidth)
                             .withModuleWidth(buttonWidth)
-                            .withModuleHeight(buttonHeight)
+                            .withModuleHeight(moduleHeight)
                             .withPadding(buttonPadding)
                             .withModules([
-                                SVG.Builder.TextButton
-                                    .withDimensions(0,0, buttonWidth, buttonHeight)
+                                SVG.Builder.ActionText
+                                    .withText("delete")
+                                    .withSize(buttonWidth, deleteButtonHeight)
+                                    .withClickListener(() => {
+                                        if(true===confirm("Are you sure you want to delete this shape?")) {
+                                            Shapes.delete(shape.id);
+                                            refreshShapesList();}})
+                                    .withModification(function() {
+                                        this.label.rotateTo(270);}),
+                                SVG.Builder.ActionText
                                     .withText("edit")
-                                    .withClickHandler(() => {
+                                    .withSize(buttonWidth, editButtonHeight)
+                                    .withClickListener(() => {
                                         shapeFilterInput.unfocus();
                                         shapesPage.withChild(SVG.Builder.Modal
                                             .withContent(ShapeForm.Builder.new().forEditing(Shapes.all[shape.id]))
@@ -2828,16 +3650,7 @@ const ChordJogApp = (() => {
                                                 shapeFilterInput.focus();
                                                 refreshShapesList();}));})
                                     .withModification(function() {
-                                        this.label.withAttribute("font-size", 14)}),
-                                SVG.Builder.TextButton
-                                    .withDimensions(0, 0, buttonWidth, buttonHeight)
-                                    .withText("delete")
-                                    .withClickHandler(() => {
-                                        if(true===confirm("Are you sure you want to delete this shape?")) {
-                                            Shapes.delete(shape.id);
-                                            refreshShapesList();}})
-                                    .withModification(function() {
-                                        this.label.withAttribute("font-size", 14);})])
+                                        this.label.rotateTo(270);})])
                             .withClass("shape-item-buttons-container")
                     ) => SVG.Builder.G()
                         .withClass("shape-item")
@@ -2855,7 +3668,7 @@ const ChordJogApp = (() => {
                 .withModules(ShapeItem.shapesToShapeItems(Shapes.all))
                 .withClass("shape-chart-grid")
                 .move(0, ShapeInput.Style.height + topRowMarginBottom),
-            shapesPageTopRow=Module.of((
+            ShapesPageTopRow=Module.of((
                 setFilterShapes=filterShapes=shapeFilter=>
                     shapeChartGrid.modules = ShapeItem.shapesToShapeItems(Shapes.search(shapeFilter)),
                 setShapeFilterInput=shapeFilterInput=ShapeInput.Builder
@@ -2867,37 +3680,21 @@ const ChordJogApp = (() => {
                     .withClass("shapes-filter-container")
                     .withChild(shapeFilterInput)
                     .withChild(Module.of((
-                        filterLabelPosition=[4,48],
+                        filterLabelPosition=[
+                            ShapeChart.RootFretLabel.Style.x - 4,
+                            ShapeChart.RootFretLabel.Style.y + 70],
+                        filterLabelWidth=19,
                         filterLabelTextLength=80,
-                    ) => SVG.Builder.G()
-                        .withClass("filter-label-container")
-                        .withChild(SVG.Builder.Text
-                            .withTextContent("filte")
-                            .withClass("shape-filter-label")
-                            .withAttributes({
-                                fontFamily: "monospace",
-                                fontSize: 15,
-                                dominantBaseline: "hanging",
-                                textAnchor: "end",
-                                cursor: "pointer"})
-                            .withTextLength(filterLabelTextLength)
-                            .disableTextSelection()
-                            .moveTo(...filterLabelPosition)
-                            .rotateTo(270))
-                        .withChild(Module.of((
-                            filterLabelWidth=19,
-                            distanceToTopOfR = 20,
-                            mouseTrapPadding={
-                                vertical: 4,
-                                horizontal: 0}
-                        ) => SVG.Builder.MouseTrap
-                            .withX(filterLabelPosition[0] - mouseTrapPadding.horizontal)
-                            .withY(filterLabelPosition[1] - mouseTrapPadding.vertical - distanceToTopOfR)
-                            .withWidth(filterLabelWidth + 2 * mouseTrapPadding.horizontal)
-                            .withHeight(filterLabelTextLength + 2 * mouseTrapPadding.vertical + distanceToTopOfR)
-                            .withClass("filter-label-mouse-trap")
-                            .withEventListener("mousedown",
-                                () => shapeFilterInput.schema = Shapes.Schema.allAnyStringAction))))),
+                        filterLabelHeight=108
+                    ) => SVG.Builder.ActionText
+                        .withText("reset")
+                        .withSize(filterLabelWidth, filterLabelHeight)
+                        .withClass("filter-button")
+                        .moveTo(...filterLabelPosition)
+                        .withModification(function(){
+                            this.label
+                                .rotateTo(270);})
+                        .withClickListener(() => shapeFilterInput.schema = Shapes.Schema.allAnyStringAction))),
                 shapesButtonContainer=Module.of((
                     buttonWidth=width - ShapeInput.Style.width - shapeFilterMarginRight - ShapeChart.FingerIndicator.Style.radius,
                     numButtons=3,
@@ -2906,7 +3703,7 @@ const ChordJogApp = (() => {
                     createShapeButton=SVG.Builder.TextButton
                         .withDimensions(0, 0, buttonWidth, buttonHeight)
                         .withText("Create")
-                        .withClickHandler(() => {
+                        .withClickListener(() => {
                             shapeFilterInput.unfocus();
                             shapesPage.withChild(SVG.Builder.Modal
                                 .withContent(ShapeForm.Builder.new().forCreation())
@@ -2917,7 +3714,7 @@ const ChordJogApp = (() => {
                     downloadShapesButton=SVG.Builder.TextButton
                         .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
                         .withText("Download")
-                        .withClickHandler(Shapes.download),
+                        .withClickListener(Shapes.download),
                     uploadShapesButtonContainer=Module.of((
                         nonInteractiveToInteractiveWidthRatio=1/3,
                         medianWidth=18,
@@ -2925,12 +3722,10 @@ const ChordJogApp = (() => {
                     ) => SVG.Builder.G()
                         .withClass("upload-buttons-container")
                         .moveTo(0, buttonIndexToYCoordinate(2))
+                        .centerAlignedBoth()
                         .withAttributes({
-                            textAnchor: "middle",
-                            dominantBaseline: "central",
                             fontSize: 17,
                             fontFamily: "Courier New"})
-                        .disableTextSelection()
                         .withChild(SVG.Builder.G()
                             .withClass("upload-buttons-label-container")
                             .withChild(SVG.Builder.Rect
@@ -2969,12 +3764,12 @@ const ChordJogApp = (() => {
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, 0, optionWidth, optionHeight)
                                 .withText("Append")
-                                .withClickHandler(() => Shapes.upload(refreshShapesList))
+                                .withClickListener(() => Shapes.upload(refreshShapesList))
                                 .withClass("upload-and-append-button"))
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, optionHeight, optionWidth, optionHeight)
                                 .withText("Replace")
-                                .withClickHandler(() => Shapes.upload(refreshShapesList, true))
+                                .withClickListener(() => Shapes.upload(refreshShapesList, true))
                                 .withClass("upload-and-replace-button")))))
                 ) => SVG.Builder.G()
                     .withClass("shapes-button-actions-container")
@@ -2982,17 +3777,43 @@ const ChordJogApp = (() => {
                     .withChild(createShapeButton)
                     .withChild(uploadShapesButtonContainer)
                     .withChild(downloadShapesButton))
-            ) => SVG.Builder.G()
-                .withClass("shape-page-top-row")
-                .withChild(shapesFilterContainer)
-                .withChild(shapesButtonContainer)),
+            ) => ({
+                Style: {endY: ShapeInput.Style.height},
+                element: SVG.Builder.G()
+                    .withClass("shape-page-top-row")
+                    .withChild(shapesFilterContainer)
+                    .withChild(shapesButtonContainer)})),
             setupShapesPage=shapesPage=SVG.Builder.G()
                 .withClass("shapes-page")
-                .withChild(shapesPageTopRow)
-                .withChild(shapeChartGrid)
+                .withChild(ShapesPageTopRow.element)
+                .withChild(SVG.Builder.NumberSlider
+                    .withRange(1, 100)
+                    .horizontallyAligned
+                    .withWidth(width - ShapeChart.Fretboard.Style.x - ShapeChart.FingerIndicator.Style.radius)
+                    .moveTo(ShapeChart.Fretboard.Style.x, ShapesPageTopRow.Style.endY + 18)
+                    .withChangeListener(value => console.log(value)))
+                .withChild(shapeChartGrid.move(0, 38))
         ) => shapesPage)}));
     return {
-        create: () => SVG.Builder.SVG
+        create: () => Module.of((
+            indexToAngle=i=>22.5*i,
+            createIndicator=i=>Module.of((angle=indexToAngle(i)) => SVG.Builder.Indicator()
+                .moveTo(300, 300)
+                .withContent(SVG.Builder.Circle.withCenter([0,0]).withRadius(5).withAttributes({
+                    fill: `hsl(${angle},100%,50%)`,
+                    strokeWidth: 1}))
+                .rotateTo(angle)
+                .withAttribute("fill", `hsl(0,0%,10%, 50%)`)
+                .withFootHeight(i % 2 === 0 ?
+                    i % 4 === 0 ? 60 : 40 :
+                    i % 3 === 0 ? 80 : 20)),
+            slowIndicators=Numbers.range(0,16).map(createIndicator),
+            fastIndicators=Numbers.range(16,32).map(createIndicator),
+            setupEventListener=setInterval(() => {
+                slowIndicators.forEach((slowIndicator, i)=>slowIndicator.rotateBy(i % 2 === 0 ? 1 : -1))
+                fastIndicators.forEach((fastIndicator, i)=>fastIndicator.rotateBy(i % 2 === 0 ? 3 : -3));
+            }, 10)
+        ) => SVG.Builder.SVG
             .withWidth(Style.width)
             .withHeight(Style.height)
             .withClass("chord-jog-app")
@@ -3001,4 +3822,10 @@ const ChordJogApp = (() => {
                 stroke: Style.colors.heavy,
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
-            .withChild(ShapesPage.new())};})();
+            .disableTextSelection()
+            .withChild(SVG.Builder.Circle.withCenter([300, 300]).withRadius(50).withAttribute("fill", "grey"))
+            .withChildren(slowIndicators)
+            .withChildren(fastIndicators)
+            .withChild(SVG.Builder.NumberLine().withModification(function(){
+                window.addEventListener("mousemove", e=>this.end = [e.clientX, e.clientY]);}))
+            .withChild(SVG.Builder.Indicator().moveTo(50, 50)))};})();
