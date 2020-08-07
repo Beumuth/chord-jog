@@ -793,19 +793,20 @@ const ChordJogApp = (() => {
                             labels.slice(1,labels.length-1).forEach(label=>label.hide());}),
                     majorMinor: Module.of((
                         minorTickScaling=.25,
-                        majorIndicesOfRange=range => Module.of((
-                            indexFirstFactorOfTen=(10-range.min)%10,
-                        ) => Numbers
-                            .range(0, Math.floor((10+range.max-range.min-indexFirstFactorOfTen)/10))
-                            .map(i=>indexFirstFactorOfTen+10*i))
+                        fiveTickScaling=.5,
+                        indexFirstFactorOfTenOfRange=rangeMin=>(10-rangeMin)%10
                     ) => LabelModeBuilder
                         .withTickEndsGenerator((longTickEnd, range) => Module.of((
-                            majorTickIndices=majorIndicesOfRange(range),
+                            indexFirstFactorOfTen=indexFirstFactorOfTenOfRange(range.min),
+                            fiveTickEnd=Vector.multiply(longTickEnd, fiveTickScaling),
                             minorTickEnd=Vector.multiply(longTickEnd, minorTickScaling)
-                        ) => index=>majorTickIndices.includes(index) ? longTickEnd : minorTickEnd))
+                        ) => index=>0 === (index - indexFirstFactorOfTen) % 10 ? longTickEnd :
+                            0 === (index - indexFirstFactorOfTen) % 5 ? fiveTickEnd : minorTickEnd))
                         .withInitializer((labels, range)=>Module.of((
-                            majorIndices=majorIndicesOfRange(range)
-                        ) => labels.forEach((label, i) => majorIndices.includes(i) ? label.show() : label.hide())))),
+                            indexFirstFactorOfTen=indexFirstFactorOfTenOfRange(range.min),
+                            nothing=console.log(indexFirstFactorOfTen)
+                        ) => labels.forEach((label, i) => 0 === (i - indexFirstFactorOfTen)%10 ?
+                            label.show() : label.hide())))),
                     all: LabelModeBuilder
                         .withTickEndsGenerator(longTickEnd=>()=>longTickEnd)
                         .withInitializer(labels=>labels.forEach(label=>label.show()))})),
