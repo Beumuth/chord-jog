@@ -773,67 +773,59 @@ const ChordJogApp = (() => {
                     withModules: modules => withModulesStep(modules),
                     withoutModules: () => withModulesStep([])}))})})})})})},
             NumberLine: Module.of((
-                LabelModes=Module.of((
-                    LabelModeBuilder = {
-                        withTickEndsGenerator: tickEndsGenerator => ({
-                        withInitializer: initializer => ({
-                            tickEndsGenerator: tickEndsGenerator,
-                            initialize: initializer})})}
-                ) => ({
-                    none: LabelModeBuilder
-                        .withTickEndsGenerator(()=>()=>[0,0])
-                        .withInitializer(labels=>labels.forEach(label=>label.hide())),
-                    firstAndLast: LabelModeBuilder
-                        .withTickEndsGenerator((longTickEnd, range) => Module.of((
-                            firstAndLast=[0,range.max-range.min]
-                        ) => index => firstAndLast.includes(index) ? longTickEnd : [0,0]))
-                        .withInitializer(labels=>{
-                            labels[0].show();
-                            labels[labels.length-1].show();
-                            labels.slice(1,labels.length-1).forEach(label=>label.hide());}),
-                    majorMinor: Module.of((
-                        minorTickScaling=.25,
-                        fiveTickScaling=.5,
-                        indexFirstFactorOfTenOfRange=rangeMin=>(10-rangeMin)%10
-                    ) => LabelModeBuilder
-                        .withTickEndsGenerator((longTickEnd, range) => Module.of((
-                            indexFirstFactorOfTen=indexFirstFactorOfTenOfRange(range.min),
-                            fiveTickEnd=Vector.multiply(longTickEnd, fiveTickScaling),
-                            minorTickEnd=Vector.multiply(longTickEnd, minorTickScaling)
-                        ) => index=>0 === (index - indexFirstFactorOfTen) % 10 ? longTickEnd :
-                            0 === (index - indexFirstFactorOfTen) % 5 ? fiveTickEnd : minorTickEnd))
-                        .withInitializer((labels, range)=>Module.of((
-                            indexFirstFactorOfTen=indexFirstFactorOfTenOfRange(range.min),
-                            nothing=console.log(indexFirstFactorOfTen)
-                        ) => labels.forEach((label, i) => 0 === (i - indexFirstFactorOfTen)%10 ?
-                            label.show() : label.hide())))),
-                    all: LabelModeBuilder
-                        .withTickEndsGenerator(longTickEnd=>()=>longTickEnd)
-                        .withInitializer(labels=>labels.forEach(label=>label.show()))})),
+                LabelModes={
+                    all: "all",
+                    tens: "tens",
+                    extrema: "extrema",
+                    none: "none",
+                    auto: "auto"},
+                TickModes={
+                    allLong: "allLong",
+                    graduated: "graduated",
+                    tensAndFives: "tensAndFives",
+                    tensOnly: "tensOnly",
+                    extrema: "extrema",
+                    auto: "auto"},
                 LabelOrientations={
                     front: "front",
                     behind: "behind"},
                 Calculators = Module.of((
                     rangeLength=range => 1+range.max-range.min,
+                    indexFirstValueDivisibleByTen=range=>Module.of((
+                        index=(10-range.min)%10
+                    ) => index > range.max ? undefined : index)
                 ) => ({
-                    AutoModeDecider: Module.of((
-                        spacePerDigit = 9
+                    LabelAutoMode: Module.of((
+                        lengthPerCharacter=12,
+                        valueLength=x=>`${x}`.length*lengthPerCharacter
                     ) => ({
+                        withLineLength: lineLength => ({
                         withRange: range => Module.of((
-                            numValues=rangeLength(range),
-                            maxAbsValue = Math.max(Math.abs(range.min), Math.abs(range.max)),
-                            tickDistanceThreshold= spacePerDigit * (
-                                maxAbsValue < 10 ? 1 :
-                                maxAbsValue < 100 ? 2 : 3)
-                        ) => ({
-                        withLineLength: lineLength =>
-                            lineLength / numValues >= tickDistanceThreshold ? LabelModes.all :
-                            lineLength < 2 * tickDistanceThreshold ? LabelModes.none :
-                            lineLength < 3 * tickDistanceThreshold ? LabelModes.firstAndLast :
-                            numValues < 15 ? LabelModes.firstAndLast :
-                            lineLength < (1/10)*numValues * tickDistanceThreshold ?
-                                LabelModes.firstAndLast :
-                                LabelModes.majorMinor}))})),
+                            lengthOfRange = rangeLength(range),
+                            valueLengths=Numbers.range(range.min, range.max+1).map(valueLength),
+                            indexFirstTen = indexFirstValueDivisibleByTen(range)
+                        ) =>
+                            lineLength < .5*(valueLengths[0] + valueLengths[lengthOfRange-1]) ? LabelModes.none :
+                            lineLength > valueLengths.reduce((sum, current) => sum + current, 0) ? LabelModes.all :
+                            lineLength > valueLengths
+                                .filter((valueLength, index) => 0 === (index - indexFirstTen)%10)
+                                .reduce((sumTensLabels, current) => sumTensLabels + current, 0) ? LabelModes.tens :
+                            LabelModes.extrema)})})),
+                    LabelsPosition: {
+                        withNormal: normal => ({
+                        withTickLength: tickLength => ({
+                        withLabelMargin: labelMargin => Vector.multiply(normal, -(labelMargin+tickLength))})})},
+                    LabelVisibilities: {
+                        withRange: range => ({
+                        withLabelMode: labelMode =>
+                            labelMode === LabelModes.all ? () => true :
+                            labelMode === LabelModes.tens ? Module.of((
+                                indexFirstTen = indexFirstValueDivisibleByTen(range)
+                            ) => index => 0 === (index - indexFirstTen) % 10) :
+                            labelMode === LabelModes.extrema ? Module.of((
+                                firstAndLastIndices = [0, rangeLength(range)-1]
+                            ) => index => firstAndLastIndices.includes(index)) :
+                            labelMode === LabelModes.none ? () => false : undefined})},
                     Line: {
                         withStart: start => ({
                         withEnd: end => Vector.minus(end, start)})},
@@ -850,6 +842,35 @@ const ChordJogApp = (() => {
                                 (line[1]-line[0] < 0 ? 1 : -1) *
                                 (Math.abs(line[1]/line[0]) <= 1 ? 1 : -1) *
                                 (labelOrientation === LabelOrientations.front ? -1 : 1)))})},
+                    TickAutoMode: {
+                        withRange: range => ({
+                        withLineLength: lineLength => Module.of((
+                            lengthOfRange = rangeLength(range),
+                            tickDistance = lineLength / lengthOfRange,
+                            indexFirstTen = indexFirstValueDivisibleByTen(range)
+                        ) =>
+                            tickDistance > 1.5 ?
+                                lengthOfRange < 15 ? TickModes.allLong : TickModes.graduated :
+                            tickDistance * 5 > 2 ? TickModes.tensAndFives :
+                            tickDistance * 10 > 2 ? TickModes.tensOnly : TickModes.extrema)})},
+                    TickEnds: {
+                        withTickMode: tickMode => ({
+                        withTickLength: tickLength => ({
+                        withNormal: normal => ({
+                        withRange: range => Module.of((
+                            indexFirstTen=indexFirstValueDivisibleByTen(range)
+                        ) => index => Vector.multiply(
+                            normal,
+                            -1 * (
+                                tickMode === TickModes.allLong ? tickLength :
+                                [TickModes.graduated, TickModes.tensAndFives, TickModes.tensOnly].includes(tickMode) ? (
+                                    0 === (index - indexFirstTen) % 10 ? tickLength :
+                                    tickMode !== TickModes.tensOnly &&
+                                        0 === (index - indexFirstTen) % 5 ? .5 * tickLength :
+                                    tickMode === TickModes.graduated ? .25 * tickLength : 0) :
+                                tickMode === TickModes.extrema ? Module.of((
+                                    firstAndLastIndices = [0, rangeLength(range)-1]
+                                ) => firstAndLastIndices.includes(index) ? tickLength : 0): undefined)))})})})},
                     RangeLength: {withRange: rangeLength}})),
                 defaults = Module.of((
                     defaults={
@@ -861,12 +882,42 @@ const ChordJogApp = (() => {
                         tickLength: 20,
                         labelMargin: 10,
                         labelOrientation: LabelOrientations.behind,
-                        labelMode: "auto"},
-                    defaultLine=Calculators.Line.withStart(defaults.start).withEnd(defaults.end)
+                        labelMode: "auto",
+                        tickMode: "auto"},
+                    defaultLine=Calculators.Line
+                        .withStart(defaults.start)
+                        .withEnd(defaults.end),
+                    defaultNormal=Calculators.Normal
+                        .withLine(defaultLine)
+                        .withLabelOrientation(defaults.labelOrientation),
+                    defaultLineLength=Calculators.LineLength.withLine(defaultLine),
+                    defaultLabelAutoMode=Calculators.LabelAutoMode
+                        .withLineLength(defaultLineLength)
+                        .withRange(defaults.range),
+                    defaultRangeLength=Calculators.RangeLength.withRange(defaults.range),
+                    defaultTickAutoMode=Calculators.TickAutoMode
+                        .withRange(defaults.range)
+                        .withLineLength(defaultLineLength)
                 ) => Objects.withFields(defaults, {
                     line: defaultLine,
-                    lineLength: Calculators.LineLength.withLine(defaultLine),
-                    normal: Calculators.Normal.withLine(defaultLine).withLabelOrientation(defaults.labelOrientation),
+                    lineLength: defaultLineLength,
+                    labelsPosition: Calculators.LabelsPosition
+                        .withNormal(defaultNormal)
+                        .withTickLength(defaults.tickLength)
+                        .withLabelMargin(defaults.labelMargin),
+                    labelVisibilities: Calculators.LabelVisibilities
+                        .withRange(defaults.range)
+                        .withLabelMode(defaultLabelAutoMode),
+                    labelMode: defaults.labelMode,
+                    labelAutoMode: defaultLabelAutoMode,
+                    tickEnds: Calculators.TickEnds
+                        .withTickMode(defaultTickAutoMode)
+                        .withTickLength(defaults.tickLength)
+                        .withNormal(defaultNormal)
+                        .withRange(defaults.range),
+                    tickMode: defaults.tickMode,
+                    tickAutoMode: defaultTickAutoMode,
+                    normal: defaultNormal,
                     rangeLength: Calculators.RangeLength.withRange(defaults.range)}))
             ) => () => SVG.Builder.G()
                 .withClass("number-line")
@@ -877,19 +928,12 @@ const ChordJogApp = (() => {
                     const baseline = SVG.Builder.Line
                         .withEndpoints(defaults.start, defaults.end)
                         .withClass("number-line-baseline");
-                    numberLine.withChild(baseline);
-                    const getLabelMode=()=>numberLine.labelMode==="auto" ?
-                        Calculators.AutoModeDecider
-                            .withRange(numberLine.range)
-                            .withLineLength(numberLine.lineLength) :
-                        LabelModes[numberLine.labelMode];
-                    const initializeLabelMode = Module.of((
-                        previousLabelMode = undefined
-                    )=>()=>{
-                        const currentLabelMode = getLabelMode();
-                        if(currentLabelMode !== previousLabelMode) {
-                            previousLabelMode = currentLabelMode;
-                            currentLabelMode.initialize(numberLine.labels, numberLine.range);}});
+                    const getLabelMode=()=>numberLine.labelMode===LabelModes.auto ?
+                        numberLine.labelAutoMode :
+                        numberLine.labelMode;
+                    const getTickMode=()=>numberLine.tickMode===TickModes.auto ?
+                        numberLine.tickAutoMode :
+                        numberLine.tickMode;
                     const updateLine=()=>{
                         numberLine.line = Calculators.Line
                             .withStart(numberLine.start)
@@ -898,74 +942,109 @@ const ChordJogApp = (() => {
                     const updateNormal=()=>numberLine.normal=Calculators.Normal
                         .withLine(numberLine.line)
                         .withLabelOrientation(numberLine.labelOrientation);
-                    const updateTickEnds=()=>Module.of((
-                        tickEnds=getLabelMode().tickEndsGenerator(
-                            Vector.multiply(numberLine.normal, -numberLine.tickLength),
-                            numberLine.range)
-                    ) => numberLine.ticks.forEach((tick, index)=>Module.of((
-                        tickEnd=tickEnds(index)
-                    ) => tick.withAttributes({
-                        x2: tickEnd[0],
-                        y2: tickEnd[1]}))));
-                    const updateLabelPositions=()=>Module.of((
-                        labelPosition=Vector.multiply(
-                            numberLine.normal,
-                            -(numberLine.labelMargin+numberLine.tickLength))
-                    ) => numberLine.labels.forEach(label => label.moveTo(...labelPosition)));
-                    const updateLabelGroupPositions=()=>numberLine.labelGroups.forEach((labelGroup, index) =>
-                        labelGroup.moveTo(...numberLine.positionOfIndex(index)));
+                    const updateLabelAutoMode = () => numberLine.labelAutoMode =
+                        numberLine.labelMode !== LabelModes.auto ?
+                            undefined :
+                            Calculators.LabelAutoMode
+                                .withLineLength(numberLine.lineLength)
+                                .withRange(numberLine.range);
+                    const updateTickAutoMode = () => numberLine.tickAutoMode =
+                        numberLine.tickMode !== TickModes.auto ?
+                            undefined :
+                            Calculators.TickAutoMode
+                                .withRange(numberLine.range)
+                                .withLineLength(numberLine.lineLength);
+                    const updateTickEnds=()=>numberLine.tickEnds = Calculators.TickEnds
+                        .withTickMode(getTickMode())
+                        .withTickLength(numberLine.tickLength)
+                        .withNormal(numberLine.normal)
+                        .withRange(numberLine.range);
+                    const updateLabelsPosition=()=>numberLine.labelsPosition = Calculators.LabelsPosition
+                        .withNormal(numberLine.normal)
+                        .withTickLength(numberLine.tickLength)
+                        .withLabelMargin(numberLine.labelMargin);
+                    const updateLabelVisibilities=()=>numberLine.labelVisibilities = Calculators.LabelVisibilities
+                        .withRange(numberLine.range)
+                        .withLabelMode(getLabelMode());
+                    const labelGroupsContainer = SVG.Builder.G().withClass("number-line-label-groups");
                     let labelGroups = [];
+                    const updateLabelGroupPositions=()=>labelGroups.forEach((labelGroup, index) =>
+                        labelGroup.moveTo(...numberLine.positionOfIndex(index)));
                     const recreateLabelGroups = () => {
-                        numberLine.withoutChildren(labelGroups);
+                        labelGroupsContainer.withoutChildren(labelGroups);
+                        const labelVisibilities = numberLine.labelVisibilities;
+                        const labelsPosition = numberLine.labelsPosition;
+                        const tickEnds = numberLine.tickEnds;
                         labelGroups = Numbers
                             .range(numberLine.range.min, 1+numberLine.range.max)
-                            .map(value=>Module.of(() => {
-                                const tick = SVG.Builder.Line.withEndpoints([0, 0], [0, 0]).withClass("number-line-tick");
+                            .map((value, index)=>Module.of(() => {
+                                const tick = SVG.Builder.Line
+                                    .withEndpoints([0, 0], tickEnds(index))
+                                    .withClass("number-line-tick");
                                 const label = SVG.Builder.Text
                                     .withTextContent(value)
                                     .withClass("number-line-label")
-                                    .centerAlignedBoth();
+                                    .centerAlignedBoth()
+                                    .moveTo(...labelsPosition);
+                                labelVisibilities(index) === true ? label.show() : label.hide();
                                 return SVG.Builder.G()
                                     .withClass("number-line-label-group")
                                     .withChild(tick)
                                     .withChild(label)
                                     .withGetters(({
                                         tick: () => tick,
-                                        label: () => label}));}));
-                        numberLine.withChildren(labelGroups);
-                        updateLabelGroupPositions();
-                        updateTickEnds();
-                        updateLabelPositions();
-                        initializeLabelMode();};
+                                        label: () => label}))
+                                    .moveTo(...numberLine.positionOfIndex(index));}));
+                        labelGroupsContainer.withChildren(labelGroups);};
                     return numberLine
                         .withParams({
                             start: Param.new(defaults.start).withObserver(updateLine),
                             end: Param.new(defaults.end).withObserver(updateLine),
                             line: Param.new(defaults.line).withObservers([
                                 line=>numberLine.lineLength=Calculators.LineLength.withLine(line),
-                                updateNormal]),
+                                updateNormal,
+                                updateLabelGroupPositions]),
                             lineLength: Param.new(defaults.lineLength).withObservers([
-                                updateLabelGroupPositions,
-                                updateTickEnds,
-                                () => numberLine.labelMode === "auto" ? initializeLabelMode() : undefined]),
+                                updateTickAutoMode,
+                                updateLabelAutoMode]),
                             normal: Param.new(defaults.normal).withObservers([
                                 updateTickEnds,
-                                updateLabelPositions]),
-                            labelOrientation: Param.new(defaults.labelOrientation).withObserver(updateNormal),
+                                updateLabelsPosition]),
                             tickLength: Param.new(defaults.tickLength).withObservers([
                                 updateTickEnds,
-                                updateLabelPositions]),
+                                updateLabelsPosition]),
+                            tickEnds: Param.new(defaults.tickEnds).withObserver(
+                                tickEnds => numberLine.ticks.forEach((tick, index)=>Module.of((
+                                    tickEnd=tickEnds(index),
+                                ) => tick.withAttributes({
+                                    x2: tickEnd[0],
+                                    y2: tickEnd[1]})))),
+                            tickMode: Param.new(defaults.tickMode).withObservers([updateTickAutoMode, updateTickEnds]),
+                            tickAutoMode: Param.new(defaults.tickAutoMode).withObserver(updateTickEnds),
+                            labelMargin: Param.new(defaults.labelMargin).withObserver(updateLabelsPosition),
+                            labelOrientation: Param.new(defaults.labelOrientation).withObserver(updateNormal),
+                            labelsPosition: Param.new(defaults.labelsPosition).withObserver(labelsPosition =>
+                                numberLine.labels.forEach(label=>label.moveTo(...labelsPosition))),
+                            labelVisibilities: Param.new(defaults.labelVisibilities).withObserver(labelVisibilities =>
+                                numberLine.labels.forEach((label, index) => labelVisibilities(index) === true ?
+                                    label.show() :
+                                    label.hide())),
                             labelMode: Param.new(defaults.labelMode).withObservers([
-                                updateTickEnds,
-                                initializeLabelMode]),
-                            labelMargin: Param.new(defaults.labelMargin).withObserver(updateLabelPositions),
+                                updateLabelAutoMode,
+                                updateLabelVisibilities]),
+                            labelAutoMode: Param.new(defaults.labelAutoMode).withObserver(updateLabelVisibilities),
                             range: Param.new(defaults.range).withObservers([
-                                range=>numberLine.rangeLength=Calculators.RangeLength.withRange(range),
+                                updateLabelAutoMode,
+                                updateTickAutoMode,
+                                updateTickEnds,
                                 recreateLabelGroups])})
+                        .withChild(baseline)
+                        .withChild(labelGroupsContainer)
                         .withGetters({
                             labelGroups: () => labelGroups,
                             ticks: () => labelGroups.map(labelGroup=>labelGroup.tick),
-                            labels: () => labelGroups.map(labelGroup=>labelGroup.label)})
+                            labels: () => labelGroups.map(labelGroup=>labelGroup.label),
+                            rangeLength: () => Calculators.RangeLength.withRange(numberLine.range)})
                         .withMethods(Module.of((
                             indexOfValue = value => value < numberLine.range.min || value > numberLine.range.max ?
                                 undefined : value - numberLine.range.min,
@@ -1203,289 +1282,6 @@ const ChordJogApp = (() => {
         ) => ({
             withText: withTextStep,
             withoutText: withTextStep(null)}));
-
-
-        svgBuilder.NumberSlider = Module.of((
-            tickRadius = 5,
-            markerRadius = 11,
-            mouseTrapPadding={minor: 5, major: 15},
-            markerStrokeWidths = {
-                normal: 1,
-                emphasized: 1.5,
-                active: 2},
-            tickDistanceThreshold=25, //The minimum tick distance until major/minor labelling is switched to
-            //t∈[0,1] represents a position along the number slider,
-            //  where 0 is the 'start' position, 1 is the 'end' position,
-            //  and values between 0 and 1 range smoothly along the line segment
-            numItemsToIndexToTMapper=n=>[1,2].includes(n) ?
-                Module.of((divisor=(1/n+1)) => i => (i+1)*divisor) :
-                Module.of((divisor=(1/(n-1))) => i => i * divisor)
-        ) => ({
-            Style: {
-                mouseTrapPadding: mouseTrapPadding},
-            withRange: (fromInclusive, toInclusive) => Module.of((
-                values=Numbers.range(fromInclusive, toInclusive + 1),
-                indexToTMapper=numItemsToIndexToTMapper(values.length)
-            ) => Module.of((
-                NextStep = {
-                    withLength: length => ({
-                    withIsHorizontal: isHorizontal => Module.of((
-                        tickDistance=values.length === 1 ? length : length / (values.length-1),
-                        valuesInfo=Object.fromEntries(
-                            values.map((value, index) => [
-                                value,
-                                Module.of((t=indexToTMapper(index)) => ({
-                                    index: index,
-                                    t: t,
-                                    coordinate: length * t}))])),
-                        moveElementToValue = isHorizontal === true ?
-                            (element, value) => element.moveTo(valuesInfo[value].coordinate, 0) :
-                            (element, value) => element.yTo(valuesInfo[value].coordinate),
-                        tickGroups=Module.of((
-                            valueToIsMajorTick=tickDistance >= tickDistanceThreshold ?
-                                () => true :
-                                value => 0 === value % 10,
-                            valueToTickGroup=Module.of((
-                                valueToTickMark=Module.of((
-                                    TickBuilder={
-                                        withValue: value => ({
-                                            withLine: line => line
-                                                .withClass("number-slider-tick")
-                                                .withDataAttribute("value", value)})}
-                                ) => value => TickBuilder
-                                    .withValue(value)
-                                    .withLine(isHorizontal === true ?
-                                        SVG.Builder.Line
-                                            .withEndpoints([0, -tickRadius], [0, tickRadius])
-                                            .xTo(valuesInfo[value].coordinate) :
-                                        SVG.Builder.Line
-                                            .withEndpoints([-tickRadius, 0], [tickRadius, 0])
-                                            .yTo(valuesInfo[value].coordinate))),
-                                valueToLabel=Module.of((
-                                    LabelStyle={
-                                        Small: {
-                                            fontSize: 11,
-                                            fill: Style.colors.heavy},
-                                        Large: {
-                                            fontSize: 16,
-                                            fill: Style.colors.black}}
-                                ) => value => SVG.Builder.Text
-                                    .withTextContent(value)
-                                    .withClass(`number-slider-label`)
-                                    .centerAlignedBoth()
-                                    .hide()
-                                    .withMethods({
-                                        withLargeText: function() {
-                                            return this.withAttributes(LabelStyle.Large);},
-                                        withSmallText: function() {
-                                            return this.withAttributes(LabelStyle.Small);}}))
-                            ) => value=>SVG.Builder.G()
-                                .withClass("number-slider-tick-group")
-                                .withChild(valueToTickMark(value))
-                                .withChild(valueToLabel(value)))
-                        ) => SVG.Builder.G()
-                            .withClass("number-slider-tick-groups")
-                            .withChildren(values.map(valueToTickGroup))),
-                        createMarker=()=> SVG.Builder.Circle
-                            .withCenter([0,0])
-                            .withRadius(markerRadius)
-                            .withAttribute("stroke-width", markerStrokeWidths.normal),
-                        IndicationBuilder={
-                            withMarker: marker => Module.of((
-                                value=undefined,
-                                changeListener=undefined,
-                                otherGetter=undefined,
-                                Indication=undefined,
-                                setupIndication=Indication={
-                                    get: () => value,
-                                    set: Module.of((
-                                        valueIndicesPlusOrMinusOne = valueIndex => {
-                                            const valueIndices = [valueIndex];
-                                            if(valueIndex > 0) {
-                                                valueIndices.unshift(valueIndex -1 );}
-                                            if(valueIndex < values.length - 1) {
-                                                valueIndices.push(valueIndex + 1);}
-                                            return valueIndices;},
-                                        formatLabelsForTargetIndex = index => {
-
-                                        }
-                                    ) => newValue => {
-                                        //Do nothing if same
-                                        if(newValue === value) {
-                                            return;}
-
-                                        const previousValueIndex = Objects.isNil(value) ?
-                                            undefined :
-                                            valuesInfo[value].index;
-                                        const otherValue = otherGetter();
-                                        const otherValueIndex = Objects.isNil(otherValue) ?
-                                            undefined :
-                                            valuesInfo[otherValue].index;
-                                        const otherIndexRange = Objects.isNil(otherValue) ?
-                                            [] : valueIndicesPlusOrMinusOne(otherValueIndex);
-
-                                        //Was the value something?
-                                        if(! Objects.isNil(value)) {
-                                            //Yes. Hide all of the previous labels.
-                                        }
-                                        else {
-                                            //No. Show the marker.
-                                            marker.show();}
-
-                                        //Is selected nothing?
-                                        if(newValue === null) {
-                                            //Yes.
-                                            marker.hide();}
-                                        else {
-                                            //No, it is something.
-                                            moveElementToValue(marker, newValue);
-
-                                            //Is the selected value the other value?
-                                            if(newValue !== otherValue) {
-                                                //No. show the preview labels underneath the selected value.
-                                                formatLabelsForTargetIndex(valuesInfo[newValue].index);}}
-                                        if(otherValueIndex !== undefined) {
-                                            formatLabelsForTargetIndex(otherValueIndex);}
-                                        value=newValue;
-                                        //Call changeListener if defined
-                                        if(undefined !== changeListener) {
-                                            changeListener(newValue);}}),
-                                    getMarker: () => marker,
-                                    setChangeListener: listener => changeListener = listener,
-                                    withOtherGetter: getter => {
-                                        otherGetter = getter;
-                                        return Indication;}}
-                            ) => Indication)},
-                        Selected=IndicationBuilder
-                            .withMarker(createMarker()
-                                .withClass("number-slider-selected-marker")),
-                        Preview=IndicationBuilder
-                            .withMarker(createMarker()
-                                .withClass("number-slider-preview-marker")
-                                .withAttribute("stroke-dasharray", "4 5")
-                                .hide())
-                            .withOtherGetter(Selected.get),
-                        setSelectedOtherGetter=Selected.withOtherGetter(Preview.get)
-                    ) => svgBuilder.G()
-                        .withClass("number-slider")
-                        .withChild(SVG.Builder.Line
-                            .withEndpoints([0,0], isHorizontal === true ? [length, 0] : [0, length])
-                            .withClass("number-slider-baseline"))
-                        .withChild(tickGroups)
-                        .withChild(SVG.Builder.G()
-                            .withClass("number-slider-markers")
-                            .withChild(Preview.getMarker())
-                            .withChild(Selected.getMarker()))
-                        .withChild(Module.of((
-                            mouseTrap=undefined,
-                            setupMouseTrap=mouseTrap=svgBuilder.MouseTrap
-                                .withDimensions(...Module.of((
-                                    horizontalDimensions = [
-                                        -mouseTrapPadding.minor,
-                                        -mouseTrapPadding.major,
-                                        2 * mouseTrapPadding.minor + length,
-                                        2 * mouseTrapPadding.major]
-                                ) => isHorizontal === true ?
-                                    horizontalDimensions :
-                                    Arrays.multiSwap(horizontalDimensions, [[0,1],[2,3]])))
-                                .withClass("number-slider-mouse-trap")
-                                .withEventListeners(Module.of((
-                                    isDragging = false,
-                                    isMouseInside = false,
-                                    targetValue = Module.of((
-                                        previousValue=undefined
-                                    ) => value => {
-                                        if(value === previousValue) {
-                                            return;}
-                                        //Is dragging happening?
-                                        if(isDragging===true) {
-                                            //Yes. Set the selected value.
-                                            Selected.set(value);}
-                                        else {
-                                            //No. Set the preview.
-                                            Preview.set(value);
-                                            //Emphasize or unemphasize the selected marker if needed
-                                            const selectedValue = Selected.get();
-                                            //Is the target value the selected value?
-                                            if(value === selectedValue) {
-                                                //Yes
-                                                Selected.getMarker()
-                                                    .withAttribute("stroke-width", markerStrokeWidths.emphasized)}
-                                            //Is the previous value the selected value?
-                                            else if(previousValue === selectedValue) {
-                                                //Yes.
-                                                Selected.getMarker()
-                                                    .withAttribute("stroke-width", markerStrokeWidths.normal)}}}),
-                                    mouseEventToValue=Module.of((
-                                        relevantMouseEventCoordinate = mouseEvent =>
-                                            MouseEvents.relativeMousePosition(mouseEvent, mouseTrap)[
-                                                isHorizontal === true ? 0 : 1],
-                                        mouseEventToTValue = e => Numbers.clamp(
-                                            relevantMouseEventCoordinate(e) / length,
-                                            0,
-                                            1),
-                                        ValueDistance = {
-                                            withValue: value => ({
-                                                withTDistance: t => ({
-                                                    value: value,
-                                                    tDistance: t})})}
-                                    ) => mouseEvent => Module.of((
-                                        tValue = mouseEventToTValue(mouseEvent),
-                                    ) => values
-                                        .reduce(
-                                            (closestValue, currentValue) => Module.of((
-                                                currentTDistance = Math.abs(valuesInfo[currentValue].t - tValue)
-                                            ) => currentTDistance >= closestValue.tDistance ?
-                                                    closestValue :
-                                                    ValueDistance
-                                                        .withValue(currentValue)
-                                                        .withTDistance(currentTDistance)),
-                                            ValueDistance
-                                                .withValue(null)
-                                                .withTDistance(Number.MAX_VALUE))
-                                        .value)),
-                                    mouseMoveListener = e => targetValue(mouseEventToValue(e)),
-                                ) => ({
-                                    mouseEnter: e => {
-                                        isMouseInside = true;
-                                        targetValue(mouseEventToValue(e));},
-                                    mouseMove: mouseMoveListener,
-                                    mouseDown: Module.of((
-                                        mouseUpListener=undefined,
-                                        setupMouseUpListener=mouseUpListener = function(e) {
-                                            isDragging = false;
-                                            window.removeEventListener("mouseup", mouseUpListener);
-                                            window.removeEventListener("mousemove", mouseMoveListener);
-                                            mouseTrap.withEventListener("mousemove", mouseMoveListener);
-                                            targetValue(isMouseInside ? mouseEventToValue(e) : null);}
-                                    ) => e => {
-                                        targetValue(null);
-                                        isDragging = true;
-                                        mouseTrap.withoutEventListener("mousemove", mouseMoveListener);
-                                        window.addEventListener("mousemove", mouseMoveListener);
-                                        window.addEventListener("mouseup", mouseUpListener);
-                                        targetValue(mouseEventToValue(e));}),
-                                    mouseLeave: () => {
-                                        isMouseInside = false;
-                                        if(! isDragging) {
-                                            targetValue(null);}}})))
-                            ) => mouseTrap))
-                            .withGetterAndSetter("value", Selected.get, Selected.set)
-                            .withMethod("withValue", function(value) {
-                                this.value = value;
-                                return this;})
-                            .withMethod("withoutValue", function() {
-                                this.value = null;
-                                return this;})
-                            .withoutValue()
-                            .withMethod("withChangeListener", function(listener) {
-                                Selected.setChangeListener(listener);
-                                return this;}))})}
-            ) => ({
-                verticallyAligned: ({
-                    withHeight: height => NextStep.withLength(height).withIsHorizontal(false)}),
-                horizontallyAligned: ({
-                    withWidth: width => NextStep.withLength(width).withIsHorizontal(true)})})))}));
 
         svgBuilder.Modal = Module.of((
             fillOpacity=.95,
