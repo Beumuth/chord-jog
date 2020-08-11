@@ -90,6 +90,24 @@ const ChordJogApp = (() => {
         ) => param)}));
 
     const Functions = {
+        binarySearch: Module.of((
+            binarySearch=undefined,
+            defineBinarySearch=binarySearch=(
+                difference,
+                length,
+                startIndex=0,
+                halfLength=Math.ceil(.5*length)
+            ) => length === 1 ? startIndex : binarySearch(
+                difference,
+                halfLength,
+                Module.of((
+                    halfLengthDifference=difference(startIndex+halfLength)
+                ) => 0 === length % 2 ?
+                    Math.abs(difference(startIndex+halfLength-1)) <= Math.abs(halfLengthDifference) ?
+                        startIndex : startIndex + halfLength :
+                    halfLengthDifference < 0 ? startIndex :
+                        halfLengthDifference > 0 ? startIndex+halfLength-1 : startIndex))
+        ) => binarySearch),
         ifThen: (condition, then) => condition === true ? then() : undefined,
         ifThenFinal: (condition, then, final) => {
             if(condition) then();
@@ -300,6 +318,7 @@ const ChordJogApp = (() => {
         multiply: multiply,
         length: length,
         norm: x=>multiply(x, 1/length(x)),
+        angle: x=>Math.atan2(x[1], x[0])*180/Math.PI,
         dot: (a,b)=>a[0]*b[0] + a[1]*b[1]}));
 
     const AffineTransformations = Module.of(() => {  //for 2d space
@@ -640,10 +659,10 @@ const ChordJogApp = (() => {
                     headWidth: 10,
                     headHeight: 20,
                     headNudge: 0,
-                    earWidth: 25,
+                    earWidth: 6,
                     footWidth: 6,
                     footHeight: 13,
-                    footSlenderness: 4},
+                    footSlenderness: .4},
                 IndicatorPath={
                     withHead: (width, height, nudge) => Module.of((head={
                         x1: -.5*width + nudge,
@@ -772,6 +791,18 @@ const ChordJogApp = (() => {
                     withModule: module => withModulesStep([module]),
                     withModules: modules => withModulesStep(modules),
                     withoutModules: () => withModulesStep([])}))})})})})})},
+            MouseTrap: {
+                withDimensions: (x, y, width, height) => SVG.Builder.Rect
+                    .withX(x)
+                    .withY(y)
+                    .withWidth(width)
+                    .withHeight(height)
+                    .withClass("mouse-trap")
+                    .withAttributes({
+                        pointerEvents: "fill",
+                        cursor: "pointer",
+                        fill: "none",
+                        stroke: "none"})},
             NumberLine: Module.of((
                 LabelModes={
                     all: "all",
@@ -877,10 +908,10 @@ const ChordJogApp = (() => {
                         range: {
                             min: 0,
                             max: 110},
-                        start: [200, 200],
-                        end: [300, 300],
-                        tickLength: 20,
-                        labelMargin: 10,
+                        start: [0, 0],
+                        end: [200, 200],
+                        tickLength: 15,
+                        labelMargin: 15,
                         labelOrientation: LabelOrientations.behind,
                         labelMode: "auto",
                         tickMode: "auto"},
@@ -1041,6 +1072,8 @@ const ChordJogApp = (() => {
                         .withChild(baseline)
                         .withChild(labelGroupsContainer)
                         .withGetters({
+                            tangent: () => [numberLine.normal[1], -numberLine.normal[0]],
+                            baseline: () => baseline,
                             labelGroups: () => labelGroups,
                             ticks: () => labelGroups.map(labelGroup=>labelGroup.tick),
                             labels: () => labelGroups.map(labelGroup=>labelGroup.label),
@@ -1061,6 +1094,67 @@ const ChordJogApp = (() => {
                             positionOfIndex: positionOfIndex,
                             positionOfValue: value => positionOfIndex(indexOfValue(value))})))
                         .withModification(recreateLabelGroups);})),
+            NumberSlider: Module.of((
+                horizontalPadding=10,
+                height=70
+            ) => () => Module.of((
+                numberLine=SVG.Builder.NumberLine(),
+                mousePositionToClosestIndex=mousePosition=>Functions.binarySearch(
+                    Module.of((
+                        line=numberLine.line,
+                        mouseT=Vector.dot(mousePosition, line)/Vector.dot(line, line)
+                    ) => index=>mouseT-numberLine.tOfIndex(index)),
+                    numberLine.rangeLength),
+                markerLabel=SVG.Builder.Text
+                    .withTextContent(numberLine.range.min+1)
+                    .withClass("number-slider-marker-label")
+                    .centerAlignedBoth()
+                    .rotateTo(-(Vector.angle(numberLine.normal)+90)),
+                marker=SVG.Builder.Indicator()
+                    .withClass("number-slider-marker")
+                    .withContent(markerLabel)
+                    .moveTo(...numberLine.positionOfIndex(0))
+                    .rotateTo(Vector.angle(numberLine.normal) + 90),
+                Selected=Param.new(0).withObserver((index, oldValue) => index === null ? marker.hide() : (
+                    oldValue === null ? marker.show() : undefined,
+                    marker.moveTo(...numberLine.positionOfIndex(index),
+                    markerLabel.textContent = numberLine.range.min + index))),
+                selectedMouseEventUpdate=e=>Selected.set(
+                    mousePositionToClosestIndex(MouseEvents.relativeMousePosition(e, numberLine.baseline))),
+                mouseUpHandler=undefined,
+                defineMouseUpHandler=mouseUpHandler=()=>{
+                    window.removeEventListener("mousemove", selectedMouseEventUpdate);
+                    window.removeEventListener("mouseup", mouseUpHandler);},
+                mouseTrap = SVG.Builder.MouseTrap
+                    .withDimensions(
+                        -horizontalPadding,
+                        -.5*height,
+                        numberLine.lineLength+2*horizontalPadding,
+                        height)
+                    .withEventListeners({
+                        mouseDown: e=>{
+                            selectedMouseEventUpdate(e);
+                            window.addEventListener("mousemove", selectedMouseEventUpdate);
+                            window.addEventListener("mouseup", mouseUpHandler);}})
+                    .withAttribute("stroke", "black")
+                    .moveTo(...numberLine.start)
+                    .rotateTo(Vector.angle(numberLine.line))
+            ) => SVG.Builder.G()
+                .withClass("number-slider")
+                .withChild(numberLine
+                    .withChild(marker)
+                    .withChild(mouseTrap)
+                    .withListeners({
+                        line: () => {
+                            const normAngle = Vector.angle(numberLine.normal);
+                            marker.moveTo(...numberLine.positionOfIndex(Selected.get())).rotateTo(normAngle+90)
+                            markerLabel.rotateTo(-normAngle-90);
+                            mouseTrap
+                                .withAttribute("width", numberLine.lineLength + 2*horizontalPadding)
+                                .moveTo(...numberLine.start)
+                                .rotateTo(Vector.angle(numberLine.line));},
+                        lineLength: lineLength=>mouseTrap.withAttribute("width", lineLength+2*horizontalPadding)})
+                .withParam("Selected", Selected)))),
             Path: () => createElement("path")
                 .withAttributes({d: null})
                 .withGetterAndSetter("d",
@@ -1070,10 +1164,10 @@ const ChordJogApp = (() => {
                     this.d = d;
                     return this;}),
             Rect: ({
-                withX: (x) => ({
-                withY: (y) => ({
-                withWidth: (width) => ({
-                withHeight: (height) => {
+                withX: x => ({
+                withY: y => ({
+                withWidth: width => ({
+                withHeight: height => {
                     const rect = createElement("rect")
                         .withAttributes({
                             x: x,
@@ -1114,7 +1208,8 @@ const ChordJogApp = (() => {
                             return this; }})
                     .withAttributes({
                         stroke: "none",
-                        fill: Style.textColor})) => ({
+                        fill: Style.textColor,
+                        fontFamily: "Courier New"})) => ({
                 withTextContent: (textContent) => createText().withTextContent(textContent),
                 withoutTextContent: () => createText()}))};
         svgBuilder.Rect.copy = (svgRect) => SVG.Builder.Rect
@@ -1203,18 +1298,6 @@ const ChordJogApp = (() => {
                             this.disable();
                             return this;}})))
                     .enabled();}})})};
-        svgBuilder.MouseTrap = {
-            withDimensions: (x, y, width, height) => svgBuilder.Rect
-                .withX(x)
-                .withY(y)
-                .withWidth(width)
-                .withHeight(height)
-                .withClass("mouse-trap")
-                .withAttributes({
-                    pointerEvents: "fill",
-                    cursor: "pointer",
-                    fill: "none",
-                    stroke: "none"})};
 
         svgBuilder.ActionText = Module.of((
             Style={
@@ -3592,25 +3675,7 @@ const ChordJogApp = (() => {
                 .withChild(shapeChartGrid.move(0, 38))
         ) => shapesPage)}));
     return {
-        create: () => Module.of((
-            indexToAngle=i=>22.5*i,
-            createIndicator=i=>Module.of((angle=indexToAngle(i)) => SVG.Builder.Indicator()
-                .moveTo(300, 300)
-                .withContent(SVG.Builder.Circle.withCenter([0,0]).withRadius(5).withAttributes({
-                    fill: `hsl(${angle},100%,50%)`,
-                    strokeWidth: 1}))
-                .rotateTo(angle)
-                .withAttribute("fill", `hsl(0,0%,10%, 50%)`)
-                .withFootHeight(i % 2 === 0 ?
-                    i % 4 === 0 ? 60 : 40 :
-                    i % 3 === 0 ? 80 : 20)),
-            slowIndicators=Numbers.range(0,16).map(createIndicator),
-            fastIndicators=Numbers.range(16,32).map(createIndicator),
-            setupEventListener=setInterval(() => {
-                slowIndicators.forEach((slowIndicator, i)=>slowIndicator.rotateBy(i % 2 === 0 ? 1 : -1))
-                fastIndicators.forEach((fastIndicator, i)=>fastIndicator.rotateBy(i % 2 === 0 ? 3 : -3));
-            }, 10)
-        ) => SVG.Builder.SVG
+        create: () => SVG.Builder.SVG
             .withWidth(Style.width)
             .withHeight(Style.height)
             .withClass("chord-jog-app")
@@ -3620,9 +3685,4 @@ const ChordJogApp = (() => {
                 strokeWidth: Style.stroke.width,
                 strokeLinecap: "round"})
             .disableTextSelection()
-            .withChild(SVG.Builder.Circle.withCenter([300, 300]).withRadius(50).withAttribute("fill", "grey"))
-            .withChildren(slowIndicators)
-            .withChildren(fastIndicators)
-            .withChild(SVG.Builder.NumberLine().withModification(function(){
-                window.addEventListener("mousemove", e=>this.end = [e.clientX, e.clientY]);}))
-            .withChild(SVG.Builder.Indicator().moveTo(50, 50)))};})();
+            .withChild(SVG.Builder.NumberSlider().moveTo(100, 100))};})();
