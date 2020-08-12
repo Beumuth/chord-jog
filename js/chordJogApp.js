@@ -93,20 +93,18 @@ const ChordJogApp = (() => {
         binarySearch: Module.of((
             binarySearch=undefined,
             defineBinarySearch=binarySearch=(
-                difference,
+                distance,
                 length,
                 startIndex=0,
                 halfLength=Math.ceil(.5*length)
             ) => length === 1 ? startIndex : binarySearch(
-                difference,
+                distance,
                 halfLength,
                 Module.of((
-                    halfLengthDifference=difference(startIndex+halfLength)
-                ) => 0 === length % 2 ?
-                    Math.abs(difference(startIndex+halfLength-1)) <= Math.abs(halfLengthDifference) ?
-                        startIndex : startIndex + halfLength :
-                    halfLengthDifference < 0 ? startIndex :
-                        halfLengthDifference > 0 ? startIndex+halfLength-1 : startIndex))
+                    indices= [startIndex + halfLength - (0===length%2 ? 1 : 2), startIndex + halfLength],
+                ) => distance(indices[0]) <= distance(indices[1]) ?
+                    startIndex :
+                    startIndex + halfLength - (0===length%2 ? 0 : 1)))
         ) => binarySearch),
         ifThen: (condition, then) => condition === true ? then() : undefined,
         ifThenFinal: (condition, then, final) => {
@@ -319,7 +317,9 @@ const ChordJogApp = (() => {
         length: length,
         norm: x=>multiply(x, 1/length(x)),
         angle: x=>Math.atan2(x[1], x[0])*180/Math.PI,
-        dot: (a,b)=>a[0]*b[0] + a[1]*b[1]}));
+        dot: (a,b)=>a[0]*b[0] + a[1]*b[1],
+        slope: x=>x[1]/x[0],
+        project: (a, b) => Vector.multiply(b, Vector.dot(a, b) / Vector.dot(b, b))}));
 
     const AffineTransformations = Module.of(() => {  //for 2d space
         const indices = [0, 1, 2];
@@ -467,13 +467,18 @@ const ChordJogApp = (() => {
                     withoutChildren: function(children) {
                         children.forEach(child => this.removeChild(child));
                         return this;},
-                    withEventListener: function(eventType, listener) {
-                        eventType = eventType.toLowerCase();
-                        this.addEventListener(eventType,
+                    withEventListener: Module.of((
+                        addEventListener=function(element, eventType, listener) {
+                            eventType = eventType.toLowerCase();
+                            element.addEventListener(eventType,
                             ModifiedEventListeners.appliesToEventType(eventType) ?
                                 ModifiedEventListeners.registerEventListener(eventType, listener, this) :
-                                listener);
-                        return this; },
+                                listener);}
+                    ) => function(eventType, listener) {
+                        Array.isArray(listener) ?
+                            listener.forEach(aListener=> addEventListener(this, eventType, aListener)) :
+                            addEventListener(this, eventType, listener);
+                        return this;}),
                     withEventListeners: function(eventListeners) {
                         Object.keys(eventListeners).forEach(eventType =>
                             this.withEventListener(eventType, eventListeners[eventType]));
@@ -523,8 +528,9 @@ const ChordJogApp = (() => {
                         ["webkitUserSelect", "mozUserSelect", "msUserSelect", "userSelect"]
                             .forEach(selectAttribute => this.style[selectAttribute] = "none");
                         return this; }})
-                .withMethods(Module.of(() => {
-                    const updateTransform = (element, transformKey, values) => {
+                .withModification(Module.of((
+                    x=0, y=0, sx=1, sy=1, rotation=0,
+                    updateTransform = (element, transformKey, values) => {
                         const valuesString = values.join(" ");
                         const transformAttribute = element.getAttribute("transform");
                         if(transformAttribute === null) {   //Does the element have a transform attribute?
@@ -544,8 +550,9 @@ const ChordJogApp = (() => {
                         element.setAttribute("transform",
                             transformAttribute.slice(0, indexArgsStart) +
                             valuesString +
-                            transformAttribute.slice(indexArgsEnd));};
-                    return Module.of((x=0, y=0, sx=1, sy=1, rotation=0) => ({
+                            transformAttribute.slice(indexArgsEnd));}
+                ) => function() {
+                    this.withMethods({
                         move: function(dx, dy) {
                             return this.moveTo(x + dx, y + dy);},
                         moveTo: function(newX, newY) {
@@ -568,7 +575,12 @@ const ChordJogApp = (() => {
                             sx *= scaleX;
                             sy *= scaleY;
                             updateTransform(this, "scale", [sx, sy]);
-                            return this;}}));}))
+                            return this;}})
+                    .withGetters({
+                        x: () => x,
+                        y: () => y,
+                        position: () => [x, y],
+                        rotation: () => rotation})}))
                 .withField("eventListeners", {});};
         const textAlignmentMethods = {
             leftAligned: function() {
@@ -641,28 +653,15 @@ const ChordJogApp = (() => {
                         cy: c[1],
                         rx: r instanceof Array ? r[0] : r,
                         ry: r instanceof Array ? r[1] : r})})},
-            Line: Module.of(
-                (createLine = () =>
-                    createElement("line").withMethod("withEndpoints",
-                        function(a, b) {
-                            return this.withAttributes({
-                                x1: a[0],
-                                y1: a[1],
-                                x2: b[0],
-                                y2: b[1] });})
-                ) => ({
-                    withEndpoints: (p1, p2) => createLine().withEndpoints(p1, p2),
-                    withoutEndpoints: () => createLine()})),
             Indicator: Module.of((
                 defaults={
                     content: null,
                     headWidth: 10,
                     headHeight: 20,
                     headNudge: 0,
-                    earWidth: 6,
-                    footWidth: 6,
-                    footHeight: 13,
-                    footSlenderness: .4},
+                    earWidth: 5,
+                    footWidth: 4,
+                    footHeight: 9},
                 IndicatorPath={
                     withHead: (width, height, nudge) => Module.of((head={
                         x1: -.5*width + nudge,
@@ -671,19 +670,17 @@ const ChordJogApp = (() => {
                         nudge: nudge}
                     ) => ({
                     withEarWidth: earWidth => ({
-                    withFoot: (width, height, slenderness) => Module.of((foot={
-                        x1: Numbers.clamp(-.5 * width, head.x1, head.x1 + head.width - width),
+                    withFoot: (width, height) => Module.of((foot={
                         width: width,
-                        height: height,
-                        slenderness: slenderness},
+                        height: height},
                     ) => `M 0 0
-                        Q ${-.5 * foot.width * foot.slenderness} ${-foot.height} ${foot.x1} ${-foot.height}
+                        L ${-.5*foot.width+head.nudge} ${-foot.height}
                         L ${head.x1} ${-foot.height}
                         a ${earWidth} ${.5*head.height} 0 1 1 0 ${-head.height}
                         l ${head.width} 0
                         a ${earWidth} ${.5*head.height} 0 1 1 0 ${head.height}
-                        L ${foot.x1 + foot.width} ${-foot.height}
-                        Q ${.5 * foot.width * foot.slenderness} ${-foot.height} 0 0`)})}))},
+                        L ${.5*foot.width+head.nudge} ${-foot.height}
+                        L 0 0`)})}))},
             ) => () => SVG.Builder.G()
                 .withClass("indicator")
                 .withModification(function() {
@@ -704,8 +701,7 @@ const ChordJogApp = (() => {
                             headNudge: Param.new(defaults.headNudge).withObservers(bothObservers),
                             earWidth: Param.new(defaults.earWidth).withObserver(drawObserver),
                             footWidth: Param.new(defaults.footWidth).withObserver(drawObserver),
-                            footHeight: Param.new(defaults.footHeight).withObservers(bothObservers),
-                            footSlenderness: Param.new(defaults.footSlenderness).withObserver(drawObserver)})))
+                            footHeight: Param.new(defaults.footHeight).withObservers(bothObservers)})))
                         .withFields({
                             contentContainer: SVG.Builder.G()
                                 .withClass("content-container")
@@ -730,14 +726,27 @@ const ChordJogApp = (() => {
                                             .withEarWidth(indicator.earWidth)
                                             .withFoot(
                                                 indicator.footWidth,
-                                                indicator.footHeight,
-                                                indicator.footSlenderness);},
+                                                indicator.footHeight);},
                                     redrawn: function() {
                                         this.redraw();
                                         return this;}})
                                 .redrawn()})
                         .withChildren([indicator.contentContainer, indicator.outline])
-                        .withGetter("height", ()=> indicator.headHeight + indicator.footHeight)})),
+                        .withGetters({
+                            height: ()=> indicator.headHeight + indicator.footHeight,
+                            width: () => indicator.headWidth + 2 * indicator.earWidth});})),
+            Line: Module.of(
+                (createLine = () =>
+                    createElement("line").withMethod("withEndpoints",
+                        function(a, b) {
+                            return this.withAttributes({
+                                x1: a[0],
+                                y1: a[1],
+                                x2: b[0],
+                                y2: b[1] });})
+                ) => ({
+                    withEndpoints: (p1, p2) => createLine().withEndpoints(p1, p2),
+                    withoutEndpoints: () => createLine()})),
             ModularGrid: {
                 withX: x => ({
                 withY: y => ({
@@ -871,7 +880,7 @@ const ChordJogApp = (() => {
                             ) => Vector.multiply(
                                 norm,
                                 (line[1]-line[0] < 0 ? 1 : -1) *
-                                (Math.abs(line[1]/line[0]) <= 1 ? 1 : -1) *
+                                (Math.abs(Vector.slope(line)) < 1 ? 1 : -1) *
                                 (labelOrientation === LabelOrientations.front ? -1 : 1)))})},
                     TickAutoMode: {
                         withRange: range => ({
@@ -1096,65 +1105,183 @@ const ChordJogApp = (() => {
                         .withModification(recreateLabelGroups);})),
             NumberSlider: Module.of((
                 horizontalPadding=10,
-                height=70
+                height=80,
+                markerPadding= {
+                    horizontal: 0,
+                    vertical: 3},
+                lengthPerCharacter=11,
+                labelHeight = 12 + 2 * markerPadding.vertical
             ) => () => Module.of((
                 numberLine=SVG.Builder.NumberLine(),
+                Selected=Param.new(0),
+                Preview=Param.new(null),
+                mousePositionOfEvent=e=>MouseEvents.relativeMousePosition(e, numberLine.baseline),
                 mousePositionToClosestIndex=mousePosition=>Functions.binarySearch(
-                    Module.of((
-                        line=numberLine.line,
-                        mouseT=Vector.dot(mousePosition, line)/Vector.dot(line, line)
-                    ) => index=>mouseT-numberLine.tOfIndex(index)),
+                    index=>{
+                        const indexPosition = numberLine.positionOfIndex(index);
+                        return Math.pow(mousePosition[0]-indexPosition[0], 2) +
+                            Math.pow(mousePosition[1]-indexPosition[1], 2)},
                     numberLine.rangeLength),
-                markerLabel=SVG.Builder.Text
-                    .withTextContent(numberLine.range.min+1)
-                    .withClass("number-slider-marker-label")
-                    .centerAlignedBoth()
-                    .rotateTo(-(Vector.angle(numberLine.normal)+90)),
-                marker=SVG.Builder.Indicator()
+                createMarker=()=>Module.of((
+                    label=SVG.Builder.Text
+                        .withTextContent(numberLine.range.min)
+                        .withClass("number-slider-marker-label")
+                        .centerAlignedBoth()
+                        .withAttribute("dy", 1.5)
+                        .rotateTo(-(Vector.angle(numberLine.normal)+90))
+                ) => SVG.Builder.Indicator()
                     .withClass("number-slider-marker")
-                    .withContent(markerLabel)
-                    .moveTo(...numberLine.positionOfIndex(0))
-                    .rotateTo(Vector.angle(numberLine.normal) + 90),
-                Selected=Param.new(0).withObserver((index, oldValue) => index === null ? marker.hide() : (
-                    oldValue === null ? marker.show() : undefined,
-                    marker.moveTo(...numberLine.positionOfIndex(index),
-                    markerLabel.textContent = numberLine.range.min + index))),
-                selectedMouseEventUpdate=e=>Selected.set(
-                    mousePositionToClosestIndex(MouseEvents.relativeMousePosition(e, numberLine.baseline))),
-                mouseUpHandler=undefined,
-                defineMouseUpHandler=mouseUpHandler=()=>{
-                    window.removeEventListener("mousemove", selectedMouseEventUpdate);
-                    window.removeEventListener("mouseup", mouseUpHandler);},
-                mouseTrap = SVG.Builder.MouseTrap
-                    .withDimensions(
-                        -horizontalPadding,
-                        -.5*height,
-                        numberLine.lineLength+2*horizontalPadding,
-                        height)
-                    .withEventListeners({
-                        mouseDown: e=>{
-                            selectedMouseEventUpdate(e);
-                            window.addEventListener("mousemove", selectedMouseEventUpdate);
-                            window.addEventListener("mouseup", mouseUpHandler);}})
-                    .withAttribute("stroke", "black")
-                    .moveTo(...numberLine.start)
-                    .rotateTo(Vector.angle(numberLine.line))
+                    .withContent(label)
+                    .withGetterAndSetter("label",
+                        () => label,
+                        function(text) {
+                            label.withTextContent(text);
+                            this.dimensioned();})
+                    .withMethods({
+                        withLabel: function(labelText) {
+                            this.label = labelText;
+                            return this;},
+                        dimensioned: Module.of((
+                            lengthAlong = (x, labelTextLength) => Math.max(...[
+                                [labelTextLength, 0],
+                                [0, labelHeight]
+                            ].map(y=>Math.abs(Vector.dot(x, y))))
+                        ) => function() {
+                            const labelTextLength = lengthPerCharacter*label.textContent.length;
+                            return this
+                                .withHeadWidth(2*markerPadding.horizontal +
+                                    lengthAlong(numberLine.tangent, labelTextLength))
+                                .withHeadHeight(2*markerPadding.vertical +
+                                    lengthAlong(numberLine.normal, labelTextLength));}),
+                        transformed: function() {
+                            const normAngle = Vector.angle(numberLine.normal);
+                            label.rotateTo(-normAngle-90);
+                            return this
+                                .moveTo(...numberLine.positionOfIndex(Selected.get()))
+                                .rotateTo(normAngle+90);}})
+                    .dimensioned()
+                    .transformed()),
+                selectedMarker=createMarker()
+                    .withClass("selected-marker")
+                    .withMethods({
+                        emphasize: function() {
+                            this.withAttribute("stroke-width", 1.5);},
+                        emphasized: function() {
+                            this.emphasize();
+                            return this;},
+                        unemphasize: function() {
+                            this.withAttribute("stroke-width", 1);},
+                        unemphasized: function() {
+                            this.unemphasize();
+                            return this;}})
+                    .withModification(function() {
+                        Selected.withObserver((index, oldValue) => {
+                            if(index === null) {
+                                this.hide()}
+                            else {
+                                if(oldValue === null) {
+                                    this.show();}
+                                this
+                                    .withLabel(index)
+                                    .moveTo(...numberLine.positionOfIndex(index))
+                                    .dimensioned();}})}),
+                previewMarker=createMarker()
+                    .withClass("preview-marker")
+                    .withAttribute("stroke-dasharray", "3 2.5")
+                    .withModification(function() {
+                        Preview.withObserver(index => {
+                            if(index === null) {
+                                this.hide();}
+                            else {
+                                if(index === Selected.get()) {
+                                    selectedMarker.emphasize();
+                                    this.hide();}
+                                else {
+                                    selectedMarker.unemphasize();
+                                    const tDifference = numberLine.tOfIndex(index) - numberLine.tOfIndex(Selected.get());
+                                    const line = numberLine.line;
+                                    const multiplier = -1*
+                                        (line[1]-line[0] < 0 ? 1 : -1) *
+                                        (Math.abs(Vector.slope(line)) < 1 ? 1 : -1);
+                                    console.log(Vector.slope(numberLine.line));
+                                    this
+                                        .withLabel(index)
+                                        .moveTo(...numberLine.positionOfIndex(index))
+                                        .dimensioned()
+                                        .withHeadNudge(Module.of((
+                                            spaceBetweenMarkers = Math.abs(tDifference)*numberLine.lineLength -
+                                                .5*(selectedMarker.width + this.width),
+                                            nothing=console.log(spaceBetweenMarkers)
+                                        ) => spaceBetweenMarkers > 0 ?
+                                            0 :
+                                            spaceBetweenMarkers * (
+                                                tDifference > 0 ? multiplier : -multiplier)))
+                                        .show();}}})})
+                    .hide(),
+                selectedMouseEventUpdate=e=>Selected.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
+                previewMouseEventUpdate=e=>Preview.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
+                mouseTrap=Module.of((
+                    isInside=false,
+                    mouseTrap=undefined,
+                    mouseUpListener=undefined,
+                    mouseMoveListener=previewMouseEventUpdate,
+                    mouseLeaveListener=()=>Preview.set(null),
+                    defineMouseUpHandler=mouseUpListener=e=>{
+                        window.removeEventListener("mousemove", selectedMouseEventUpdate);
+                        window.removeEventListener("mouseup", mouseUpListener);
+                        mouseTrap.withEventListeners({
+                            mouseMove: mouseMoveListener,
+                            mouseLeave: mouseLeaveListener});
+                        selectedMarker.unemphasize();
+                        if(isInside === true) {
+                            previewMouseEventUpdate(e);}},
+                    defineMouseTrap=mouseTrap=SVG.Builder.MouseTrap
+                        .withDimensions(
+                            -horizontalPadding,
+                            -.5*height,
+                            numberLine.lineLength+2*horizontalPadding,
+                            height)
+                        .withEventListeners({
+                            mouseEnter: () => isInside=true,
+                            mouseMove: mouseMoveListener,
+                            mouseDown: (e) => {
+                                Preview.set(null);
+                                selectedMarker.emphasize();
+                                selectedMouseEventUpdate(e);
+                                mouseTrap.withoutEventListeners({
+                                    mousemove: mouseMoveListener,
+                                    mouseLeave: mouseLeaveListener});
+                                window.addEventListener("mousemove", selectedMouseEventUpdate);
+                                window.addEventListener("mouseup", mouseUpListener);},
+                            mouseLeave: [
+                                () => isInside = false,
+                                mouseLeaveListener]})
+                        .moveTo(...numberLine.start)
+                        .rotateTo(Vector.angle(numberLine.line))
+                ) => mouseTrap)
             ) => SVG.Builder.G()
                 .withClass("number-slider")
                 .withChild(numberLine
-                    .withChild(marker)
+                    .withChild(selectedMarker)
+                    .withChild(previewMarker)
                     .withChild(mouseTrap)
                     .withListeners({
+                        range: ()=> {
+                            selectedMarker.dimensioned();
+                            previewMarker.dimensioned();
+                            Selected.set(mousePositionToClosestIndex(selectedMarker.position));},
+                        normal: () => {
+                            [selectedMarker, previewMarker].forEach(marker =>
+                                marker.transformed().dimensioned());},
                         line: () => {
-                            const normAngle = Vector.angle(numberLine.normal);
-                            marker.moveTo(...numberLine.positionOfIndex(Selected.get())).rotateTo(normAngle+90)
-                            markerLabel.rotateTo(-normAngle-90);
+                            [selectedMarker, previewMarker].forEach(marker =>
+                                marker.transformed().dimensioned());
                             mouseTrap
                                 .withAttribute("width", numberLine.lineLength + 2*horizontalPadding)
                                 .moveTo(...numberLine.start)
                                 .rotateTo(Vector.angle(numberLine.line));},
-                        lineLength: lineLength=>mouseTrap.withAttribute("width", lineLength+2*horizontalPadding)})
-                .withParam("Selected", Selected)))),
+                        lineLength: lineLength=>mouseTrap.withAttribute("width", lineLength+2*horizontalPadding)}))
+                .withParam("Selected", Selected))),
             Path: () => createElement("path")
                 .withAttributes({d: null})
                 .withGetterAndSetter("d",
