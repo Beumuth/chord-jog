@@ -1,4 +1,5 @@
 const ChordJogApp = (() => {
+    let chordJogApp=undefined;
     const Style = {
         width: 800,
         height: 800,
@@ -97,7 +98,7 @@ const ChordJogApp = (() => {
                 length,
                 startIndex=0,
                 halfLength=Math.ceil(.5*length)
-            ) => length === 1 ? startIndex : binarySearch(
+            ) => length <= 1 ? startIndex : binarySearch(
                 distance,
                 halfLength,
                 Module.of((
@@ -792,9 +793,14 @@ const ChordJogApp = (() => {
                                         rowIndexToModuleY(rowIndex)])
                                 )=> modules.forEach((module, index)=> this.append(
                                     module.moveTo(...moduleIndexToCoordinates(index)))));})
-                        .withMethod("withModules", function(modules) {
-                            this.modules = modules;
-                            return this;})
+                        .withMethods({
+                            withModules: function(modules) {
+                                this.modules = modules;
+                                return this;},
+                            clear: function() {this.modules = [];},
+                            cleared: function() {
+                                this.clear();
+                                return this;}})
                         .withModules(modules))
                 ) => ({
                     withModule: module => withModulesStep([module]),
@@ -1113,7 +1119,7 @@ const ChordJogApp = (() => {
                 labelHeight = 12 + 2 * markerPadding.vertical
             ) => () => Module.of((
                 numberLine=SVG.Builder.NumberLine(),
-                Selected=Param.new(0),
+                Selected=Param.new(null),
                 Preview=Param.new(null),
                 mousePositionOfEvent=e=>MouseEvents.relativeMousePosition(e, numberLine.baseline),
                 mousePositionToClosestIndex=mousePosition=>Functions.binarySearch(
@@ -1181,8 +1187,9 @@ const ChordJogApp = (() => {
                             else {
                                 if(oldValue === null) {
                                     this.show();}
+                                index = Numbers.clamp(index, 0, numberLine.range.max - numberLine.range.min);
                                 this
-                                    .withLabel(index)
+                                    .withLabel(numberLine.range.min + index)
                                     .moveTo(...numberLine.positionOfIndex(index))
                                     .dimensioned();}})}),
                 previewMarker=createMarker()
@@ -1198,20 +1205,19 @@ const ChordJogApp = (() => {
                                     this.hide();}
                                 else {
                                     selectedMarker.unemphasize();
-                                    const tDifference = numberLine.tOfIndex(index) - numberLine.tOfIndex(Selected.get());
+                                    const tDifference = numberLine.tOfIndex(index) -
+                                        numberLine.tOfIndex(Selected.get());
                                     const line = numberLine.line;
                                     const multiplier = -1*
                                         (line[1]-line[0] < 0 ? 1 : -1) *
                                         (Math.abs(Vector.slope(line)) < 1 ? 1 : -1);
-                                    console.log(Vector.slope(numberLine.line));
                                     this
-                                        .withLabel(index)
+                                        .withLabel(index + numberLine.range.min)
                                         .moveTo(...numberLine.positionOfIndex(index))
                                         .dimensioned()
                                         .withHeadNudge(Module.of((
                                             spaceBetweenMarkers = Math.abs(tDifference)*numberLine.lineLength -
-                                                .5*(selectedMarker.width + this.width),
-                                            nothing=console.log(spaceBetweenMarkers)
+                                                .5*(selectedMarker.width + this.width)
                                         ) => spaceBetweenMarkers > 0 ?
                                             0 :
                                             spaceBetweenMarkers * (
@@ -1269,6 +1275,7 @@ const ChordJogApp = (() => {
                         range: ()=> {
                             selectedMarker.dimensioned();
                             previewMarker.dimensioned();
+                            Selected.set(null);
                             Selected.set(mousePositionToClosestIndex(selectedMarker.position));},
                         normal: () => {
                             [selectedMarker, previewMarker].forEach(marker =>
@@ -1281,6 +1288,8 @@ const ChordJogApp = (() => {
                                 .moveTo(...numberLine.start)
                                 .rotateTo(Vector.angle(numberLine.line));},
                         lineLength: lineLength=>mouseTrap.withAttribute("width", lineLength+2*horizontalPadding)}))
+                .withGetters({
+                    numberLine: () => numberLine})
                 .withParam("Selected", Selected))),
             Path: () => createElement("path")
                 .withAttributes({d: null})
@@ -3596,23 +3605,32 @@ const ChordJogApp = (() => {
                         .withSchema(shapeInput.schema)
                         .withRange(rootFretRangeInput.range));
                     return shapeFormWithSchemaAndRange(Shapes.Schema.allUnsounded, Frets.Range.roots);}})))}}));
-
+    
     const ShapesPage = Module.of((
         shapeFilterMarginRight=32,
         topRowMarginBottom=10,
         shapeChartGridPadding= {
             horizontal: 5,
-            vertical: 5},
+            vertical: 5 },
+        shapeChartMarginTop=10,
         shapeChartGridMaxColumns=4,
-        maxMatches=12
+        maxMatches=12,
+        width = shapeChartGridMaxColumns*ShapeChart.Style.width +
+            (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
     ) => ({
+        Style: {
+            width: width},
         new: () => Module.of((
-            shapesPage=undefined,
-            width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-                (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
-            filterShapes=undefined,
+            matches=[],
+            pageSlider=undefined,
             shapeFilterInput=undefined,
-            refreshShapesList = () => filterShapes(shapeFilterInput.schema),
+            refreshShapesList=undefined,
+            updatePageSliderRange=undefined,
+            updateMatches=()=>{
+                matches = Shapes.search(shapeFilterInput.schema);
+                updatePageSliderRange();
+                pageSlider.selected = 0;
+                refreshShapesList();},
             ShapeItem=Module.of((
                 deleteButtonHeight=65,
                 editButtonHeight=40,
@@ -3642,7 +3660,7 @@ const ChordJogApp = (() => {
                                     .withClickListener(() => {
                                         if(true===confirm("Are you sure you want to delete this shape?")) {
                                             Shapes.delete(shape.id);
-                                            refreshShapesList();}})
+                                            updateMatches();}})
                                     .withModification(function() {
                                         this.label.rotateTo(270);}),
                                 SVG.Builder.ActionText
@@ -3650,12 +3668,12 @@ const ChordJogApp = (() => {
                                     .withSize(buttonWidth, editButtonHeight)
                                     .withClickListener(() => {
                                         shapeFilterInput.unfocus();
-                                        shapesPage.withChild(SVG.Builder.Modal
+                                        chordJogApp.withChild(SVG.Builder.Modal
                                             .withContent(ShapeForm.Builder.new().forEditing(Shapes.all[shape.id]))
                                             .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                             .withCloseCallback(() => {
                                                 shapeFilterInput.focus();
-                                                refreshShapesList();}));})
+                                                updateMatches(pageSlider.selected);}));})
                                     .withModification(function() {
                                         this.label.rotateTo(270);})])
                             .withClass("shape-item-buttons-container")
@@ -3666,23 +3684,12 @@ const ChordJogApp = (() => {
                             .unfixed()
                             .withoutAnyStringAction())
                         .withChild(buttonsContainer)))})),
-            shapeChartGrid=SVG.Builder.ModularGrid
-                .withX(0).withY(0)
-                .withWidth(width)
-                .withModuleWidth(ShapeChart.Style.width)
-                .withModuleHeight(ShapeItem.Style.height)
-                .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
-                .withModules(ShapeItem.shapesToShapeItems(Shapes.all))
-                .withClass("shape-chart-grid")
-                .move(0, ShapeInput.Style.height + topRowMarginBottom),
             ShapesPageTopRow=Module.of((
-                setFilterShapes=filterShapes=shapeFilter=>
-                    shapeChartGrid.modules = ShapeItem.shapesToShapeItems(Shapes.search(shapeFilter)),
-                setShapeFilterInput=shapeFilterInput=ShapeInput.Builder
+                setupShapeFilterInput=shapeFilterInput=ShapeInput.Builder
                     .withWildcards()
                     .blank()
                     .focused()
-                    .withChangeListener(filterShapes),
+                    .withChangeListener(updateMatches),
                 shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
                     .withChild(shapeFilterInput)
@@ -3703,7 +3710,8 @@ const ChordJogApp = (() => {
                                 .rotateTo(270);})
                         .withClickListener(() => shapeFilterInput.schema = Shapes.Schema.allAnyStringAction))),
                 shapesButtonContainer=Module.of((
-                    buttonWidth=width - ShapeInput.Style.width - shapeFilterMarginRight - ShapeChart.FingerIndicator.Style.radius,
+                    buttonWidth= width - ShapeInput.Style.width - shapeFilterMarginRight -
+                        ShapeChart.FingerIndicator.Style.radius,
                     numButtons=3,
                     buttonHeight=ShapeChart.Fretboard.Style.height/numButtons,
                     buttonIndexToYCoordinate=index=>index*buttonHeight,
@@ -3712,12 +3720,12 @@ const ChordJogApp = (() => {
                         .withText("Create")
                         .withClickListener(() => {
                             shapeFilterInput.unfocus();
-                            shapesPage.withChild(SVG.Builder.Modal
+                            chordJogApp.withChild(SVG.Builder.Modal
                                 .withContent(ShapeForm.Builder.new().forCreation())
                                 .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                 .withCloseCallback(() => {
-                                    shapeFilterInput.focus();
-                                    refreshShapesList();}));}),
+                                    updateMatches();
+                                    shapeFilterInput.focus();}));}),
                     downloadShapesButton=SVG.Builder.TextButton
                         .withDimensions(0, buttonIndexToYCoordinate(1), buttonWidth, buttonHeight)
                         .withText("Download")
@@ -3771,12 +3779,12 @@ const ChordJogApp = (() => {
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, 0, optionWidth, optionHeight)
                                 .withText("Append")
-                                .withClickListener(() => Shapes.upload(refreshShapesList))
+                                .withClickListener(() => Shapes.upload(updateMatches))
                                 .withClass("upload-and-append-button"))
                             .withChild(SVG.Builder.TextButton
                                 .withDimensions(0, optionHeight, optionWidth, optionHeight)
                                 .withText("Replace")
-                                .withClickListener(() => Shapes.upload(refreshShapesList, true))
+                                .withClickListener(() => Shapes.upload(updateMatches, true))
                                 .withClass("upload-and-replace-button")))))
                 ) => SVG.Builder.G()
                     .withClass("shapes-button-actions-container")
@@ -3790,26 +3798,83 @@ const ChordJogApp = (() => {
                     .withClass("shape-page-top-row")
                     .withChild(shapesFilterContainer)
                     .withChild(shapesButtonContainer)})),
-            setupShapesPage=shapesPage=SVG.Builder.G()
-                .withClass("shapes-page")
-                .withChild(ShapesPageTopRow.element)
-                .withChild(SVG.Builder.NumberSlider
-                    .withRange(1, 100)
-                    .horizontallyAligned
-                    .withWidth(width - ShapeChart.Fretboard.Style.x - ShapeChart.FingerIndicator.Style.radius)
-                    .moveTo(ShapeChart.Fretboard.Style.x, ShapesPageTopRow.Style.endY + 18)
-                    .withChangeListener(value => console.log(value)))
-                .withChild(shapeChartGrid.move(0, 38))
-        ) => shapesPage)}));
+            shapeChartGrid=Module.of(() => SVG.Builder.ModularGrid
+                .withX(0).withY(0)
+                .withWidth(width)
+                .withModuleWidth(ShapeChart.Style.width)
+                .withModuleHeight(ShapeItem.Style.height)
+                .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
+                .withModules(ShapeItem.shapesToShapeItems(Shapes.all))
+                .withClass("shape-chart-grid")
+                .moveTo(0, ShapesPageTopRow.Style.endY + shapeChartMarginTop)),
+            initializeUndefinedVariables=Module.of((
+                pageSliderMarginLeft = 50
+            ) => {
+                updatePageSliderRange = () => pageSlider.numberLine.range = {
+                    min: 1,
+                    max: Numbers.clampLower(Math.ceil(matches.length/maxMatches), 1)};
+                refreshShapesList = () => {
+                    const startIndex = pageSlider.selected*maxMatches;
+                    shapeChartGrid.cleared().withModules(ShapeItem.shapesToShapeItems(
+                        matches.slice(startIndex, startIndex+maxMatches)));};
+                pageSlider = SVG.Builder.NumberSlider()
+                    .withModification(function() {
+                        this.numberLine.withEnd([
+                            0,
+                            3 * ShapeChart.Style.height + 2 * shapeChartGridPadding.vertical]);})
+                    .moveTo(
+                        width + pageSliderMarginLeft,
+                        ShapesPageTopRow.Style.endY + shapeChartMarginTop)
+                    .withListener("selected", refreshShapesList);
+                updateMatches();})
+        ) => SVG.Builder.G()
+            .withClass("shapes-page")
+            .withChild(ShapesPageTopRow.element)
+            .withChild(pageSlider)
+            .withChild(shapeChartGrid))}));
+
+    chordJogApp = Module.of((
+        NavigationBar = Module.of((
+            startY=20,
+            height=24,
+            marginBottom=10,
+            moduleWidth=80,
+            fontSize=18,
+            padding=(3/4)*moduleWidth,
+            createButton=text=>SVG.Builder.ActionText
+                .withText(text)
+                .withSize(moduleWidth, height)
+                .withClass("practice-button")
+                .withModification(function() {
+                    this.label.withAttribute("font-size", fontSize);})
+        ) => ({
+            Style: {
+                endY: startY + .5*height,
+                marginBottom: marginBottom},
+            new: () => SVG.Builder.ModularGrid
+                .withX(0)
+                .withY(0)
+                .withWidth(Style.width)
+                .withModuleWidth(moduleWidth)
+                .withModuleHeight(height)
+                .withPadding(padding)
+                .withModules([
+                    createButton("Practice").withClass("practice-button"),
+                    createButton("Shapes").withClass("shapes-button")])
+                .withClass("navigation-bar")
+                .yTo(startY)})),
+        shapesPage = ShapesPage.new().yTo(NavigationBar.Style.endY + NavigationBar.Style.marginBottom)
+    ) => SVG.Builder.SVG
+        .withWidth(Style.width)
+        .withHeight(Style.height)
+        .withClass("chord-jog-app")
+        .withAttributes({
+            fill: "none",
+            stroke: Style.colors.heavy,
+            strokeWidth: Style.stroke.width,
+            strokeLinecap: "round"})
+        .disableTextSelection()
+        .withChild(NavigationBar.new())
+        .withChild(shapesPage));
     return {
-        create: () => SVG.Builder.SVG
-            .withWidth(Style.width)
-            .withHeight(Style.height)
-            .withClass("chord-jog-app")
-            .withAttributes({
-                fill: "none",
-                stroke: Style.colors.heavy,
-                strokeWidth: Style.stroke.width,
-                strokeLinecap: "round"})
-            .disableTextSelection()
-            .withChild(SVG.Builder.NumberSlider().moveTo(100, 100))};})();
+        create: () => chordJogApp};})();
