@@ -44,13 +44,15 @@ const ChordJogApp = (() => {
             param=undefined,
             defineParam=param={
                 get: () => value,
-                set: newValue => {
+                set: (newValue) => {
                     const failValidation = validations.find(validation=>validation.condition(newValue, value));
-                    return failValidation===undefined ? (
-                        oldValue = value,
-                        value = newValue,
-                        observers.forEach(observer => observer(value, oldValue)),
-                        true) : failValidation.reason;},
+                    if(failValidation === undefined) {
+                        oldValue = value;
+                        value = newValue;
+                        observers.forEach(observer => observer(value, oldValue));
+                        return true;}
+                    else {
+                        return failValidation.reason;}},
                 withValue: newValue => {
                     param.set(newValue);
                     return param;},
@@ -1139,6 +1141,7 @@ const ChordJogApp = (() => {
                 numberLine=SVG.Builder.NumberLine(),
                 Selected=Param.new(null),
                 Preview=Param.new(null),
+                changeListener=null,
                 mousePositionOfEvent=e=>MouseEvents.relativeMousePosition(e, numberLine.baseline),
                 mousePositionToClosestIndex=mousePosition=>Functions.binarySearch(
                     index=>{
@@ -1242,11 +1245,12 @@ const ChordJogApp = (() => {
                                                 tDifference > 0 ? multiplier : -multiplier)))
                                         .show();}}})})
                     .hide(),
-                selectedMouseEventUpdate=e=>Selected.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
-                previewMouseEventUpdate=e=>Preview.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
                 mouseTrap=Module.of((
                     isInside=false,
+                    isDragging=false,
                     mouseTrap=undefined,
+                    selectedMouseEventUpdate=e=> Selected.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
+                    previewMouseEventUpdate=e=>Preview.set(mousePositionToClosestIndex(mousePositionOfEvent(e))),
                     mouseUpListener=undefined,
                     mouseMoveListener=previewMouseEventUpdate,
                     mouseLeaveListener=()=>Preview.set(null),
@@ -1258,7 +1262,9 @@ const ChordJogApp = (() => {
                             mouseLeave: mouseLeaveListener});
                         selectedMarker.unemphasize();
                         if(isInside === true) {
-                            previewMouseEventUpdate(e);}},
+                            previewMouseEventUpdate(e);}
+                        if(changeListener !== null) {
+                            changeListener(Selected.get());}},
                     defineMouseTrap=mouseTrap=SVG.Builder.MouseTrap
                         .withDimensions(
                             -horizontalPadding,
@@ -1308,7 +1314,17 @@ const ChordJogApp = (() => {
                         lineLength: lineLength=>mouseTrap.withAttribute("width", lineLength+2*horizontalPadding)}))
                 .withGetters({
                     numberLine: () => numberLine})
-                .withParam("Selected", Selected))),
+                .withGetterAndSetter("selected",
+                    Selected.get,
+                    index=>Selected.set(index))
+                .withMethods({
+                    withSelected: function(selectedIndex) {
+                        this.selected = selectedIndex;
+                        return this;},
+                    setChangeListener: listener=>changeListener=listener,
+                    withChangeListener: function(listener) {
+                        this.setChangeListener(listener);
+                        return this;}}))),
             Path: () => createElement("path")
                 .withAttributes({d: null})
                 .withGetterAndSetter("d",
@@ -3653,7 +3669,7 @@ const ChordJogApp = (() => {
                 matches = Shapes.search(shapeFilterInput.schema);
                 updatePageSliderRange();
                 pageSlider.selected = 0;
-                refreshShapesList();},
+                refreshShapesList(pageSlider.selected);},
             ShapeItem=Module.of((
                 deleteButtonHeight=65,
                 editButtonHeight=40,
@@ -3836,8 +3852,8 @@ const ChordJogApp = (() => {
                 updatePageSliderRange = () => pageSlider.numberLine.range = {
                     min: 1,
                     max: Numbers.clampLower(Math.ceil(matches.length/maxMatches), 1)};
-                refreshShapesList = () => {
-                    const startIndex = pageSlider.selected*maxMatches;
+                refreshShapesList = selectedIndex => {
+                    const startIndex = selectedIndex*maxMatches;
                     shapeChartGrid.cleared().withModules(ShapeItem.shapesToShapeItems(
                         matches.slice(startIndex, startIndex+maxMatches)));};
                 pageSlider = SVG.Builder.NumberSlider()
@@ -3848,7 +3864,7 @@ const ChordJogApp = (() => {
                     .moveTo(
                         width + pageSliderMarginLeft,
                         ShapesPageTopRow.Style.endY + shapeChartMarginTop)
-                    .withListener("selected", refreshShapesList);
+                    .withChangeListener(refreshShapesList);
                 updateMatches();})
         ) => SVG.Builder.G()
             .withClass("shapes-manager")
