@@ -243,7 +243,9 @@ const ChordJogApp = (() => {
         clamp: (value, fromInclusive, toInclusive) =>
             value < fromInclusive ? fromInclusive :
                 value > toInclusive ? toInclusive :
-                    value};
+                    value,
+        randomIntegerInRange: (fromInclusive, toInclusive) =>
+            Math.floor(Math.random() * (toInclusive - fromInclusive) + fromInclusive)};
     const Arrays = {
         replaceItem: (array, index, replacement) => {
             array[index] = replacement;
@@ -814,10 +816,26 @@ const ChordJogApp = (() => {
                     .withHeight(height)
                     .withClass("mouse-trap")
                     .withAttributes({
-                        pointerEvents: "fill",
-                        cursor: "pointer",
                         fill: "none",
-                        stroke: "none"})},
+                        stroke: "none"})
+                    .withMethods({
+                        isEnabled: function() {
+                            return this.getAttribute("pointer-events") !== "none";},
+                        enable: function() {
+                            this.withAttributes({
+                                pointerEvents: "fill",
+                                cursor: "pointer",});},
+                        enabled: function() {
+                            this.enable();
+                            return this;},
+                        disable: function() {
+                            this.withAttributes({
+                                cursor: "default",
+                                pointerEvents: "none"});},
+                        disabled: function() {
+                            this.disable();
+                            return this;}})
+                    .enabled()},
             NumberLine: Module.of((
                 LabelModes={
                     all: "all",
@@ -1441,6 +1459,7 @@ const ChordJogApp = (() => {
                 fontSize: 15},
             withTextStep = text => ({
                 withSize: (width, height) => Module.of((
+                    enabled=true,
                     clickCallback=undefined,
                     label=svgBuilder.Text
                         .withTextContent(text)
@@ -1463,7 +1482,6 @@ const ChordJogApp = (() => {
                             mouseUpListener = undefined,
                             defineMouseUpHandler=mouseUpListener = () => {
                                 isMouseDown = false;
-                                inactivateLabel();
                                 window.removeEventListener("mouseup", mouseUpListener);
                                 if(isInside === true) {
                                     previewLabel();
@@ -1481,12 +1499,15 @@ const ChordJogApp = (() => {
                                 isMouseDown = true;
                                 activateLabel();
                                 window.addEventListener("mouseup", mouseUpListener);},
-                            mouseLeave: () => {
+                            mouseLeave: function() {
                                 isInside = false;
-                                if(isMouseDown === false) {
-                                    inactivateLabel();}
-                                else {
-                                    previewLabel();}}})))
+                                //If the mouse trap is disabled during the click event,
+                                //suppress the resulting mouse leave event that is fired.
+                                if(this.isEnabled()) {
+                                    if(isMouseDown === false) {
+                                        inactivateLabel();}
+                                    else {
+                                        previewLabel();}}}})))
                 ) => svgBuilder.G()
                     .withClass("action-text")
                     .withChild(label)
@@ -1800,7 +1821,7 @@ const ChordJogApp = (() => {
                         (maxActiveRelativeFret === undefined ? 0 : maxActiveRelativeFret) + .5) +
                     FingerlessIndicatorStyle.radius + FingerlessIndicatorStyle.margin
             ) => ({
-                forString: (string) => Module.of((
+                forString: string => Module.of((
                     centerX = FingerlessIndicatorStyle.startX + ((string - 1) * Fretboard.Style.stringSpacing),
                     centerTop = [
                         centerX,
@@ -2104,6 +2125,7 @@ const ChordJogApp = (() => {
                         SkeletonBuilder.withoutAnyStringAction())
                     .withChild(shapeChartMeat)
                     .withChild(rootFretLabel)
+                    .withGetter("rootFretLabel", () => rootFretLabel)
                     .withGetterAndSetter("schema",
                         Schema.get,
                         Schema.set)
@@ -2121,7 +2143,7 @@ const ChordJogApp = (() => {
                 anyStringActionStep = (schema, rootFret) => ({
                     withAnyStringAction: () => buildStep(schema, rootFret, true),
                     withoutAnyStringAction: () => buildStep(schema, rootFret, false)}),
-                rootFretStep = (schema) => ({
+                rootFretStep = schema => ({
                     fixed: rootFret => anyStringActionStep(schema, rootFret),
                     unfixed: () => anyStringActionStep(schema, null)})
             ) => ({
@@ -3606,7 +3628,7 @@ const ChordJogApp = (() => {
                         .withRange(rootFretRangeInput.range));
                     return shapeFormWithSchemaAndRange(Shapes.Schema.allUnsounded, Frets.Range.roots);}})))}}));
     
-    const ShapesPage = Module.of((
+    const ShapesManager = Module.of((
         shapeFilterMarginRight=32,
         topRowMarginBottom=10,
         shapeChartGridPadding= {
@@ -3637,7 +3659,7 @@ const ChordJogApp = (() => {
                 moduleHeight=deleteButtonHeight-10,
                 buttonWidth=18,
                 buttonPadding=3,
-                buttonsContainerOffsetX=-3,
+                buttonsContainerOffsetX=-4,
                 buttonsContainerOffsetY=45
             ) => ({
                 Style: {
@@ -3804,7 +3826,7 @@ const ChordJogApp = (() => {
                 .withModuleWidth(ShapeChart.Style.width)
                 .withModuleHeight(ShapeItem.Style.height)
                 .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
-                .withModules(ShapeItem.shapesToShapeItems(Shapes.all))
+                .withoutModules()
                 .withClass("shape-chart-grid")
                 .moveTo(0, ShapesPageTopRow.Style.endY + shapeChartMarginTop)),
             initializeUndefinedVariables=Module.of((
@@ -3828,42 +3850,153 @@ const ChordJogApp = (() => {
                     .withListener("selected", refreshShapesList);
                 updateMatches();})
         ) => SVG.Builder.G()
-            .withClass("shapes-page")
+            .withClass("shapes-manager")
             .withChild(ShapesPageTopRow.element)
             .withChild(pageSlider)
             .withChild(shapeChartGrid))}));
 
-    chordJogApp = Module.of((
-        NavigationBar = Module.of((
-            startY=20,
-            height=24,
-            marginBottom=10,
-            moduleWidth=80,
-            fontSize=18,
-            padding=(3/4)*moduleWidth,
-            createButton=text=>SVG.Builder.ActionText
-                .withText(text)
-                .withSize(moduleWidth, height)
-                .withClass("practice-button")
+    const ShapesGenerator = Module.of((
+        defaultNumChords=6,
+        numChordsRange = {
+            min: 1,
+            max: 12},
+        numChordsButtonSize={
+            width: 95,
+            height: 30},
+        shapeChartGridMarginTop = 90,
+        shapeChartGridPadding= {
+            horizontal: 5,
+            vertical: 5 },
+        shapeChartGridMaxColumns=4,
+        shapeChartGridWidth = shapeChartGridMaxColumns * (ShapeChart.Style.width + shapeChartGridPadding.horizontal) -
+            shapeChartGridPadding.horizontal,
+        numChordsSelectorMarginRight=30,
+        numChordsSelectorWidth = 400,
+        topRowMarginTop = 40,
+        topRowWidth = numChordsSelectorWidth + numChordsSelectorMarginRight + numChordsButtonSize.width
+    ) => ({
+        new: () => Module.of((
+            numShapesSelector = SVG.Builder.NumberSlider()
+                .withClass("num-shapes-selector")
                 .withModification(function() {
-                    this.label.withAttribute("font-size", fontSize);})
-        ) => ({
-            Style: {
-                endY: startY + .5*height,
-                marginBottom: marginBottom},
-            new: () => SVG.Builder.ModularGrid
-                .withX(0)
-                .withY(0)
-                .withWidth(Style.width)
-                .withModuleWidth(moduleWidth)
-                .withModuleHeight(height)
-                .withPadding(padding)
-                .withModules([
-                    createButton("Practice").withClass("practice-button"),
-                    createButton("Shapes").withClass("shapes-button")])
-                .withClass("navigation-bar")
-                .yTo(startY)})),
-        shapesPage = ShapesPage.new().yTo(NavigationBar.Style.endY + NavigationBar.Style.marginBottom)
+                    this.numberLine
+                        .withEnd([numChordsSelectorWidth, 0])
+                        .withRange(numChordsRange)})
+                .withSelected(defaultNumChords-numChordsRange.min),
+            shapesGrid = SVG.Builder.ModularGrid
+                .withX(0).withY(0)
+                .withWidth(shapeChartGridWidth)
+                .withModuleWidth(ShapeChart.Style.width)
+                .withModuleHeight(ShapeChart.Style.height)
+                .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
+                .withoutModules()
+                .yTo(shapeChartGridMarginTop),
+            generateChords=()=>{
+                const shapeIndices = [];
+                while(shapeIndices.length < numShapesSelector.selected+numChordsRange.min) {
+                    const chordIndex = Numbers.randomIntegerInRange(0, Shapes.all.length);
+                    console.log(chordIndex);
+                    if(! shapeIndices.includes(chordIndex)) {
+                        shapeIndices.push(chordIndex);}}
+                shapesGrid.modules = shapeIndices.map(shapeIndex => Module.of((
+                    shape=Shapes.all[shapeIndex]
+                ) => ShapeChart.Builder
+                    .forSchema(shape.schema)
+                    .fixed(Numbers.randomIntegerInRange(shape.range.min, shape.range.max))
+                    .withoutAnyStringAction()
+                    .withModification(function() {
+                        this.rootFretLabel.withAttribute("font-weight", "bold");})))},
+            topRow = SVG.Builder.G()
+                .withClass("num-shapes-row")
+                .moveTo(.5*(Style.width - topRowWidth), topRowMarginTop)
+                .withChild(numShapesSelector)
+                .withChild(SVG.Builder.TextButton
+                    .withDimensions(0, 0, numChordsButtonSize.width, numChordsButtonSize.height)
+                    .withText("Generate")
+                    .withClickListener(generateChords)
+                    .xTo(numChordsSelectorWidth + numChordsSelectorMarginRight)),
+            initialize=generateChords()
+        ) => SVG.Builder.G()
+            .withClass("shapes-generator")
+            .withChild(topRow)
+            .withChild(shapesGrid))}))
+
+    const NavigationBar = Module.of((
+        startY=20,
+        height=24,
+        marginBottom=10,
+        moduleWidth=80,
+        fontSize=18,
+        padding=(3/4)*moduleWidth,
+        createButton=text=>SVG.Builder.ActionText
+            .withText(text)
+            .withSize(moduleWidth, height)
+            .withClass("practice-button")
+            .withModification(function() {
+                this.label.withAttribute("font-size", fontSize);})
+    ) => ({
+        Style: {
+            endY: startY + .5*height,
+            marginBottom: marginBottom},
+        new: () => Module.of((
+            application=undefined,
+            activeButton=null,
+            activePage=null,
+            buttonLinks = {},
+            setActive=name=>{
+                //Toggle active button
+                if(activeButton !== null) {
+                    activeButton.withModification(function() {
+                        this.label.withAttribute("text-decoration");
+                        this.mouseTrap.enable();});}
+                activeButton = buttonLinks[name].button.withModification(function() {
+                    this.label.setAttribute("text-decoration", "underline");
+                    this.mouseTrap.disable();});
+
+                //Toggle active page
+                if(activePage !== null) {
+                    application.withoutChild(activePage);}
+                application.withChild(buttonLinks[name].page);
+                activePage = buttonLinks[name].page;}
+        ) => SVG.Builder.ModularGrid
+            .withX(0)
+            .withY(0)
+            .withWidth(Style.width)
+            .withModuleWidth(moduleWidth)
+            .withModuleHeight(height)
+            .withPadding(padding)
+            .withoutModules()
+            .withClass("navigation-bar")
+            .yTo(startY)
+            .withMethods({
+                setApplication: app => application = app,
+                forApplication: function(application) {
+                    this.setApplication(application);
+                    return this;},
+                addPage: function(name, page) {
+                    const button = createButton(name)
+                        .withClass(`${name}-button`)
+                        .withClickListener(() => setActive(name));
+                    buttonLinks[name] = {
+                        button: button,
+                        page: page };
+                    this.modules = this.modules.concat(button);},
+                withPage: function(page, name) {
+                    this.addPage(page, name);
+                    return this;},
+                activatePage: setActive,
+                withActivePage: function(name) {
+                    setActive(name);
+                    return this;}}))}));
+
+    chordJogApp = Module.of((
+        navigationBar = NavigationBar.new(),
+        pages={
+            Generate: ShapesGenerator.new(),
+            Manage: ShapesManager.new()},
+        addPage=(name, content)=>navigationBar
+            .withPage(name, content.yTo(NavigationBar.Style.endY + NavigationBar.Style.marginBottom)),
+        addPages=Object.entries(pages).forEach(page => addPage(page[0], page[1]))
     ) => SVG.Builder.SVG
         .withWidth(Style.width)
         .withHeight(Style.height)
@@ -3874,7 +4007,8 @@ const ChordJogApp = (() => {
             strokeWidth: Style.stroke.width,
             strokeLinecap: "round"})
         .disableTextSelection()
-        .withChild(NavigationBar.new())
-        .withChild(shapesPage));
+        .withChild(navigationBar)
+        .withModification(function() {
+            navigationBar.forApplication(this).activatePage("Generate");}));
     return {
         create: () => chordJogApp};})();
