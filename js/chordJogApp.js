@@ -247,7 +247,7 @@ const ChordJogApp = (() => {
                 value > toInclusive ? toInclusive :
                     value,
         randomIntegerInRange: (fromInclusive, toInclusive) =>
-            Math.floor(Math.random() * (toInclusive - fromInclusive) + fromInclusive)};
+            Math.floor(Math.random() * (1 + toInclusive - fromInclusive) + fromInclusive)};
     const Arrays = {
         replaceItem: (array, index, replacement) => {
             array[index] = replacement;
@@ -3914,7 +3914,7 @@ const ChordJogApp = (() => {
                     numShapesSelector.selected+numChordsRange.min,
                     Shapes.all.length)
                 while(shapeIndices.length < numChords) {
-                    const chordIndex = Numbers.randomIntegerInRange(0, Shapes.all.length);
+                    const chordIndex = Numbers.randomIntegerInRange(0, Shapes.all.length - 1);
                     if(! shapeIndices.includes(chordIndex)) {
                         shapeIndices.push(chordIndex);}}
                 shapesGrid.modules = shapeIndices.map(shapeIndex => Module.of((
