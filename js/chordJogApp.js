@@ -3655,7 +3655,7 @@ const ChordJogApp = (() => {
         shapeChartGridMaxColumns=4,
         maxMatches=12,
         width = shapeChartGridMaxColumns*ShapeChart.Style.width +
-            (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal,
+            (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal
     ) => ({
         Style: {
             width: width},
@@ -3878,7 +3878,7 @@ const ChordJogApp = (() => {
             min: 1,
             max: 12},
         numChordsButtonSize={
-            width: 95,
+            width: ShapeChart.Fretboard.Style.width,
             height: 30},
         shapeChartGridMarginTop = 90,
         shapeChartGridPadding= {
@@ -3887,10 +3887,11 @@ const ChordJogApp = (() => {
         shapeChartGridMaxColumns=4,
         shapeChartGridWidth = shapeChartGridMaxColumns * (ShapeChart.Style.width + shapeChartGridPadding.horizontal) -
             shapeChartGridPadding.horizontal,
-        numChordsSelectorMarginRight=30,
-        numChordsSelectorWidth = 400,
-        topRowMarginTop = 35,
-        topRowWidth = numChordsSelectorWidth + numChordsSelectorMarginRight + numChordsButtonSize.width
+        numChordsSelectorMarginRight=shapeChartGridPadding.horizontal + ShapeChart.Fretboard.Style.x + 8,
+        numChordsSelectorWidth = (3/4) * shapeChartGridWidth -
+            ShapeChart.Fretboard.Style.x -
+            ShapeChart.FingerIndicator.Style.radius,
+        topRowMarginTop = 35
     ) => ({
         new: () => Module.of((
             numShapesSelector = SVG.Builder.NumberSlider()
@@ -3907,7 +3908,7 @@ const ChordJogApp = (() => {
                 .withModuleHeight(ShapeChart.Style.height)
                 .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
                 .withoutModules()
-                .moveTo(.5 * (Style.width - shapeChartGridWidth), shapeChartGridMarginTop),
+                .moveTo(0, shapeChartGridMarginTop),
             generateChords=()=>{
                 const shapeIndices = [];
                 const numChords = Numbers.clampUpper(
@@ -3927,7 +3928,7 @@ const ChordJogApp = (() => {
                         this.rootFretLabel.withAttribute("font-weight", "bold");})))},
             topRow = SVG.Builder.G()
                 .withClass("num-shapes-row")
-                .moveTo(.5*(Style.width - topRowWidth), topRowMarginTop)
+                .moveTo(ShapeChart.Fretboard.Style.x, topRowMarginTop)
                 .withChild(numShapesSelector)
                 .withChild(SVG.Builder.TextButton
                     .withDimensions(0, 0, numChordsButtonSize.width, numChordsButtonSize.height)
