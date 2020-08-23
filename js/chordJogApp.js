@@ -3865,7 +3865,7 @@ const ChordJogApp = (() => {
             height: 30},
         shapeChartGridMarginTop = 90,
         shapeChartGridPadding= {
-            horizontal: 5,
+            horizontal: 7,
             vertical: 5 },
         shapeChartGridMaxColumns=4,
         shapeChartGridWidth = shapeChartGridMaxColumns * (ShapeChart.Style.width + shapeChartGridPadding.horizontal) -
