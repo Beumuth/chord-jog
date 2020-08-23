@@ -3915,7 +3915,6 @@ const ChordJogApp = (() => {
                     Shapes.all.length)
                 while(shapeIndices.length < numChords) {
                     const chordIndex = Numbers.randomIntegerInRange(0, Shapes.all.length);
-                    console.log(chordIndex);
                     if(! shapeIndices.includes(chordIndex)) {
                         shapeIndices.push(chordIndex);}}
                 shapesGrid.modules = shapeIndices.map(shapeIndex => Module.of((
