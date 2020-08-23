@@ -3865,7 +3865,7 @@ const ChordJogApp = (() => {
             height: 30},
         shapeChartGridMarginTop = 90,
         shapeChartGridPadding= {
-            horizontal: 7,
+            horizontal: 10,
             vertical: 5 },
         shapeChartGridMaxColumns=4,
         shapeChartGridWidth = shapeChartGridMaxColumns * (ShapeChart.Style.width + shapeChartGridPadding.horizontal) -
@@ -3925,9 +3925,9 @@ const ChordJogApp = (() => {
         startY=20,
         height=24,
         marginBottom=10,
-        moduleWidth=80,
+        moduleWidth=95,
         fontSize=18,
-        padding=(3/4)*moduleWidth,
+        padding=30,
         createButton=text=>SVG.Builder.ActionText
             .withText(text)
             .withSize(moduleWidth, height)
