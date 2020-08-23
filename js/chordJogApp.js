@@ -3889,7 +3889,7 @@ const ChordJogApp = (() => {
             shapeChartGridPadding.horizontal,
         numChordsSelectorMarginRight=30,
         numChordsSelectorWidth = 400,
-        topRowMarginTop = 40,
+        topRowMarginTop = 35,
         topRowWidth = numChordsSelectorWidth + numChordsSelectorMarginRight + numChordsButtonSize.width
     ) => ({
         new: () => Module.of((
@@ -3907,7 +3907,7 @@ const ChordJogApp = (() => {
                 .withModuleHeight(ShapeChart.Style.height)
                 .withPadding(shapeChartGridPadding.horizontal, shapeChartGridPadding.vertical)
                 .withoutModules()
-                .yTo(shapeChartGridMarginTop),
+                .moveTo(.5 * (Style.width - shapeChartGridWidth), shapeChartGridMarginTop),
             generateChords=()=>{
                 const shapeIndices = [];
                 const numChords = Numbers.clampUpper(
