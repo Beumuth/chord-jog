@@ -662,7 +662,7 @@ const ChordJogApp = (() => {
                     headWidth: 10,
                     headHeight: 20,
                     headNudge: 0,
-                    earWidth: 5,
+                    earWidth: 7,
                     footWidth: 4,
                     footHeight: 9},
                 IndicatorPath={
@@ -1766,9 +1766,10 @@ const ChordJogApp = (() => {
                 fileReader.addEventListener('loadend', e => {
                     shapes = mergeShapesLists(shapes, shapesFromString(e.target.result));
                     if(++numLoaded===files.length) {
-                        overwrite === true ?
-                            all = shapes :
-                            all = mergeShapesLists(all, shapes);
+                        if(overwrite !== true) {
+                            shapes = mergeShapesLists(all, shapes);}
+                        all.length = 0;
+                        all.push(...shapes);
                         saveToLocalStorage();
                         uploadCompleteListener();}
                     else {
@@ -3893,7 +3894,10 @@ const ChordJogApp = (() => {
                 .yTo(shapeChartGridMarginTop),
             generateChords=()=>{
                 const shapeIndices = [];
-                while(shapeIndices.length < numShapesSelector.selected+numChordsRange.min) {
+                const numChords = Numbers.clampUpper(
+                    numShapesSelector.selected+numChordsRange.min,
+                    Shapes.all.length)
+                while(shapeIndices.length < numChords) {
                     const chordIndex = Numbers.randomIntegerInRange(0, Shapes.all.length);
                     console.log(chordIndex);
                     if(! shapeIndices.includes(chordIndex)) {
