@@ -887,7 +887,7 @@ const ChordJogApp = (() => {
                             labelMode === LabelModes.all ? () => true :
                             labelMode === LabelModes.tens ? Module.of((
                                 indexFirstTen = indexFirstValueDivisibleByTen(range),
-                            ) => (index, nothing=console.log(index)) => 0 === (index - indexFirstTen) % 10) :
+                            ) => index => 0 === (index - indexFirstTen) % 10) :
                             labelMode === LabelModes.extrema ? Module.of((
                                 firstAndLastIndices = [0, rangeLength(range)-1]
                             ) => index => firstAndLastIndices.includes(index)) :
