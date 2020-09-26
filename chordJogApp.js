@@ -3959,6 +3959,7 @@ const ChordJogApp = (() => {
             .withChild(shapesGrid))}))
 
     const NavigationBar = Module.of((
+        activePageKey = "chord-jog-active-page",
         startY=20,
         height=24,
         marginBottom=10,
@@ -3994,7 +3995,10 @@ const ChordJogApp = (() => {
                 if(activePage !== null) {
                     application.withoutChild(activePage);}
                 application.withChild(buttonLinks[name].page);
-                activePage = buttonLinks[name].page;}
+                activePage = buttonLinks[name].page;
+
+                //Save active page to local storage
+                localStorage.setItem(activePageKey, name);}
         ) => SVG.Builder.ModularGrid
             .withX(0)
             .withY(0)
@@ -4010,6 +4014,7 @@ const ChordJogApp = (() => {
                 forApplication: function(application) {
                     this.setApplication(application);
                     return this;},
+                hasPage: name => buttonLinks[name] !== undefined,
                 addPage: function(name, page) {
                     const button = createButton(name)
                         .withClass(`${name}-button`)
@@ -4022,6 +4027,13 @@ const ChordJogApp = (() => {
                     this.addPage(page, name);
                     return this;},
                 activatePage: setActive,
+                withActivatePageInLocalStorage: function(defaultPage) {
+                    const activePage = localStorage.getItem(activePageKey);
+                    if(activePage !== null && this.hasPage(activePage)) {
+                        this.activatePage(activePage);}
+                    else {
+                        this.activatePage(defaultPage);}
+                    return this;},
                 withActivePage: function(name) {
                     setActive(name);
                     return this;}}))}));
@@ -4046,6 +4058,8 @@ const ChordJogApp = (() => {
         .disableTextSelection()
         .withChild(navigationBar)
         .withModification(function() {
-            navigationBar.forApplication(this).activatePage("Generate");}));
+            navigationBar
+                .forApplication(this)
+                .withActivatePageInLocalStorage("Generate");}));
     return {
         create: () => chordJogApp};})();
