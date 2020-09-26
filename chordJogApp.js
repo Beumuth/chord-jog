@@ -1738,15 +1738,14 @@ const ChordJogApp = (() => {
             Schema.equals(shape.schema, schema)),
         getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
         add: shape => {
-            shape.id = all.length;
             all.push(shape);
             saveToLocalStorage();},
-        update: shape => {
-            all[shape.id] = shape;
+        update: (id, shape) => {
+            all[id] = shape;
             saveToLocalStorage();},
         delete: id => {
             all.splice(id, 1);
-            Numbers.range(id, all.length).forEach(i => all[i].id = i - 1);
+            Numbers.range(id, all.length).forEach(i => all[i].id--);
             saveToLocalStorage();},
         search: schemaQuery => all.filter(shape =>undefined === shape.schema.find((stringAction, index) =>
             Module.of((
@@ -3632,11 +3631,7 @@ const ChordJogApp = (() => {
                 forEditing: shape => {
                     shapeValidations = ShapeValidations.forEditing(shape.id)
                         .concat([ShapeValidations.Builder
-                            .withFailCondition(schema =>{
-                                console.log(
-                                    Shapes.Schema.toString(Shapes.all[shape.id].schema),
-                                    Shapes.Schema.toString(schema));
-                                return Shapes.Schema.equals(schema, Shapes.all[shape.id].schema);})
+                            .withFailCondition(schema => Shapes.Schema.equals(schema, Shapes.all[shape.id].schema))
                             .withoutErrorMessage()])
                         .concat(ShapeValidations.common)
                     reset = () => Module.of((
