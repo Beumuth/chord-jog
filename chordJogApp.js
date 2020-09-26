@@ -1738,6 +1738,7 @@ const ChordJogApp = (() => {
             Schema.equals(shape.schema, schema)),
         getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
         add: shape => {
+            shape.id = all.length;
             all.push(shape);
             saveToLocalStorage();},
         update: (id, shape) => {
@@ -3668,6 +3669,7 @@ const ChordJogApp = (() => {
         shapeChartMarginTop=10,
         shapeChartGridMaxColumns=4,
         maxMatches=12,
+        pageOfShape=id=>Math.ceil((1+id)/maxMatches) - 1,
         width = shapeChartGridMaxColumns*ShapeChart.Style.width +
             (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal
     ) => ({
@@ -3679,11 +3681,11 @@ const ChordJogApp = (() => {
             shapeFilterInput=undefined,
             refreshShapesList=undefined,
             updatePageSliderRange=undefined,
-            updateMatches=()=>{
+            updateMatches=(pageNumber=pageSlider.selected)=>{
                 matches = Shapes.search(shapeFilterInput.schema);
                 updatePageSliderRange();
-                pageSlider.selected = 0;
-                refreshShapesList(pageSlider.selected);},
+                pageSlider.selected = pageNumber;
+                refreshShapesList(pageNumber);},
             ShapeItem=Module.of((
                 deleteButtonHeight=65,
                 editButtonHeight=40,
@@ -3713,7 +3715,8 @@ const ChordJogApp = (() => {
                                     .withClickListener(() => {
                                         if(true===confirm("Are you sure you want to delete this shape?")) {
                                             Shapes.delete(shape.id);
-                                            updateMatches();}})
+                                            updateMatches(
+                                                pageOfShape(shape.id < Shapes.all.length ? shape.id : shape.id - 1));}})
                                     .withModification(function() {
                                         this.label.rotateTo(270);}),
                                 SVG.Builder.ActionText
@@ -3726,7 +3729,7 @@ const ChordJogApp = (() => {
                                             .withContentSize(ShapeForm.Style.width, ShapeForm.Style.height)
                                             .withCloseCallback(() => {
                                                 shapeFilterInput.focus();
-                                                updateMatches(pageSlider.selected);}));})
+                                                updateMatches();}));})
                                     .withModification(function() {
                                         this.label.rotateTo(270);})])
                             .withClass("shape-item-buttons-container")
@@ -3866,8 +3869,8 @@ const ChordJogApp = (() => {
                 updatePageSliderRange = () => pageSlider.numberLine.range = {
                     min: 1,
                     max: Numbers.clampLower(Math.ceil(matches.length/maxMatches), 1)};
-                refreshShapesList = selectedIndex => {
-                    const startIndex = selectedIndex*maxMatches;
+                refreshShapesList = selectedPage => {
+                    const startIndex = selectedPage*maxMatches;
                     shapeChartGrid.cleared().withModules(ShapeItem.shapesToShapeItems(
                         matches.slice(startIndex, startIndex+maxMatches)));};
                 pageSlider = SVG.Builder.NumberSlider()
@@ -3879,7 +3882,7 @@ const ChordJogApp = (() => {
                         width + pageSliderMarginLeft,
                         ShapesPageTopRow.Style.endY + shapeChartMarginTop)
                     .withChangeListener(refreshShapesList);
-                updateMatches();})
+                updateMatches(0);})
         ) => SVG.Builder.G()
             .withClass("shapes-manager")
             .withChild(ShapesPageTopRow.element)
