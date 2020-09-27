@@ -3745,7 +3745,7 @@ const ChordJogApp = (() => {
                     .withWildcards()
                     .blank()
                     .focused()
-                    .withChangeListener(()=>updateMatches()),
+                    .withChangeListener(()=>updateMatches(0)),
                 shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
                     .withChild(shapeFilterInput)
