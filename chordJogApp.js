@@ -1991,40 +1991,44 @@ const ChordJogApp = (() => {
 
         //The 'skeleton' consists of the passive portion of the ShapeChart -
         //fretboard and finger indicator placeholders.
-        const SkeletonBuilder = Module.of((
-            createSkeleton=() => SVG.Builder.G()
-                .withClass("shape-chart-skeleton")
-                .withChild(SVG.Builder.G()
-                    .withClass("fingerless-indicators")
+        const SkeletonBuilder = {
+            new: () => Module.of((
+                unfingeredIndicators = SVG.Builder.G()
+                    .withClass("unfingered-indicators")
                     .withAttribute("stroke", Style.colors.medium)
                     .withChildren(Strings.all
-                        .map(string => FingerlessIndicator.Builder.forString(string).topOnly)
-                        .map(fingerIndicatorBuilder => [
-                            fingerIndicatorBuilder.open(),
-                            fingerIndicatorBuilder.dead()])
-                        .flat()))
-                .withChild(SVG.Builder.G()
-                    .withClass("fretboard")
-                    .withAttribute("stroke", Style.colors.heavy)
-                    .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
-                        .forString(string)
-                        .toFret(Frets.Relative.last)))
-                    .withChildren(Numbers.range(Frets.Relative.first, Frets.Relative.last + 2)
-                        .map(belowFret => Fretboard.FretDividerBuilder
-                            .belowFret(belowFret)
-                            .fromString(Strings.first)
-                            .toString(Strings.last))))
-        ) => ({
-            withAnyStringAction: () => createSkeleton()
-                .withChild(SVG.Builder.G()
-                    .withClass("any-string-action-indicators")
-                    .withChildren(Strings.all
-                        .map(string => FingerlessIndicator.Builder
+                    .map(string => FingerlessIndicator.Builder.forString(string).topOnly)
+                    .map(fingerIndicatorBuilder => [
+                        fingerIndicatorBuilder.open(),
+                        fingerIndicatorBuilder.dead()])
+                    .flat()),
+                anyStringActionIndicators=Strings.all.map(string => FingerlessIndicator.Builder
+                    .forString(string)
+                    .bottomOnly
+                    .withMaxActiveRelativeFret(Frets.Relative.max)
+                    .any()),
+                skeleton=SVG.Builder.G()
+                    .withClass("shape-chart-skeleton")
+                    .withChild(SVG.Builder.G()
+                        .withClass("fretboard")
+                        .withAttribute("stroke", Style.colors.heavy)
+                        .withChildren(Strings.all.map(string => Fretboard.StringLineBuilder
                             .forString(string)
-                            .bottomOnly
-                            .withMaxActiveRelativeFret(Frets.Relative.max)
-                            .any()))),
-            withoutAnyStringAction: () => createSkeleton()}));
+                            .toFret(Frets.Relative.last)))
+                        .withChildren(Numbers.range(Frets.Relative.first, Frets.Relative.last + 2)
+                            .map(belowFret => Fretboard.FretDividerBuilder
+                                .belowFret(belowFret)
+                                .fromString(Strings.first)
+                                .toString(Strings.last)))),
+                previewParam=Param.new(false).withObserver(withPreview => withPreview === true ?
+                    skeleton.withChild(unfingeredIndicators) :
+                    skeleton.withoutChild(unfingeredIndicators)),
+                anyStringActionParam=Param.new(false).withObserver(withAnyStringAction => withAnyStringAction === true ?
+                    unfingeredIndicators.withChildren(anyStringActionIndicators) :
+                    unfingeredIndicators.withoutChildren(anyStringActionIndicators))
+            ) => skeleton.withParams({
+                preview: previewParam,
+                anyStringAction: anyStringActionParam}))};
 
         //The 'meat' consists of the active portion of the ShapeChart -
         // darkened fretboard strings and finger indicators.
@@ -2118,7 +2122,7 @@ const ChordJogApp = (() => {
             RootFretLabel: {
                 Style: RootFretLabel.Style},
             Builder: Module.of((
-                buildStep = (schema, rootFret, includeAnyStringAction) => Module.of((
+                buildStep = (schema, rootFret) => Module.of((
                     shapeChartMeat = MeatBuilder.forSchema(schema),
                     rootFretLabel = rootFret === null ?
                         RootFretLabel.Builder.unfixed() :
@@ -2134,12 +2138,11 @@ const ChordJogApp = (() => {
                         get: () => value,
                         set: (rootFret) => {
                             value = rootFret;
-                            rootFretLabel.rootFret = value;}}))
+                            rootFretLabel.rootFret = value;}})),
+                    skeleton=SkeletonBuilder.new()
                 ) => SVG.Builder.G()
                     .withClass("shape-chart")
-                    .withChild(includeAnyStringAction === true ?
-                        SkeletonBuilder.withAnyStringAction() :
-                        SkeletonBuilder.withoutAnyStringAction())
+                    .withChild(skeleton)
                     .withChild(shapeChartMeat)
                     .withChild(rootFretLabel)
                     .withGetter("rootFretLabel", () => rootFretLabel)
@@ -2156,13 +2159,11 @@ const ChordJogApp = (() => {
                     .withMethod("withRootFret", function(rootFret) {
                         this.rootFret = rootFret;
                         return this;})
-                    .withRootFret(rootFret)),
-                anyStringActionStep = (schema, rootFret) => ({
-                    withAnyStringAction: () => buildStep(schema, rootFret, true),
-                    withoutAnyStringAction: () => buildStep(schema, rootFret, false)}),
+                    .withRootFret(rootFret)
+                    .withGetter("skeleton", () => skeleton)),
                 rootFretStep = schema => ({
-                    fixed: rootFret => anyStringActionStep(schema, rootFret),
-                    unfixed: () => anyStringActionStep(schema, null)})
+                    fixed: rootFret => buildStep(schema, rootFret),
+                    unfixed: () => buildStep(schema, null)})
             ) => ({
                 blank: () => rootFretStep(Shapes.Schema.allUnsounded),
                 forSchema: schema => rootFretStep(schema)}))};});
@@ -2921,13 +2922,12 @@ const ChordJogApp = (() => {
                     withAnyStringAction: () => withAnyStringActionStep(true),
                     withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
             createShapeInput=(schema, withWildcards) => Module.of((
-                shapeChart = Module.of((
-                    anyStringActionStep=ShapeChart.Builder
-                        .forSchema(schema)
-                        .unfixed()
-                ) => withWildcards === true ?
-                    anyStringActionStep.withAnyStringAction() :
-                    anyStringActionStep.withoutAnyStringAction()),
+                shapeChart = ShapeChart.Builder
+                    .forSchema(schema)
+                    .unfixed()
+                    .withModification(function() {
+                        this.skeleton.preview = true;
+                        this.skeleton.anyStringAction = withWildcards;}),
                 previewMeatContainer = SVG.Builder.G()
                     .withClass("preview-meat-container")
                     .withAttributes({
@@ -3682,6 +3682,7 @@ const ChordJogApp = (() => {
             refreshShapesList=undefined,
             updatePageSliderRange=undefined,
             updateMatches=(pageNumber=pageSlider.selected)=>{
+                console.log(pageNumber);
                 matches = Shapes.search(shapeFilterInput.schema);
                 updatePageSliderRange();
                 pageSlider.selected = pageNumber;
@@ -3737,15 +3738,14 @@ const ChordJogApp = (() => {
                         .withClass("shape-item")
                         .withChild(ShapeChart.Builder
                             .forSchema(shape.schema)
-                            .unfixed()
-                            .withoutAnyStringAction())
+                            .unfixed())
                         .withChild(buttonsContainer)))})),
             ShapesPageTopRow=Module.of((
                 setupShapeFilterInput=shapeFilterInput=ShapeInput.Builder
                     .withWildcards()
                     .blank()
                     .focused()
-                    .withChangeListener(updateMatches),
+                    .withChangeListener(()=>updateMatches()),
                 shapesFilterContainer=SVG.Builder.G()
                     .withClass("shapes-filter-container")
                     .withChild(shapeFilterInput)
@@ -3940,7 +3940,6 @@ const ChordJogApp = (() => {
                 ) => ShapeChart.Builder
                     .forSchema(shape.schema)
                     .fixed(Numbers.randomIntegerInRange(shape.range.min, shape.range.max))
-                    .withoutAnyStringAction()
                     .withModification(function() {
                         this.rootFretLabel.withAttribute("font-weight", "bold");})))},
             topRow = SVG.Builder.G()
