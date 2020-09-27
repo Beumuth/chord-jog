@@ -1326,7 +1326,6 @@ const ChordJogApp = (() => {
                         this.setChangeListener(listener);
                         return this;}}))),
             Path: () => createElement("path")
-                .withAttributes({d: null})
                 .withGetterAndSetter("d",
                     function() {return this.getAttribute("d");},
                     function(d) {this.setAttribute("d", d);})
@@ -2314,10 +2313,10 @@ const ChordJogApp = (() => {
             ) => ({
                 withRegions: regions => Module.of((
                     regionByValue=(value) => regions.find(region => region.value === value),
-                    mouseEventToClosestRegionValue = (e) => regions
+                    mouseEventToClosestRegionValue = mousePosition => regions
                         .map(region => ({
                             value: region.value,
-                            distance2: region.distance2([e.offsetX, e.offsetY])}))
+                            distance2: region.distance2(mousePosition)}))
                         .reduce((closestRegion, currentRegion) =>
                             closestRegion.distance2 <= currentRegion.distance2 ?
                                 closestRegion : currentRegion)
@@ -2341,7 +2340,7 @@ const ChordJogApp = (() => {
                                 get: () => previewIndicator.region.value,
                                 set: preview => previewIndicator.region = preview !== null ?
                                     regionByValue(preview) :
-                                    null},
+                                    null}
                         ) => SVG.Builder.G()
                             .withClass("finger-input")
                             .withChild(SVG.Builder.Path() //hand-outline
@@ -2586,10 +2585,16 @@ const ChordJogApp = (() => {
                             .withChild(SVG.Builder.MouseTrap
                                 .withDimensions(0, 0, FingerInputStyle.baseWidth, FingerInputStyle.baseHeight)
                                 .withClass("finger-input-mouse-trap")
-                                .withEventListeners({
-                                    mouseMove: e => Preview.set(mouseEventToClosestRegionValue(e)),
-                                    mouseDown: e => Selected.set(mouseEventToClosestRegionValue(e)),
-                                    mouseLeave: () => Preview.set(null)}))
+                                .withModification(function() {
+                                    const mouseTrap = this;
+                                    const getMousePosition=e=>MouseEvents.relativeMousePosition(e, mouseTrap)
+                                        .map(x => x / FingerInputStyle.scale);
+                                    this.withEventListeners({
+                                        mouseMove: e => Preview.set(
+                                            mouseEventToClosestRegionValue(getMousePosition(e))),
+                                        mouseDown: e =>Selected.set(
+                                            mouseEventToClosestRegionValue(getMousePosition(e))),
+                                        mouseLeave: () => Preview.set(null)});}))
                             .withGetterAndSetter("selected", Selected.get, Selected.set)
                             .withSetter("changeListener", Selected.setChangeListener)
                             .withMethod("withChangeListener", function(listener) {
@@ -2827,9 +2832,10 @@ const ChordJogApp = (() => {
                             activeFinger: activeFingerGetter(),
                             dragAction: dragAction
                         }),
-                        createMouseEventListeners = stateToSchemaChangeMapper => Module.of((
+                        createMouseEventListeners = (stateToSchemaChangeMapper, container)  => Module.of((
+                            relativeMousePosition = e => MouseEvents.relativeMousePosition(e, container),
                             mouseEventToSchemaChange = e => stateToSchemaChangeMapper(
-                                mousePositionToState([e.offsetX, e.offsetY]))
+                                mousePositionToState(relativeMousePosition(e)))
                         ) => ({
                             mouseenter: function(e) {
                                 currentMouseTrap = this;
@@ -2839,7 +2845,7 @@ const ChordJogApp = (() => {
                                 else {
                                     Preview.set(schema);}},
                             mousemove: e => {
-                                previousMousePosition = [e.offsetX, e.offsetY];
+                                previousMousePosition = relativeMousePosition(e);
                                 const schema = mouseEventToSchemaChange(e).schema;
                                 if(dragAction !== null) {
                                     Schema.set(schema, false);}
@@ -2879,8 +2885,10 @@ const ChordJogApp = (() => {
                                     ShapeChart.FingerlessIndicator.Style.margin +
                                     FingerlessIndicators.Style.padding.vertical)
                             .withClass("fingerless-indicators-mouse-trap")
-                            .withEventListeners(createMouseEventListeners(
-                                FingerlessIndicators.mouseTrapStateToSchemaChange)),
+                            .withModification(function() {
+                                this.withEventListeners(createMouseEventListeners(
+                                    FingerlessIndicators.mouseTrapStateToSchemaChange,
+                                    this));}),
                         fretboardMouseTrap=SVG.Builder.MouseTrap
                             .withDimensions(
                                 ShapeChart.Fretboard.Style.x - Fretboard.Style.padding,
@@ -2888,8 +2896,10 @@ const ChordJogApp = (() => {
                                 ShapeChart.Fretboard.Style.width + 2 * Fretboard.Style.padding,
                                 ShapeChart.Fretboard.Style.height + Fretboard.Style.padding)
                             .withClass("fretboard-mouse-trap")
-                            .withEventListeners(createMouseEventListeners(
-                                Fretboard.mouseTrapStateToSchemaChange)),
+                            .withModification(function() {
+                                this.withEventListeners(createMouseEventListeners(
+                                    Fretboard.mouseTrapStateToSchemaChange,
+                                    this));}),
                         shapeInputMouseTraps=SVG.Builder.G()
                             .withClass("shape-input-mouse-traps")
                             .withChild(fingerlessIndicatorMouseTrap)
@@ -2916,8 +2926,10 @@ const ChordJogApp = (() => {
                                         ShapeChart.FingerlessIndicator.Style.margin +
                                         AnyStringAction.Style.padding.vertical)
                                 .withClass("fingerless-indicators-mouse-trap")
-                                .withEventListeners(createMouseEventListeners(
-                                    AnyStringAction.mouseTrapStateToSchemaChange))))
+                                .withModification(function() {
+                                    this.withEventListeners(createMouseEventListeners(
+                                        AnyStringAction.mouseTrapStateToSchemaChange,
+                                        this));})))
                 ) => ({
                     withAnyStringAction: () => withAnyStringActionStep(true),
                     withoutAnyStringAction: () => withAnyStringActionStep(false)}))})})})),
@@ -3682,7 +3694,6 @@ const ChordJogApp = (() => {
             refreshShapesList=undefined,
             updatePageSliderRange=undefined,
             updateMatches=(pageNumber=pageSlider.selected)=>{
-                console.log(pageNumber);
                 matches = Shapes.search(shapeFilterInput.schema);
                 updatePageSliderRange();
                 pageSlider.selected = pageNumber;
