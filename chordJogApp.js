@@ -3498,8 +3498,8 @@ const ChordJogApp = (() => {
                 ShapeValidations = Module.of((
                     ShapeValidationBuilder={
                         withFailCondition: conditional => Module.of((
-                            createValidation=errorMessage=>(schema, fingerActions) =>
-                                conditional(schema, fingerActions) === true ? errorMessage : null
+                            createValidation=errorMessage=>(schema, fingerActions, rootFretRange) =>
+                                conditional(schema, fingerActions, rootFretRange) === true ? errorMessage : null
                         ) => ({
                             withErrorMessage: createValidation,
                             withoutErrorMessage: () => createValidation("")}))}
@@ -3592,7 +3592,7 @@ const ChordJogApp = (() => {
                         reset();
                         output.textContent = "Saved";})
                     .withClass("shape-form-save-button"),
-                schemaChangeListener=Module.of((
+                doValidations=Module.of((
                     invalidSaveButtonEventListeners = {
                         mouseEnter: function() {
                             output.withAttribute("text-decoration", "underline"); },
@@ -3604,10 +3604,12 @@ const ChordJogApp = (() => {
                     validate=() => {
                         output.textContent = null;
                         saveButton.withoutEventListeners(invalidSaveButtonEventListeners).enable();}
-                ) => newSchema => {
-                    const fingerActions=Shapes.Schema.getFingerActions(newSchema);
+                ) => () => {
+                    const schema = shapeInput.schema;
+                    const fingerActions=Shapes.Schema.getFingerActions(schema);
+                    const rootFretRange = rootFretRangeInput.range;
                     for(const validation of shapeValidations) {
-                        const errorReason = validation(newSchema, fingerActions);
+                        const errorReason = validation(schema, fingerActions, rootFretRange);
                         if(errorReason !== null) {
                             return invalidate(errorReason);}}
                     validate();}),
@@ -3616,13 +3618,14 @@ const ChordJogApp = (() => {
                         .withoutWildcards()
                         .withSchema(schema)
                         .focused()
-                        .withChangeListener(schemaChangeListener),
+                        .withChangeListener(doValidations),
                     setRootFretRangeInput=rootFretRangeInput=Module.of((
                         padding=8
                     ) => RootFretRangeInput.Builder
                         .withRange(range)
                         .withWidth(ShapeFormStyle.width - 2 * padding)
-                        .move(padding, ShapeFormStyle.RootFretRange.y)),
+                        .move(padding, ShapeFormStyle.RootFretRange.y)
+                        .withChangeListener(doValidations)),
                     shapeForm=SVG.Builder.G()
                         .withClass("shape-form")
                         .withChild(shapeInput)
@@ -3638,13 +3641,16 @@ const ChordJogApp = (() => {
                             .withClass("shape-form-reset-button"))
                         .withChild(saveButton)
                         .withChild(output),
-                    firstSchemaChange=schemaChangeListener(schema)
+                    firstValidation=doValidations()
                 ) => shapeForm)
             ) => ({
                 forEditing: shape => {
                     shapeValidations = ShapeValidations.forEditing(shape.id)
                         .concat([ShapeValidations.Builder
-                            .withFailCondition(schema => Shapes.Schema.equals(schema, Shapes.all[shape.id].schema))
+                            .withFailCondition((schema, fingerActions, rootFretRange) => Module.of((
+                                currentShape=Shapes.all[shape.id]
+                            ) => Shapes.Schema.equals(schema, currentShape.schema) &&
+                                Frets.Range.equals(rootFretRange, currentShape.range)))
                             .withoutErrorMessage()])
                         .concat(ShapeValidations.common)
                     reset = () => Module.of((
@@ -3657,7 +3663,7 @@ const ChordJogApp = (() => {
                             .withId(shape.id)
                             .withSchema(shapeInput.schema)
                             .withRange(rootFretRangeInput.range));
-                        schemaChangeListener(shapeInput.schema);};
+                        doValidations();};
                     return shapeFormWithSchemaAndRange(shape.schema, shape.range);},
                 forCreation: () => {
                     shapeValidations = ShapeValidations.forCreation
