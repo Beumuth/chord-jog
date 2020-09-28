@@ -1740,8 +1740,8 @@ const ChordJogApp = (() => {
             shape.id = all.length;
             all.push(shape);
             saveToLocalStorage();},
-        update: (id, shape) => {
-            all[id] = shape;
+        update: shape => {
+            all[shape.id] = shape;
             saveToLocalStorage();},
         delete: id => {
             all.splice(id, 1);
