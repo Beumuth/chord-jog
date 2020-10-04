@@ -2769,15 +2769,29 @@ const ChordJogApp = (() => {
                             //Is there an existing finger action with the same finger and fret?
                             if(targetFingerAndFretActions.length > 0) {
                                 //Yes. Fill the gap with the substitute action.
+                                const minExtendedString = Math.min(targetString, targetFingerAndFretActions[0].string);
+                                const maxExtendedString = Math.max(
+                                    targetString,
+                                    Arrays.last(targetFingerAndFretActions).string);
                                 Numbers
                                     .range(
                                         1 + (
                                             targetString < targetFingerAndFretActions[0].string ?
                                                 targetString :
                                                 Arrays.last(targetFingerAndFretActions).string),
-                                        targetString > Arrays.last(targetFingerAndFretActions).string ?
-                                            targetString :
-                                            targetFingerAndFretActions[0].string)
+                                        1 + (
+                                            targetString > Arrays.last(targetFingerAndFretActions).string ?
+                                                targetString :
+                                                targetFingerAndFretActions[0].string))
+                                    .filter(string => {
+                                        //Do not replace fingered string actions that are not at one of the ends
+                                        //of the finger bar and with a different finger and higher fret
+                                        const stringAction = schema[string - 1];
+                                        return string === minExtendedString ||
+                                            string === maxExtendedString ||
+                                            Shapes.StringAction.isFingerless(stringAction) ||
+                                            stringAction.finger === substituteStringAction.finger ||
+                                            stringAction.fret <= substituteStringAction.fret;})
                                     .forEach(string => schema[string - 1] = substituteStringAction);}}
                         //Finally, substitute for the targetString itself.
                         schema[targetString - 1] = substituteStringAction;
