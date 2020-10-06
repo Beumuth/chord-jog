@@ -862,13 +862,18 @@ const ChordJogApp = (() => {
                     ) => index > range.max ? undefined : index)
                 ) => ({
                     LabelAutoMode: Module.of((
-                        lengthPerCharacter=12,
-                        valueLength=x=>`${x}`.length*lengthPerCharacter
+                        characterWidth=12,
+                        characterHeight=13,
+                        valueWidth=x=>`${x}`.length*characterWidth
                     ) => ({
                         withLineLength: lineLength => ({
-                        withRange: range => Module.of((
+                        withRange: range => ({
+                        withTangent: tangent => Module.of((
                             lengthOfRange = rangeLength(range),
-                            valueLengths=Numbers.range(range.min, range.max+1).map(valueLength),
+                            valueLengths=Numbers.range(range.min, range.max+1).map(i=>
+                                Vector.length(Vector.project(
+                                    [valueWidth(i), characterHeight],
+                                    tangent))),
                             indexFirstTen = indexFirstValueDivisibleByTen(range)
                         ) =>
                             lineLength < .5*(valueLengths[0] + valueLengths[lengthOfRange-1]) ? LabelModes.none :
@@ -876,7 +881,7 @@ const ChordJogApp = (() => {
                             lineLength > valueLengths
                                 .filter((valueLength, index) => 0 === (index - indexFirstTen)%10)
                                 .reduce((sumTensLabels, current) => sumTensLabels + current, 0) ? LabelModes.tens :
-                            LabelModes.extrema)})})),
+                            LabelModes.extrema)})})})),
                     LabelsPosition: {
                         withNormal: normal => ({
                         withTickLength: tickLength => ({
@@ -908,6 +913,8 @@ const ChordJogApp = (() => {
                                 (line[1]-line[0] < 0 ? 1 : -1) *
                                 (Math.abs(Vector.slope(line)) < 1 ? 1 : -1) *
                                 (labelOrientation === LabelOrientations.front ? -1 : 1)))})},
+                    Tangent: {
+                        withNormal: normal => [normal[1], -normal[0]]},
                     TickAutoMode: {
                         withRange: range => ({
                         withLineLength: lineLength => Module.of((
@@ -956,10 +963,12 @@ const ChordJogApp = (() => {
                     defaultNormal=Calculators.Normal
                         .withLine(defaultLine)
                         .withLabelOrientation(defaults.labelOrientation),
+                    defaultTangent=Calculators.Tangent.withNormal(defaultNormal),
                     defaultLineLength=Calculators.LineLength.withLine(defaultLine),
                     defaultLabelAutoMode=Calculators.LabelAutoMode
                         .withLineLength(defaultLineLength)
-                        .withRange(defaults.range),
+                        .withRange(defaults.range)
+                        .withTangent(defaultTangent),
                     defaultRangeLength=Calculators.RangeLength.withRange(defaults.range),
                     defaultTickAutoMode=Calculators.TickAutoMode
                         .withRange(defaults.range)
@@ -1013,7 +1022,8 @@ const ChordJogApp = (() => {
                             undefined :
                             Calculators.LabelAutoMode
                                 .withLineLength(numberLine.lineLength)
-                                .withRange(numberLine.range);
+                                .withRange(numberLine.range)
+                                .withTangent(numberLine.tangent);
                     const updateTickAutoMode = () => numberLine.tickAutoMode =
                         numberLine.tickMode !== TickModes.auto ?
                             undefined :
@@ -1108,7 +1118,7 @@ const ChordJogApp = (() => {
                         .withChild(baseline)
                         .withChild(labelGroupsContainer)
                         .withGetters({
-                            tangent: () => [numberLine.normal[1], -numberLine.normal[0]],
+                            tangent: () => Calculators.Tangent.withNormal(numberLine.normal),
                             baseline: () => baseline,
                             labelGroups: () => labelGroups,
                             ticks: () => labelGroups.map(labelGroup=>labelGroup.tick),
