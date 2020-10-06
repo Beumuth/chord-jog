@@ -1103,6 +1103,7 @@ const ChordJogApp = (() => {
                                 updateLabelAutoMode,
                                 updateTickAutoMode,
                                 updateTickEnds,
+                                updateLabelVisibilities,
                                 recreateLabelGroups])})
                         .withChild(baseline)
                         .withChild(labelGroupsContainer)
