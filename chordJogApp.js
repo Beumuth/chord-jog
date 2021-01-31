@@ -1731,19 +1731,26 @@ const ChordJogApp = (() => {
             .map(shape =>`${Schema.toString(shape.schema)};${shape.range.min},${shape.range.max}`)
             .join("\r\n"),
         localStorageKey = "chord-jog-shapes",
+        shapesLibraryUrl = "https://raw.githubusercontent.com/Beumuth/chord-jog/0.3.0/library.shapes",
         all = Module.of(() => {
-            const shapeString = localStorage.getItem(localStorageKey);
-            return shapeString === null || shapeString.length === 0 ?
-                [] : shapesFromString(shapeString);}),
+            const shapesString = localStorage.getItem(localStorageKey);
+            return shapesString !== null && shapesString.length > 0 ? shapesFromString(shapesString) : [];}),
         saveToLocalStorage = () => localStorage.setItem(
             localStorageKey,
-            shapesToString(all))
+            shapesToString(all)),
+        replaceAll = shapes => {
+            all.length = 0;
+            all.push(...shapes);
+            saveToLocalStorage();}
     ) => ({
         StringAction: StringAction,
         FingerAction: FingerAction,
         Schema: Schema,
         Builder: ShapesBuilder,
         all: all,
+        downloadStandardLibrary: () => fetch(shapesLibraryUrl)
+            .then(response => response.ok ? response.text() : "")
+            .then(shapesFromString),
         existsWithSchema: schema => all.some(shape =>
             Schema.equals(shape.schema, schema)),
         getWithSchema: schema => all.find(shape => Schema.equals(shape.schema, schema)),
@@ -1762,6 +1769,7 @@ const ChordJogApp = (() => {
             Module.of((
                 stringActionQuery=schemaQuery[index]
             ) => ! StringAction.matches(stringAction, stringActionQuery)))),
+        replaceAll: replaceAll,
         download: () => {
             //Convert the shapes to a text string and open in a new tab
             const tempLink = document.createElement('a');
@@ -1794,9 +1802,7 @@ const ChordJogApp = (() => {
                     if(++numLoaded===files.length) {
                         if(overwrite !== true) {
                             shapes = mergeShapesLists(all, shapes);}
-                        all.length = 0;
-                        all.push(...shapes);
-                        saveToLocalStorage();
+                        replaceAll(shapes);
                         uploadCompleteListener();}
                     else {
                         readNext();}});
@@ -3927,6 +3933,7 @@ const ChordJogApp = (() => {
                 updateMatches(0);})
         ) => SVG.Builder.G()
             .withClass("shapes-manager")
+            .withMethod("refresh", ()=>updateMatches())
             .withChild(ShapesPageTopRow.element)
             .withChild(pageSlider)
             .withChild(shapeChartGrid))}));
@@ -3950,7 +3957,8 @@ const ChordJogApp = (() => {
         numChordsSelectorWidth = (3/4) * shapeChartGridWidth -
             ShapeChart.Fretboard.Style.x -
             ShapeChart.FingerIndicator.Style.radius,
-        topRowMarginTop = 35
+        topRowMarginTop = 35,
+        numChordsKey = "chord-jog-num-chords"
     ) => ({
         new: () => Module.of((
             numShapesSelector = SVG.Builder.NumberSlider()
@@ -3959,7 +3967,10 @@ const ChordJogApp = (() => {
                     this.numberLine
                         .withEnd([numChordsSelectorWidth, 0])
                         .withRange(numChordsRange)})
-                .withSelected(defaultNumChords-numChordsRange.min),
+                .withSelected(Module.of((
+                    savedNumChords = localStorage.getItem(numChordsKey)
+                ) => savedNumChords !== null ? Number.parseInt(savedNumChords) : defaultNumChords-numChordsRange.min))
+                .withChangeListener(numChords => localStorage.setItem(numChordsKey, numChords)),
             shapesGrid = SVG.Builder.ModularGrid
                 .withX(0).withY(0)
                 .withWidth(shapeChartGridWidth)
@@ -3996,6 +4007,7 @@ const ChordJogApp = (() => {
             initialize=generateChords()
         ) => SVG.Builder.G()
             .withClass("shapes-generator")
+            .withMethod("regenerate", generateChords)
             .withChild(topRow)
             .withChild(shapesGrid))}))
 
@@ -4020,8 +4032,10 @@ const ChordJogApp = (() => {
         new: () => Module.of((
             application=undefined,
             activeButton=null,
-            activePage=null,
+            activePageName=null,
             buttonLinks = {},
+            getPage=name=>buttonLinks[name].page,
+            getActivePage=()=>getPage(activePageName),
             setActive=name=>{
                 //Toggle active button
                 if(activeButton !== null) {
@@ -4033,10 +4047,10 @@ const ChordJogApp = (() => {
                     this.mouseTrap.disable();});
 
                 //Toggle active page
-                if(activePage !== null) {
-                    application.withoutChild(activePage);}
-                application.withChild(buttonLinks[name].page);
-                activePage = buttonLinks[name].page;
+                if(activePageName !== null) {
+                    application.withoutChild(getActivePage());}
+                application.withChild(getPage(name));
+                activePageName = name;
 
                 //Save active page to local storage
                 localStorage.setItem(activePageKey, name);}
@@ -4101,6 +4115,12 @@ const ChordJogApp = (() => {
         .withModification(function() {
             navigationBar
                 .forApplication(this)
-                .withActivatePageInLocalStorage("Generate");}));
+                .withActivatePageInLocalStorage("Generate");})
+        .withModification(() => Shapes.all.length === 0 ?
+            Shapes.downloadStandardLibrary().then(shapes => {
+                Shapes.replaceAll(shapes);
+                pages.Generate.regenerate();
+                pages.Manage.refresh();}) :
+            undefined));
     return {
         create: () => chordJogApp};})();
