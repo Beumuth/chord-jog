@@ -3482,7 +3482,7 @@ const ChordJogApp = (() => {
                 y: ShapeChart.Style.height + marginTop,
                 marginTop: marginTop})),
             ButtonsStyle=Module.of((
-                buttonsMarginTop = 10,
+                buttonsMarginTop = 0,
                 buttonsWidth = width / (2 + 3 / Numbers.goldenRatio),
                 buttonsHeight = buttonsWidth / Numbers.goldenRatio,
                 buttonsStartX = 0,
@@ -3494,7 +3494,7 @@ const ChordJogApp = (() => {
                 y: buttonsY,
                 height: buttonsHeight,
                 spacing: buttonsWidth / Numbers.goldenRatio})),
-            ErrorMessageStyle=Module.of((marginTop = 6) => ({
+            ErrorMessageStyle=Module.of((marginTop = 12) => ({
                 x: .5 * width,
                 y: ButtonsStyle.y + ButtonsStyle.height + marginTop,
                 height: 15, //hardcoded
