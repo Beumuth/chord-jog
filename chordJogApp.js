@@ -4067,12 +4067,12 @@ const ChordJogApp = (() => {
         ) => Objects.withMethods(
             SVG.Builder(
                 SVG.Compositions.ModularGrid({
-                    width: Style.width,
+                    width: Style.width - .5 * moduleWidth,
                     moduleWidth: moduleWidth,
                     moduleHeight: height,
                     padding: padding}))
                 .withClass("navigation-bar")
-                .yTo(startY)
+                .moveTo(.5*moduleWidth, startY)
                 .build(),
             {
                 setApplication: app => application = app,
@@ -4088,7 +4088,7 @@ const ChordJogApp = (() => {
                             height: height,
                             clickListener: () => setActive(name)}),
                         function() {
-                            SVG.leftAlign(SVG.withFontSize(this.label, fontSize));});
+                            SVG.withFontSize(this.label, fontSize);});
                     buttonLinks[name] = {
                         button: button,
                         page: page };
