@@ -1266,8 +1266,7 @@ const ChordJogApp = (() => {
                         fontSize: 16,
                         changeListener: Functions.noop,
                         cellSize: 25,
-                        digitLabelsMargin: 5,
-                        selectionLabelMargin: 5}
+                        labelMargin: 5}
                 ) => Objects.Builder((optionsArg={}) =>
                     Module.of((
                         options=Objects.withDefaults(optionsArg, defaults),
@@ -1276,26 +1275,17 @@ const ChordJogApp = (() => {
                         numDigits = x => x === 0 ? 1 : 1+Math.floor(Math.log10(x)),
                         digitLabels = () => Numbers.range(0, 10)
                             .map(i => SVG.Builder(SVG.Text(i))
-                                .moveTo((.5+i) * options.cellSize, -options.digitLabelsMargin)
+                                .moveTo((.5+i) * options.cellSize, -options.labelMargin)
                                 .centerAlign()
                                 .topAlign()
                                 .build()),
                         digitLabelContainer = SVG.Builder(SVG.G())
                             .withChildren(...digitLabels())
                             .build(),
-                        selectionLabelPosition = () => [
-                            options.cellSize * 10 + options.selectionLabelMargin,
-                            .5 * numDigits(options.max) * options.cellSize,],
-                        selectionLabel = SVG.Builder(SVG.Text(options.initial??options.min))
-                            .centerAlign()
-                            .bottomAlign()
-                            .moveTo(...selectionLabelPosition())
-                            .rotateTo(-90)
-                            .build(),
                         cellGridWidth = () => 10 * options.cellSize,
                         cellGrid = Module.of((
-                            indexToDigitValue=i=>[Math.floor(i/10), i%10],
-                            digitValueToIndex=(digit,value)=>digit*10+value,
+                            indexToDigitValue=i=>[numDigits(options.max) - Math.floor(i/10) - 1, i%10],
+                            digitValueToIndex=(digit,value)=>10*(numDigits(options.max)-digit-1)+value,
                             createCells=() => Numbers
                                 .range(0, 10*numDigits(options.max), 1)
                                 .map(i => Module.of((digitValue = indexToDigitValue(i)) => SVG.withAttributes(
@@ -1348,7 +1338,7 @@ const ChordJogApp = (() => {
                                 disable: function(digit, value) {
                                     SVG.Compositions.MouseRegion.disable(
                                         SVG.Builder(this.modules[digitValueToIndex(digit, value)])
-                                            .withFill(Style.colors.medium)
+                                            .withFill(Style.colors.light)
                                             .withStrokeWidth(1)
                                             .build());},
                                 enableDisableAll: () => {
@@ -1411,7 +1401,6 @@ const ChordJogApp = (() => {
                             selectedNumber = null,
                             render = () => {
                                 SVG.withChildren(SVG.clearChildren(digitLabelContainer), ...digitLabels());
-                                SVG.moveTo(selectionLabel, ...selectionLabelPosition());
                                 cellGrid.resetCells();
                                 cellGrid.enableDisableAll();
                                 Numbers.range(0, numDigits(options.max))
@@ -1430,7 +1419,6 @@ const ChordJogApp = (() => {
                                 number = Numbers.clamp(number, options.min, options.max);
                                 if(number !== selectedNumber && number >= options.min && number <= options.max) {
                                     selectedNumber = number;
-                                    selectionLabel.textContent = selectedNumber;
                                     render();
                                     changeListener(selectedNumber);}},
                             rerender: render})),
@@ -1438,7 +1426,7 @@ const ChordJogApp = (() => {
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
                             .withClass("number-by-digit-input")
-                            .withChildren(digitLabelContainer, cellGrid, selectionLabel)
+                            .withChildren(digitLabelContainer, cellGrid)
                             .withFontSize(options.fontSize)
                             .build())
                         .withGettersAndSetters({
@@ -3931,12 +3919,13 @@ const ChordJogApp = (() => {
 
     const ShapesGenerator = Module.of((
         defaultNumChords=6,
+        numShapesInputCellSize=25,
         numChordsRange = {
             min: 1,
             max: 12},
         generateButtonSize={
             width: ShapeChart.Fretboard.Style.width,
-            height: 30},
+            height: 2*numShapesInputCellSize},
         shapeChartGridMarginTop = 90,
         shapeChartGridPadding= {
             horizontal: 10,
@@ -3945,7 +3934,6 @@ const ChordJogApp = (() => {
         shapeChartGridWidth = shapeChartGridMaxColumns * (ShapeChart.Style.width + shapeChartGridPadding.horizontal) -
             shapeChartGridPadding.horizontal,
         topRowMarginTop = 20,
-        numShapesInputCellSize=25,
         generateButtonMarginRight=15,
         numChordsKey = "chord-jog-num-chords"
     ) => ({
@@ -3987,13 +3975,11 @@ const ChordJogApp = (() => {
                 .withClass("num-shapes-row")
                 .withChild(SVG.Builder(SVG.G())
                     .withClass("num-shapes-row-content")
-                    .withChild(SVG.yTo(
-                        SVG.Compositions.TextButton({
-                            text: "Generate",
-                            width: generateButtonSize.width,
-                            height: generateButtonSize.height,
-                            clickListener: generateChords}),
-                        .5*numShapesInputCellSize))
+                    .withChild(SVG.Compositions.TextButton({
+                        text: "Generate",
+                        width: generateButtonSize.width,
+                        height: generateButtonSize.height,
+                        clickListener: generateChords}))
                     .withChild(numShapesInput)
                     .xTo(.5 * (Style.width - (
                         generateButtonSize.width +
@@ -4077,7 +4063,7 @@ const ChordJogApp = (() => {
                             height: height,
                             clickListener: () => setActive(name)}),
                         function() {
-                            SVG.withFontSize(this.label, fontSize);});
+                            SVG.leftAlign(SVG.withFontSize(this.label, fontSize));});
                     buttonLinks[name] = {
                         button: button,
                         page: page };
