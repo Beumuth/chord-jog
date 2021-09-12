@@ -1549,12 +1549,14 @@ const ChordJogApp = (() => {
                             return textButton;},
                         enable: textButton => SVG.Builder(textButton)
                             .withCursor(SVG.Attributes.Presentation.Cursor.pointer)
+                            .withPointerEvents("none")
                             .withModification(function(){
                                 SVG.withTextDecoration(this.label, "none");
                                 SVG.Compositions.MouseRegion.enable(this.mouseRegion);})
                             .build(),
                         disable: textButton => SVG.Builder(textButton)
                             .withCursor("not-allowed")
+                            .withPointerEvents("fill")
                             .withModification(function(){
                                 SVG.withTextDecoration(this.label, "line-through");
                                 SVG.Compositions.MouseRegion.disable(this.mouseRegion);})
