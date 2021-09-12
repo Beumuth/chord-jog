@@ -1261,6 +1261,7 @@ const ChordJogApp = (() => {
                 NumberByDigitInput: Module.of((
                     defaults = {
                         initial: null,
+                        enabled: true,
                         min: 0,
                         max: 100,
                         fontSize: 16,
@@ -1341,7 +1342,10 @@ const ChordJogApp = (() => {
                                             .withFill(Style.colors.light)
                                             .withStrokeWidth(1)
                                             .build());},
-                                enableDisableAll: () => {
+                                enableDisableAll: function() {
+                                    if(options.enabled === false) {
+                                        return Numbers.range(0, this.modules.length)
+                                            .forEach(i=>this.disable(...indexToDigitValue(i)));}
                                     const digits = numDigits(options.max);
                                     const mins = [];
                                     const maxes = [];
@@ -1368,7 +1372,7 @@ const ChordJogApp = (() => {
                                                 digits-i-1
                                             ) !== (
                                                 digitMax = Numbers.digitValue(options.max, digits-i-1));}
-                                        Arrays.insertFirst(mins, digitMin);;
+                                        Arrays.insertFirst(mins, digitMin);
                                         Arrays.insertFirst(maxes, digitMax);});
                                     Numbers
                                         .range(0, digits)
@@ -1376,12 +1380,12 @@ const ChordJogApp = (() => {
                                             //Enable values for this digit
                                             Numbers
                                                 .range(mins[digit], maxes[digit]+1)
-                                                .forEach(value => cellGrid.enable(digit, value));
+                                                .forEach(value => this.enable(digit, value));
                                             //Disable values for this digit
                                             Numbers
                                                 .range(0, mins[digit])
                                                 .concat(Numbers.range(maxes[digit]+1, 10))
-                                                .forEach(value => cellGrid.disable(digit, value));});}})),
+                                                .forEach(value => this.disable(digit, value));});}})),
                         Preview = Module.of((digit=null, value=null) => ({
                             set: (newDigit, newValue) => {
                                 if(newDigit === digit && newValue === value) {
@@ -1399,13 +1403,14 @@ const ChordJogApp = (() => {
                             unset: () => Preview.set(null, null)})),
                         Selection = Module.of((
                             selectedNumber = null,
-                            render = () => {
+                            fullRender = () => {
                                 SVG.withChildren(SVG.clearChildren(digitLabelContainer), ...digitLabels());
                                 cellGrid.resetCells();
                                 cellGrid.enableDisableAll();
-                                Numbers.range(0, numDigits(options.max))
-                                    .map(digit=>Numbers.digitValue(selectedNumber, digit))
-                                    .forEach((value, digit)=> cellGrid.select(digit, value));}
+                                if(selectedNumber !== null && options.enabled === true) {
+                                    Numbers.range(0, numDigits(options.max))
+                                        .map(digit=>Numbers.digitValue(selectedNumber, digit))
+                                        .forEach((value, digit)=> cellGrid.select(digit, value));}}
                         ) => ({
                             get: () => selectedNumber,
                             setDigit: (digit, value) => {
@@ -1419,9 +1424,9 @@ const ChordJogApp = (() => {
                                 number = Numbers.clamp(number, options.min, options.max);
                                 if(number !== selectedNumber && number >= options.min && number <= options.max) {
                                     selectedNumber = number;
-                                    render();
+                                    fullRender();
                                     changeListener(selectedNumber);}},
-                            rerender: render})),
+                            rerender: fullRender})),
                         initialize=Selection.set(options.initial??options.min)
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
@@ -1433,6 +1438,13 @@ const ChordJogApp = (() => {
                             changeListener: {
                                 get: () => changeListener,
                                 set: f => changeListener = f },
+                            enabled: {
+                                get: () => options.enabled,
+                                set: enabled => {
+                                    if(enabled === options.enabled) return;
+                                    options.enabled = enabled;
+                                    cellGrid.enableDisableAll();
+                                    Selection.rerender();}},
                             value: {
                                 get: () => Selection.get(),
                                 set: Selection.set},
@@ -1440,7 +1452,6 @@ const ChordJogApp = (() => {
                                 get: () => options.min,
                                 set: min => min === options.min ? undefined : (
                                     options.min = min,
-                                    cellGrid.enableDisableAll(),
                                     Selection.get() < options.min ?
                                         Selection.set(options.min) :
                                         cellGrid.enableDisableAll())},
@@ -1470,6 +1481,12 @@ const ChordJogApp = (() => {
                             return input;},
                         withMax: (input, max) => {
                             input.max = max;
+                            return input;},
+                        enable: input => {
+                            input.enabled = true;
+                            return input;},
+                        disable: input => {
+                            input.enabled = false;
                             return input;}})
                     .withBuilder()
                     .build()),
@@ -3710,14 +3727,20 @@ const ChordJogApp = (() => {
                         matches.slice(startIndex, startIndex+maxMatches)));},
             pageSliderMax = () => Numbers.clampLower(Math.ceil(matches.length/maxMatches)-1,0),
             updatePageInputRange=() => {
-                pageInput.max = pageSliderMax();
+                if(matches.length === 0) {
+                    pageInput.max = 0;
+                    pageInput.enabled = false;}
+                else {
+                    pageInput.enabled = true;
+                    pageInput.max = pageSliderMax();}
                 SVG.yTo(shapeChartGrid,
                     ShapesPageTopRow.Style.endY + shapeChartMarginTop + pageInputMarginTop +
                     Numbers.clampLower(pageInput.max.toString().length, 1)*pageInputCellSize);},
             updateMatches=(pageNumber=pageInput.selected)=>{
                 matches = Shape.search(shapeFilterInput.schema);
                 updatePageInputRange();
-                pageInput.selected = pageNumber;
+                //if(matches.length > 0) {
+                    pageInput.selected = pageNumber;//}
                 refreshShapesList(pageNumber);},
             ShapeItem=Module.of((
                 deleteButtonWidth=65,
@@ -3794,7 +3817,9 @@ const ChordJogApp = (() => {
                             text: "reset",
                             width: filterLabelWidth,
                             height: filterLabelHeight,
-                            clickListener: () => shapeFilterInput.schema = Shape.Schema.allAnyStringAction()}))
+                            clickListener: () => {
+                                shapeFilterInput.schema = Shape.Schema.allAnyStringAction();
+                                pageInput.value = 0;}}))
                         .withClass("filter-button")
                         .moveTo(...filterLabelPosition)
                         .withModification(function(){
