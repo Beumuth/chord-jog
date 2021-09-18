@@ -265,7 +265,8 @@ const ChordJogApp = (() => {
             Builder: builderize(Objects),
             builderize: builderize,
             isNil: Module.of((nils = [null, undefined]) =>
-                object => nils.includes(object))}));
+                object => nils.includes(object)),
+            sameKeyValues: (...keys) => Object.fromEntries(keys.map(key => [key, key]))}));
 
     const Numbers = {
         goldenRatio: (1+Math.sqrt(5))/2,
@@ -973,109 +974,138 @@ const ChordJogApp = (() => {
                     .withBuilder()
                     .build()),
                 /**
-                 * A container for arranging elements in a grid. Properties of instances include:
-                 *     modules
-                 *     --of the container
-                 *         width
-                 *         height
-                 *     --of each module
-                 *         moduleWidth
-                 *         moduleHeight
-                 *     --between each module
-                 *         horizontalPadding
-                 *         verticalPadding
+                 * A container for arranging elements in a grid.
                  */
                 ModularGrid: Module.of((
-                    defaults = {
+                    Alignment= {
+                        Horizontal: Objects.sameKeyValues("left", "center", "right"),
+                        Vertical: Objects.sameKeyValues("top", "center", "bottom")},
+                    Overflow= Objects.sameKeyValues("left", "center", "right"),
+                    defaults= {
                         modules: [],
-                        width: 100,
-                        moduleWidth: 10,
-                        moduleHeight: 10,
-                        padding: 10,
-                        horizontalPadding: undefined,
-                        verticalPadding: undefined},
-                    positionModules = Module.of((
-                        innerWidth=(moduleWidth, horizontalPadding, numColumns)=>
-                            numColumns*(moduleWidth+horizontalPadding)-horizontalPadding,
-                        numColumns=(width, moduleWidth, horizontalPadding, numModules)=>Arrays.findLast(
-                            Numbers.range(1, 1+numModules),
-                            candidate=>innerWidth(moduleWidth, horizontalPadding, candidate)<=width),
-                        moduleX=(width, moduleWidth, horizontalPadding, numColumns, columnIndex) => .5*width +
-                            (columnIndex-numColumns/2)*moduleWidth +
-                            (columnIndex-(numColumns-1)/2)*horizontalPadding,
-                        moduleY=(moduleHeight, verticalPadding, rowIndex)=>
-                            rowIndex*(moduleHeight+verticalPadding),
-                        moduleCoordinates=(options, numColumns,moduleIndex)=>Module.of((
-                            rowIndex=Math.ceil((moduleIndex+1)/numColumns)-1
-                        ) => [
-                            moduleX(
-                                options.width,
-                                options.moduleWidth,
-                                options.horizontalPadding,
-                                //How many columns are in this row?
-                                rowIndex < Math.ceil(options.modules.length/numColumns)-1 ?  //Not the last row?
-                                    numColumns :        //Yes: numColumns
-                                    Module.of((         //No: the number of columns on the last row
-                                        remainder=options.modules.length%numColumns
-                                    )=> remainder > 0 ? remainder : numColumns),
-                                moduleIndex%numColumns),
-                            moduleY(options.moduleHeight, options.verticalPadding, rowIndex)])
-                    ) => options => Module.of((
-                        myNumColumns=numColumns(
-                            options.width,
-                            options.moduleWidth,
-                            options.horizontalPadding,
-                            options.modules.length)
-                    ) => options.modules.map((module, index)=>
-                        SVG.moveTo(module, ...moduleCoordinates(options, myNumColumns, index)))))
+                        moduleSize: {
+                            width: 10,
+                            height: 10},
+                        padding: {
+                            horizontal: 10,
+                            vertical: 10},
+                        columns: 4,
+                        alignment: {
+                            //Determines where the modules are positioned within the
+                            // [[0,0],[moduleSize.width, moduleSize.height]] rectangle
+                            horizontal: Alignment.Horizontal.left,
+                            vertical: Alignment.Vertical.top},
+                        overflow: Overflow.center},
+                    withPositionedModules=modularGrid=>{
+                        SVG.Compositions.ModularGrid.positions(modularGrid).forEach((position, index) =>
+                            SVG.moveTo(modularGrid.modules[index], ...position));
+                        return modularGrid;}
                 ) => Objects
-                    .Builder((optionsArg={}) => Module.of((
-                        options=Objects.withModification(
-                            Objects.withDefaults(optionsArg, defaults),
-                            function() {
-                                this.horizontalPadding = this.horizontalPadding??this.padding;
-                                this.verticalPadding = this.verticalPadding??this.padding;
-                                positionModules(this);})
-                    ) => Objects.withGettersAndSetters(
-                        SVG.Builder(SVG.G())
-                            .withClass("modular-grid")
-                            .withChildren(...options.modules)
-                            .build(),
-                        {
-                            modules: {
-                                get: () => options.modules,
-                                set: function(newModules) {
-                                    options.modules.forEach(module => {
-                                        if(module.parentNode === this) {
-                                            this.removeChild(module);}});
-                                    options.modules = newModules;
-                                    positionModules(options);
-                                    SVG.withChildren(this, ...options.modules);}},
-                            width: {
-                                get: () => options.width,
-                                set: newWidth => {
-                                    options.width = newWidth;
-                                    positionModules(options);}},
-                            moduleWidth: {
-                                get: () => options.moduleWidth,
-                                set: newModuleWidth => {
-                                    options.moduleWidth = newModuleWidth;
-                                    positionModules(options);}},
-                            moduleHeight: {
-                                get: () => options.moduleHeight,
-                                set: newModuleHeight => {
-                                    options.moduleHeight = newModuleHeight;
-                                    positionModules(options);}},
-                            horizontalPadding: {
-                                get: () => options.horizontalPadding,
-                                set: newHorizontalPadding => {
-                                    options.horizontalPadding = newHorizontalPadding;
-                                    positionModules(options);}},
-                            verticalPadding: {
-                                get: () => options.verticalPadding,
-                                set: newVerticalPadding => {
-                                    options.verticalPadding = newVerticalPadding;
-                                    positionModules(options);}}})))
+                    .Builder((options={}) => Module.of((
+                        modules= options.modules??defaults.modules,
+                        moduleSize= Module.of(
+                            (width, height) => Objects.withGettersAndSetters({}, {
+                                width: {
+                                    get: () => width,
+                                    set: newWidth => {
+                                        if(width === newWidth) return;
+                                        width = newWidth;
+                                        withPositionedModules(me);}},
+                                height: {
+                                    get: () => height,
+                                    set: newHeight => {
+                                        if(height === newHeight) return;
+                                        height = newHeight;
+                                        withPositionedModules(me);}}}),
+                            ...(
+                                typeof options.moduleSize === "number" ?
+                                    Numbers.nCopies(options.moduleSize, 2) :
+                                Objects.isNil(options.moduleSize) ?
+                                    [defaults.moduleSize, defaults.moduleSize] :
+                                    [options.moduleSize.width, options.moduleSize.height])),
+                        padding= Module.of(
+                            (horizontal, vertical) => Objects.withGettersAndSetters({}, {
+                                horizontal: {
+                                    get: () => horizontal,
+                                    set: newHorizontal => {
+                                        if(horizontal === newHorizontal) return;
+                                        horizontal = newHorizontal;
+                                        withPositionedModules(me);}},
+                                vertical: {
+                                    get: () => vertical,
+                                    set: newVertical => {
+                                        if(vertical === newVertical) return;
+                                        vertical = newVertical;
+                                        withPositionedModules(me);}}}),
+                            ...(
+                                typeof options.padding === "number" ?
+                                    Numbers.nCopies(options.padding, 2) :
+                                    Objects.isNil(options.padding) ?
+                                        [defaults.padding.horizontal, defaults.padding.vertical] :
+                                        [options.padding.horizontal, options.padding.vertical])),
+                        columns= options.columns??defaults.columns,
+                        alignment= Module.of(
+                            (horizontal, vertical) => Objects.withGettersAndSetters({}, {
+                                horizontal: {
+                                    get: () => horizontal,
+                                    set: newHorizontal => {
+                                        if(horizontal === newHorizontal) return;
+                                        horizontal = newHorizontal;
+                                        withPositionedModules(me);}},
+                                vertical: {
+                                    get: () => vertical,
+                                    set: newVertical => {
+                                        if(vertical === newVertical) return;
+                                        vertical = newVertical;
+                                        withPositionedModules(me);}}}),
+                            ...(Object.values(Objects.withDefaults(options.alignment??{}, defaults.alignment)))),
+                        overflow= options.overflow??defaults.overflow,
+                        me=withPositionedModules(Objects.withGettersAndSetters(
+                            SVG.Builder(SVG.G())
+                                .withClass("modular-grid")
+                                .withChildren(...modules)
+                                .build(),
+                            {
+                                modules: {
+                                    get: () => modules,
+                                    set: newModules => {
+                                        modules.forEach(module => {
+                                            if(module.parentNode === me) {
+                                                me.removeChild(module);}});
+                                        modules = newModules;
+                                        withPositionedModules(me);
+                                        SVG.withChildren(me, ...modules);}},
+                                moduleSize: {
+                                    get: () => moduleSize,
+                                    set: newModuleSize => {
+                                        if(typeof newModuleSize === "number") {
+                                            moduleSize.width = newModuleSize;
+                                            moduleSize.height = newModuleSize;}
+                                        else {
+                                            moduleSize.width = newModuleSize.width;
+                                            moduleSize.height = newModuleSize.height;}}},
+                                padding: {
+                                    get: () => padding,
+                                    set: newPadding => {
+                                        if(typeof newPadding === "number") {
+                                            padding.horizontal = newPadding;
+                                            padding.vertical = newPadding;}
+                                        else {
+                                            padding.horizontal = newPadding.horizontal;
+                                            padding.vertical = newPadding.vertical;}}},
+                                columns: {
+                                    get: () => columns,
+                                    set: newColumns => {
+                                        columns = newColumns;
+                                        withPositionedModules(me);}},
+                                alignment: {
+                                    get: () => alignment},
+                                overflow: {
+                                    get: () => overflow,
+                                    set: newOverflow => {
+                                        overflow = newOverflow;
+                                        withPositionedModules(me);}}}))
+                    ) => me))
                     .withFields({
                         withModules: (modularGrid, ...modules) => {
                             modularGrid.modules = Arrays.distinct(modularGrid.modules.concat(modules));
@@ -1087,6 +1117,46 @@ const ChordJogApp = (() => {
                             return modularGrid;},
                         clear: modularGrid => SVG.Compositions.ModularGrid.setModules(modularGrid, [])})
                     .withBuilder({initializer: () => SVG.Compositions.ModularGrid()})
+                    .withFields({
+                        Alignment: Alignment,
+                        Overflow: Overflow})
+                    .withMethod("positions", modularGrid => {
+                        const alignmentOffset=[
+                            modularGrid.alignment.horizontal === Alignment.Horizontal.left ?
+                                0 :
+                            modularGrid.alignment.horizontal === Alignment.Horizontal.center ?
+                                .5 * modularGrid.moduleSize.width :
+                            modularGrid.alignment.horizontal === Alignment.Horizontal.right ?
+                                modularGrid.moduleSize.width : undefined,
+                            modularGrid.alignment.vertical === Alignment.Vertical.top ?
+                                0 :
+                            modularGrid.alignment.vertical === Alignment.Vertical.center ?
+                                .5 * modularGrid.moduleSize.height :
+                            modularGrid.alignment.vertical === Alignment.Vertical.bottom ?
+                                modularGrid.moduleSize.height : undefined];
+                        const fullRowXs=Numbers.range(0, modularGrid.columns)
+                            .map(i=>alignmentOffset[0]+i*(modularGrid.moduleSize.width+modularGrid.padding.horizontal));
+                        const numFullRows=Math.floor(modularGrid.modules.length/modularGrid.columns);
+                        const columnYs=Numbers.range(0,Math.ceil(modularGrid.modules.length / modularGrid.columns))
+                            .map(i=>alignmentOffset[1]+i*(modularGrid.moduleSize.height+modularGrid.padding.vertical));
+                        const lastRowBlankColumns = modularGrid.columns - modularGrid.modules.length % modularGrid.columns;
+                        const overflowX = modularGrid.overflow === Overflow.left ? 0 :
+                            modularGrid.overflow === Overflow.center ? .5 * (
+                                lastRowBlankColumns * modularGrid.moduleSize.width +
+                                (lastRowBlankColumns - 2) * modularGrid.padding.horizontal) :
+                                modularGrid.overflow === Overflow.right ? lastRowBlankColumns * (
+                                    modularGrid.moduleSize.width + modularGrid.padding.horizontal) : undefined;
+                        //Full row positions
+                        return Numbers.range(0, numFullRows)
+                            .map(row=>Numbers.range(0, modularGrid.columns)
+                                .map(column=>[fullRowXs[column], columnYs[row]]))
+                            .flat()
+                            .concat(
+                                //Unfull row positions
+                                Numbers.range(numFullRows*modularGrid.columns, modularGrid.modules.length)
+                                    .map((moduleIndex, column)=>[
+                                        overflowX + column * (modularGrid.moduleSize.width + modularGrid.padding.horizontal),
+                                        Arrays.last(columnYs)]));})
                     .build()),
                 Modal: Module.of((
                     fillOpacity=.95,
@@ -1283,7 +1353,6 @@ const ChordJogApp = (() => {
                         digitLabelContainer = SVG.Builder(SVG.G())
                             .withChildren(...digitLabels())
                             .build(),
-                        cellGridWidth = () => 10 * options.cellSize,
                         cellGrid = Module.of((
                             indexToDigitValue=i=>[numDigits(options.max) - Math.floor(i/10) - 1, i%10],
                             digitValueToIndex=(digit,value)=>10*(numDigits(options.max)-digit-1)+value,
@@ -1311,9 +1380,8 @@ const ChordJogApp = (() => {
                         ) => Objects.withMethods(
                             SVG.Compositions.ModularGrid({
                                 modules: createCells(),
-                                width: cellGridWidth(),
-                                moduleWidth: options.cellSize,
-                                moduleHeight: options.cellSize,
+                                columns: 10,
+                                moduleSize: options.cellSize,
                                 padding: 0}),
                             {
                                 resetCells: function() {
@@ -1460,14 +1528,13 @@ const ChordJogApp = (() => {
                                 set: max => {
                                     if(max === options.max) return;
                                     const oldNumDigits = numDigits(options.max);
-                                    const numDigitDelta = numDigits(max) - oldNumDigits;
                                     options.max = max;
                                     if(Selection.get() > options.max) {
                                         Selection.set(options.max);}
                                     else {
-                                        Selection.rerender();}
-                                    if(numDigitDelta !== 0) {
-                                        cellGrid.width = cellGridWidth();}}}})
+                                        Selection.rerender();}}},
+                            cellGrid: {
+                                get: () => cellGrid}})
                         .build()))
                     .withFields({
                         withChangeListener: (input, listener) => {
@@ -3741,8 +3808,7 @@ const ChordJogApp = (() => {
             updateMatches=(pageNumber=pageInput.selected)=>{
                 matches = Shape.search(shapeFilterInput.schema);
                 updatePageInputRange();
-                //if(matches.length > 0) {
-                    pageInput.selected = pageNumber;//}
+                pageInput.selected = pageNumber;
                 refreshShapesList(pageNumber);},
             ShapeItem=Module.of((
                 deleteButtonWidth=65,
@@ -3764,10 +3830,11 @@ const ChordJogApp = (() => {
                             .forSchema(shape.schema)
                             .unfixed())
                         .withChild(SVG.Builder(SVG.Compositions.ModularGrid({ //Buttons container
-                            width: 2*deleteButtonWidth + 2*buttonPadding,
-                            moduleWidth: moduleWidth,
-                            moduleHeight: buttonHeight,
+                            moduleSize: {
+                                width: moduleWidth,
+                                height: buttonHeight},
                             padding: buttonPadding,
+                            columns: 2,
                             modules: [
                                 SVG.Compositions.ActionText({
                                     text: "edit",
@@ -3923,9 +3990,10 @@ const ChordJogApp = (() => {
                     .build()})),
             shapeChartGrid=SVG.withClass(
                 SVG.Compositions.ModularGrid({
-                    width: width+20,
-                    moduleWidth: ShapeChart.Style.width,
-                    moduleHeight: ShapeItem.Style.height,
+                    moduleSize: {
+                        width: ShapeChart.Style.width,
+                        height: ShapeItem.Style.height},
+                    columns: 4,
                     padding: shapeChartGridPadding.horizontal + shapeChartGridPadding.vertical}),
                 "shape-chart-grid"),
             pageInput = SVG.moveTo(
@@ -3933,7 +4001,7 @@ const ChordJogApp = (() => {
                     cellSize: pageInputCellSize,
                     max: pageSliderMax(),
                     changeListener: refreshShapesList}),
-                ShapeChart.Fretboard.Style.x + .5*(width - ShapeChart.Fretboard.Style.x - 10*pageInputCellSize) + 3,
+                .5*(Style.width - 10*pageInputCellSize),
                 ShapesPageTopRow.Style.endY + pageInputMarginTop)
         ) => {
             updateMatches(0);
@@ -3977,11 +4045,13 @@ const ChordJogApp = (() => {
                 generateButtonSize.width + generateButtonMarginRight),
             shapesGrid = SVG.yTo(
                 SVG.Compositions.ModularGrid({
-                    width: shapeChartGridWidth,
-                    moduleWidth: ShapeChart.Style.width,
-                    moduleHeight: ShapeChart.Style.height,
-                    horizontalPadding: shapeChartGridPadding.horizontal,
-                    verticalPadding: shapeChartGridPadding.vertical}),
+                    moduleSize: {
+                        width: ShapeChart.Style.width,
+                        height: ShapeChart.Style.height},
+                    columns: 4,
+                    padding: {
+                        horizontal: shapeChartGridPadding.horizontal,
+                        vertical: shapeChartGridPadding.vertical}}),
                 shapeChartGridMarginTop),
             generateChords=()=>{
                 const shapeIndices = [];
@@ -4069,12 +4139,17 @@ const ChordJogApp = (() => {
         ) => Objects.withMethods(
             SVG.Builder(
                 SVG.Compositions.ModularGrid({
-                    width: Style.width - .5 * moduleWidth,
-                    moduleWidth: moduleWidth,
-                    moduleHeight: height,
-                    padding: padding}))
+                    moduleSize: {
+                        width: moduleWidth,
+                        height: height},
+                    alignment: {
+                        horizontal: "center"},
+                    columns: 0,
+                    padding: {
+                        horizontal: padding,
+                        vertical: 0}}))
                 .withClass("navigation-bar")
-                .moveTo(.5*moduleWidth, startY)
+                .yTo(startY)
                 .build(),
             {
                 setApplication: app => application = app,
@@ -4094,7 +4169,10 @@ const ChordJogApp = (() => {
                     buttonLinks[name] = {
                         button: button,
                         page: page };
-                    this.modules = this.modules.concat(button);},
+                    this.columns = this.modules.length+1;
+                    this.modules = this.modules.concat(button);
+                    SVG.xTo(this,
+                        .5*(Style.width - this.modules.length * moduleWidth - (this.modules.length - 1) * padding));},
                 withPage: function(page, name) {
                     this.addPage(page, name);
                     return this;},
