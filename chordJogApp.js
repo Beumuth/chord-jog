@@ -3817,7 +3817,7 @@ const ChordJogApp = (() => {
                 buttonHeight=18,
                 buttonPadding=3,
                 buttonsContainerOffsetX=-4,
-                buttonsContainerOffsetY=25
+                buttonsContainerOffsetY=35
             ) => ({
                 Style: {
                     width: ShapeChart.Style.width,
