@@ -4533,8 +4533,8 @@ const ChordJogApp = (() => {
         new: () => Module.of((
             numShapesInput = SVG.moveTo(
                 SVG.Compositions.EnumInput.Number({
-                    min: 1,
-                    max: 12,
+                    min: numChordsRange.min,
+                    max: numChordsRange.max,
                     value: Module.of((
                         savedNumChords = localStorage.getItem(numChordsKey)
                     ) => {
@@ -4584,7 +4584,7 @@ const ChordJogApp = (() => {
                     .xTo(.5 * (Style.width - (
                         generateButtonSize.width +
                         generateButtonMarginRight +
-                        10 * numShapesInputCellSize)))
+                        (1 + numChordsRange.max - numChordsRange.min) * numShapesInputCellSize)))
                     .build())
                 .yTo(topRowMarginTop)
                 .build()
