@@ -4305,10 +4305,10 @@ const ChordJogApp = (() => {
                 SVG.yTo(shapeChartGrid,
                     ShapesPageTopRow.Style.endY + shapeChartMarginTop + pageInputMarginTop +
                     Math.max(pageInput.max.toString().length, 1)*pageInputCellSize);},
-            updateMatches=(pageNumber=pageInput.selected)=>{
+            updateMatches=(pageNumber=pageInput.value)=>{
                 matches = Shape.search(shapeFilterInput.schema);
                 updatePageInputRange();
-                pageInput.selected = pageNumber;
+                pageInput.value = pageNumber;
                 refreshShapesList(pageNumber);},
             ShapeItem=Module.of((
                 deleteButtonWidth=65,
