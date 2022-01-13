@@ -1012,7 +1012,7 @@ const ChordJogApp = (() => {
                         Preview=Module.of((value=null) => ({
                             get: () => value,
                             set: newValue => {
-                                if(value === newValue || ! values.includes(newValue)) return;
+                                if(value === newValue || ! [null].concat(values.includes(newValue))) return;
                                 if(value !== null) {
                                     listeners.unpreview(value);}
                                 value = newValue;
@@ -1022,7 +1022,7 @@ const ChordJogApp = (() => {
                         Selection=Module.of((value=null) => ({
                             get: () => value,
                             set: newValue => {
-                                if(value === newValue || ! values.includes(newValue)) return;
+                                if(value === newValue || ! [null].concat(values.includes(newValue))) return;
                                 if(value !== null) {
                                     listeners.unselect(value);}
                                 value = newValue;
