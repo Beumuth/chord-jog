@@ -1047,10 +1047,8 @@ const ChordJogApp = (() => {
                                     Preview.unset();
                                     SVG.Compositions.AbstractEnumInput.closestSelected(
                                         this.parentNode, ...e.position);},
-                                up: function(e) {
-                                    const selected = pointToValue(...e.position, values);
-                                    Selection.set(selected);
-                                    listeners.selectComplete(selected);}}})
+                                up: function() {
+                                    listeners.selectComplete(Selection.get());}}})
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
                             .withClass("abstract-enum-input")
