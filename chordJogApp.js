@@ -21,6 +21,7 @@ const ChordJogApp = (() => {
      */
     const Module = {
         of: (f, ...args) => f.apply(undefined, args)};
+
     const Param = Module.of((
         Validation={
             new: () => ({
@@ -94,19 +95,32 @@ const ChordJogApp = (() => {
 
     const Functions = {
         noop: ()=>{},
-        binarySearch: (
-                fDistance,
-                length,
-                startIndex=0,
-                halfLength=Math.ceil(.5*length)
-            ) => length <= 1 ? startIndex : Functions.binarySearch(
-                fDistance,
-                halfLength,
-                Module.of((
-                    indices= [startIndex + halfLength - (0===length%2 ? 1 : 2), startIndex + halfLength],
-                ) => fDistance(indices[0]) <= fDistance(indices[1]) ?
-                    startIndex :
-                    startIndex + halfLength - (0===length%2 ? 0 : 1))),
+        constant: value=> ()=> value,
+        /**
+         * @param list
+         * @param comparator Function of form (item, index)=>{...} that returns
+         *      <0 if the search item is behind the item argument
+         *      >0 if the search item is ahead of the item argument
+         *      0 if the search item is the item argument
+         * @param resolver If the item is not found, this function is called with the index of the closest guess
+         *      to be mapped to a return value.
+         * @returns The index of the item, or the result of calling resolver with the closest guess.
+         */
+        binarySearch: (list, comparator, resolver=closest=>null)=> {
+            if(list.length===0) {
+                return resolver(0);}
+            const innerBinarySearch= (comparator, length, startIndex=0)=> {
+                const guess = startIndex + Math.ceil(.5 * length) - 1;
+                const comparison = comparator(list[guess], guess);
+                return comparison === 0 ?
+                    guess :
+                    length === 1 || guess+1 === list.length || guess < 0 ?
+                        resolver(clamp(guess, 0, list.length-1)) :
+                        innerBinarySearch(
+                            comparator,
+                            Math.floor(.5 * length),
+                            comparison > 0 ? guess+1 : startIndex);};
+            return innerBinarySearch(comparator, list.length);},
         ifThen: (condition, then) => condition === true ? then() : undefined,
         ifThenFinal: (condition, then, final) => {
             if(condition) then();
@@ -114,7 +128,10 @@ const ChordJogApp = (() => {
         ifThenElse: (condition, then, fElse) => condition === true ? then() : fElse(),
         ifThenElseFinal: (condition, then, fElse, final) => {
             condition === true ? then() : fElse();
-            return final();}};
+            return final();},
+        while: (condition, f) => {
+            while(condition() === true) {
+                f();}}};
 
     const Objects = Module.of((
         defaultBuilderizeOptions = {
@@ -152,21 +169,26 @@ const ChordJogApp = (() => {
                     configurable: true});
                 return object;},
             withGetters: (object, getters) => {
-                Object.entries(getters).forEach(getter =>
-                    Object.defineProperty(object, getter[0],{
-                        get: getter[1],
-                        configurable: true}));
+                Object.entries(getters).forEach(getter=> Objects.withGetter(object, ...getter));
+                return object;},
+            withoutGetters: (object, ...keys) => {
+                getters.forEach(getter=> Objects.withoutGetter(object, getter));
                 return object;},
             withSetter: (object, key, setter) => {
                 Object.defineProperty(object, key, {
                     set: setter,
                     configurable: true});
                 return object; },
+            withoutSetter: (object, key) => {
+                Object.defineProperty(object, key, {
+                    set: undefined,
+                    configurable: true});
+                return object;},
             withSetters: (object, setters) => {
-                Object.entries(setters).forEach(setter =>
-                    Object.defineProperty(object, setter[0],{
-                        set: setter[1],
-                        configurable: true}));
+                Object.entries(setters).forEach(setter => Objects.withSetter(object, ...setter));
+                return object;},
+            withoutSetters: (object, ...keys) => {
+                setters.forEach(setter=> Object.withoutSetter(object, setter));
                 return object;},
             withGetterAndSetter: (object, key, getter, setter) => {
                 Object.defineProperty(object, key, {
@@ -174,17 +196,18 @@ const ChordJogApp = (() => {
                     set: setter,
                     configurable: true});
                 return object; },
+            withoutGetterAndSetter: (object, key) => {
+                Object.defineProperty(object, key, {
+                    get: undefined,
+                    set: undefined,
+                    configurable: true});
+                return object;},
             withGettersAndSetters: (object, gettersAndSetters) => {
-                Object.entries(gettersAndSetters).forEach(entry => {
-                    const property = {};
-                    if(typeof entry[1].get === "function") {
-                        property.get = entry[1].get;}
-                    if(typeof entry[1].set === "function") {
-                        property.set = entry[1].set;}
-                    Object.defineProperty(object, entry[0], {
-                        get: entry[1].get,
-                        set: entry[1].set,
-                        configurable: true});});
+                Object.entries(gettersAndSetters).forEach(entry =>
+                    Objects.withGetterAndSetter(object, entry[0], entry[1].get, entry[1].set));
+                return object;},
+            withoutGettersAndSetters: (object, ...keys) => {
+                keys.forEach(key=> Objects.withoutGetterAndSetter(object, key));
                 return object;},
             withField: (object, key, value=undefined) => {
                 object[key] = value;
@@ -192,6 +215,9 @@ const ChordJogApp = (() => {
             withFields: (object, fields) => {
                 Object.entries(fields).forEach(field => object[field[0]] = field[1]);
                 return object;},
+            withOnlyField: (object, field) => ({
+                [field]: object[field]}),
+            withOnlyFields: (object, ...fields) => Object.fromEntries(fields.map(field=> [field, object[field]])),
             withDefaults: (object, defaults) => {
                 Object.entries(defaults).forEach(
                     defaultEntry => Objects.isNil(object[defaultEntry[0]]) ?
@@ -248,7 +274,7 @@ const ChordJogApp = (() => {
             withModification: (object, modification) => {
                 modification.bind(object)(object);
                 return object; },
-            withModifications: (object, modifications) => {
+            withModifications: (object, ...modifications) => {
                 modifications.forEach(mutation => mutation.bind(object)());
                 return object; },
             withMethod: (object, name, method) => {
@@ -258,6 +284,10 @@ const ChordJogApp = (() => {
                 Object.keys(methods).forEach(key =>
                     object[key] = methods[key].bind(object));
                 return object; },
+            withSimpleBuilderSetters: (object, ...keys)=> Objects.withFields(object,
+                Object.fromEntries(keys.map(key=>[
+                    "with" + key.substr(0, 1).toUpperCase() + key.substr(1),
+                    (object, value)=> Objects.withField(object, key, value)]))),
             withBuilder: (object, options={}) =>
                 Objects.withField(object, "Builder",
                     builderize(object, Objects.withDefaults(options, defaultBuilderizeOptions)))}
@@ -266,7 +296,16 @@ const ChordJogApp = (() => {
             builderize: builderize,
             isNil: Module.of((nils = [null, undefined]) =>
                 object => nils.includes(object)),
-            sameKeyValues: (...keys) => Object.fromEntries(keys.map(key => [key, key]))}));
+            sameKeyValues: (...keys) => Object.fromEntries(keys.map(key => [key, key])),
+            withSameValue: (value, ...keys) => Object.fromEntries(keys.map(key => [key, value])),
+            changeValues: (object, modifier) => Object.fromEntries(
+                Object.entries(object).map(entry => [entry[0], modifier(entry[0])])),
+            merge: (a, b, resolutions={}) => {
+                const merged = Object.fromEntries(Object.entries(a));
+                Object.entries(b).forEach(bEntry => Objects.isNil(merged[bEntry[0]]) ?
+                    merged[bEntry[0]] = bEntry[1] :
+                    resolutions[bEntry[0]]??merged[bEntry[0]]);
+                return merged;}}));
 
     const Numbers = {
         goldenRatio: (1+Math.sqrt(5))/2,
@@ -276,12 +315,8 @@ const ChordJogApp = (() => {
             for(let i = fromInclusive; i < toExclusive; ++i) {
                 range.push(i);}
             return range;},
-        clampLower: (value, fromInclusive) => value < fromInclusive ? fromInclusive : value,
-        clampUpper: (value, toInclusive) => value > toInclusive ? toInclusive : value,
-        clamp: (value, fromInclusive, toInclusive) =>
-            value < fromInclusive ? fromInclusive :
-                value > toInclusive ? toInclusive :
-                    value,
+        rangeInclusive: (fromInclusive, toInclusive) => Numbers.range(fromInclusive, toInclusive+1),
+        clamp: (value, fromInclusive, toInclusive) => Math.min(Math.max(value, fromInclusive), toInclusive),
         toString: x => `${x}`,
         toDigitArray: x => {
             const xString = x.toString();
@@ -293,6 +328,7 @@ const ChordJogApp = (() => {
         digitValue: (number, digit) => Math.floor(number / Math.pow(10, digit))%10,
         randomIntegerInRange: (fromInclusive, toInclusive) =>
             Math.floor(Math.random() * (1 + toInclusive - fromInclusive) + fromInclusive)};
+
     const Arrays = {
         insertAt: (array, index, item) => {
             array.splice(index, 0, item);
@@ -621,33 +657,23 @@ const ChordJogApp = (() => {
                     valuesString +
                     transformAttribute.slice(indexArgsEnd));
                 return element;},
-            move: (element, dx, dy) => SVG.moveTo(element,
-                Number.parseFloat(element.customTransform.x) + dx,
-                Number.parseFloat(element.customTransform.y) + dy),
+            move: (element, dx, dy) => {
+                const translate = SVG.getTranslate(element);
+                return SVG.moveTo(element, translate[0] + dx, translate[1] + dy);},
             moveTo: (element, newX, newY) => {
-                element.customTransform.x = newX;
-                element.customTransform.y = newY;
-                return SVG.updateTransform(element, "translate", [
-                    Number.parseFloat(element.customTransform.x)/Number.parseFloat(element.customTransform.sx),
-                    Number.parseFloat(element.customTransform.y)/Number.parseFloat(element.customTransform.sy)]);},
-            xTo: (element, x) => SVG.moveTo(element, x, Number.parseFloat(element.customTransform.y)),
-            yTo: (element, y) => SVG.moveTo(
-                element,
-                Number.parseFloat(element.customTransform.x),
-                y),
-            rotateTo: (element, degrees, origin=[0,0]) => {
-                element.customTransform.rotation = degrees;
-                return SVG.updateTransform(element, "rotate", [degrees % 360, origin[0], origin[1]]);},
+                const scale = SVG.getScale(element);
+                return SVG.updateTransform(element, "translate", [newX/scale[0], newY/scale[1]]);},
+            xTo: (element, x) => SVG.moveTo(element, x, SVG.getTranslate(element)[1]),
+            yTo: (element, y) => SVG.moveTo(element, SVG.getTranslate(element)[0], y),
+            rotateTo: (element, degrees, origin=[0,0]) =>
+                SVG.updateTransform(element, "rotate", [degrees % 360, origin[0], origin[1]]),
             rotateBy: (element, degrees, origin=[0,0]) => SVG.rotateTo(
                 element,
-                element.customTransform.rotation + degrees,
+                SVG.getRotate(element)[0] + degrees,
                 origin),
             scale: (element, scaleX, scaleY=scaleX) => {
-                const newSx = Number.parseFloat(element.customTransform.sx) * scaleX;
-                const newSy = Number.parseFloat(element.customTransform.sy) * scaleY;
-                element.customTransform.sx = newSx;
-                element.customTransform.sy = newSy;
-                return SVG.updateTransform(element, "scale", [newSx, newSy]);},
+                const scale = SVG.getScale(element);
+                return SVG.updateTransform(element, "scale", [scale[0]*scaleX, scale[1]*scaleY]);},
             //Presentation attributes
             withColor: (element, color) => SVG.withAttribute(element, "color", color),
             withCursor: (element, cursor) => SVG.withAttribute(element, "cursor", cursor),
@@ -673,7 +699,7 @@ const ChordJogApp = (() => {
             centerAlign: element => SVG.withTextAnchor(element, SVG.Attributes.Presentation.TextAnchor.middle),
             rightAlign: element => SVG.withTextAnchor(element, SVG.Attributes.Presentation.TextAnchor.end),
             topAlign: element =>
-                SVG.withDominantBaseline(element, SVG.Attributes.Presentation.DominantBaseline.baseline),
+                SVG.withDominantBaseline(element, SVG.Attributes.Presentation.DominantBaseline.auto),
             centerAlignVertical: element =>
                 SVG.withDominantBaseline(element, SVG.Attributes.Presentation.DominantBaseline.middle),
             bottomAlign: element =>
@@ -684,6 +710,21 @@ const ChordJogApp = (() => {
                 .build()})
         .withBuilder({defaultInitial: undefined})
         .withFields({
+            getTransform: (element, type)=> {
+                if(typeof element.getAttribute !== "function") {
+                    let sba = 1;}
+                const transformAttribute = element.getAttribute("transform");
+                if(transformAttribute === null) {
+                    return SVG.Attributes.Transform[type].identity;}
+                const indexType = transformAttribute.indexOf(type);
+                return indexType === -1 ?
+                    SVG.Attributes.Transform[type].identity :
+                    SVG.Attributes.Transform[type].parse(transformAttribute.substring(
+                        transformAttribute.indexOf("(", indexType) + 1,
+                        transformAttribute.indexOf(")", indexType)));},
+            getTranslate: element=> SVG.getTransform(element, "translate"),
+            getScale: element=> SVG.getTransform(element, "scale"),
+            getRotate: element=> SVG.getTransform(element, "rotate"),
             G: () => SVG("g"),
             Circle: Objects
                 .Builder((center=[0,0], radius=1)=>SVG.Circle.Builder(SVG("circle"))
@@ -776,12 +817,12 @@ const ChordJogApp = (() => {
                 .withField("getD", path => path.getAttribute("d"))
                 .build(),
             Rect: Objects
-                .Builder((x=0, y=0, width=10, height=10)=> SVG.withAttributes(SVG("rect"),
+                .Builder(options=> SVG.withAttributes(SVG("rect"),
                     {
-                        x: x,
-                        y: y,
-                        width: width,
-                        height: height}))
+                        x: options.x??0,
+                        y: options.y??0,
+                        width: options.width??10,
+                        height: options.height??10}))
                 .withFields({
                     withWidth: (rect, width) => SVG.withAttribute(rect, "width", width),
                     withHeight: (rect, height) => SVG.withAttribute(rect, "height", height),
@@ -852,63 +893,350 @@ const ChordJogApp = (() => {
                 .build(),
             Attributes: {
                 Presentation: {
-                        getDominantBaseline: element => element.getAttribute("dominant-baseline"),
-                        getTextAnchor: element => element.getAttribute("text-anchor"),
-                        Cursor: {
-                            auto: "auto",
-                            crosshair: "crosshair",
-                            default: "default",
-                            pointer: "pointer",
-                            move: "move",
-                            eResize: "e-resize",
-                            neResize: "ne-resize",
-                            nwResize: "nw-resize",
-                            nResize: "n-resize",
-                            seResize: "se-resize",
-                            swResize: "sw-resize",
-                            sResize: "s-resize",
-                            wResize: "w-resize",
-                            text: "text",
-                            wait: "wait",
-                            help: "help"},
-                        DominantBaseline: {
-                            auto: "auto",
-                            textBottom: "text-bottom",
-                            alphabetic: "alphabetic",
-                            ideographic: "ideographic",
-                            middle: "middle",
-                            central: "central",
-                            mathematical: "mathematical",
-                            hanging: "hanging",
-                            textTop: "text-top"},
-                        PointerEvents: {
-                            boundingBox: "bounding-box",
-                            visiblePainted: "visible-painted",
-                            visibleFill: "visible-fill",
-                            visibleStroke: "visible-stroke",
-                            visible: "visible",
-                            painted: "painted",
-                            fill: "fill",
-                            stroke: "stroke",
-                            all: "all",
-                            none: "none"},
-                        TextAnchor: {
-                            start: "start",
-                            middle: "middle",
-                            end: "end"},
-                        TextDecoration: {
-                            Line: {
-                                none: "none",
-                                underline: "underline",
-                                overline: "overline",
-                                lineThrough: "line-through"},
-                            Style: {
-                                solid: "solid",
-                                double: "double",
-                                dotted: "dotted",
-                                dashed: "dashed",
-                                wavy: "wavy"}}}},
-            Compositions: {
+                    Cursor: {
+                        auto: "auto",
+                        crosshair: "crosshair",
+                        default: "default",
+                        pointer: "pointer",
+                        move: "move",
+                        eResize: "e-resize",
+                        neResize: "ne-resize",
+                        nwResize: "nw-resize",
+                        nResize: "n-resize",
+                        seResize: "se-resize",
+                        swResize: "sw-resize",
+                        sResize: "s-resize",
+                        wResize: "w-resize",
+                        text: "text",
+                        wait: "wait",
+                        help: "help"},
+                    DominantBaseline: {
+                        auto: "auto",
+                        textBottom: "text-bottom",
+                        alphabetic: "alphabetic",
+                        ideographic: "ideographic",
+                        middle: "middle",
+                        central: "central",
+                        mathematical: "mathematical",
+                        hanging: "hanging",
+                        textTop: "text-top"},
+                    PointerEvents: {
+                        boundingBox: "bounding-box",
+                        visiblePainted: "visible-painted",
+                        visibleFill: "visible-fill",
+                        visibleStroke: "visible-stroke",
+                        visible: "visible",
+                        painted: "painted",
+                        fill: "fill",
+                        stroke: "stroke",
+                        all: "all",
+                        none: "none"},
+                    TextAnchor: {
+                        start: "start",
+                        middle: "middle",
+                        end: "end"},
+                    TextDecoration: {
+                        Line: {
+                            none: "none",
+                            underline: "underline",
+                            overline: "overline",
+                            lineThrough: "line-through"},
+                        Style: {
+                            solid: "solid",
+                            double: "double",
+                            dotted: "dotted",
+                            dashed: "dashed",
+                            wavy: "wavy"}}},
+                Transform: {
+                    translate: {
+                        identity: [0, 0],
+                        parse: string=> string.split(/[\s,]/).map(x=> Number.parseFloat(x.trim()))},
+                    rotate: {
+                        identity: 0,
+                        parse: string=> Number.parseFloat(string.split(/[\s,]/)[0].trim())},
+                    scale: {
+                        identity: [1, 1],
+                        parse: string=> string.split(/[\s,]/).map(x=> Number.parseFloat(x.trim()))},
+                    skewX: {
+                        identity: 0,
+                        parse: string=> Number.parseFloat(string.trim())},
+                    skewY: {
+                        identity: 0,
+                        parse: string=> Number.parseFloat(string.trim())}}},
+            Compositions: Module.of((
+                parseCellSize= (defaultCellSize, actualCellSize)=>
+                    Objects.isNil(actualCellSize) ?
+                        {
+                            width: defaultCellSize,
+                            height: defaultCellSize} :
+                    typeof actualCellSize === "number" ?
+                        {
+                            width: actualCellSize,
+                            height: actualCellSize} :
+                        {
+                            width: typeof actualCellSize.width === "number" ?
+                                actualCellSize.width : defaultCellSize,
+                            height: typeof actualCellSize.height === "number" ?
+                                actualCellSize.height : defaultCellSize}
+            )=> ({
+                /**
+                 * An AbstractEnumInput selects zero to one given values by clicking regions in space.
+                 * Mousing over previews the selection if clicked.
+                 * It is Abstract in that it is an invisible mouse region, expected to be a part of other compositions.
+                 * Selections can be continuously updated during mouse drags, triggering a 'selectComplete'
+                 *     event upon mouse up.
+                 * Constructed given the width and height (of the underlying MouseRegion, list of values,
+                 *  a 'pointToValue' function of the form (x,y,values)=> ... that returns the value
+                 *      at the given (x,y) coordinate or null,
+                 *  and a 'listeners' field with the following event type subfields (functions that accepts a value) -
+                 *      preview
+                 *      unpreview
+                 *      select
+                 *      selectComplete (upon mouse up, as oppose to mouse drag)
+                 *      unselect
+                 */
+                AbstractEnumInput: Module.of((
+                    EventTypes=["preview", "unpreview", "select", "selectComplete", "unselect"],
+                    defaults = {
+                        width: 300,
+                        height: 300,
+                        values: [],
+                        pointToValue: undefined,
+                        listeners: Objects.withSameValue(Functions.noop, ...EventTypes)},
+                ) => Objects.Builder((options={}) =>
+                    Module.of((
+                        values=options.values??defaults.values,
+                        pointToValue = options.pointToValue,
+                        listeners=Object.fromEntries(EventTypes.map(key =>
+                            [key, options.listeners[key]??defaults.listeners[key]])),
+                        Preview=Module.of((value=null) => ({
+                            get: () => value,
+                            set: newValue => {
+                                if(value === newValue || ! values.includes(newValue)) return;
+                                if(value !== null) {
+                                    listeners.unpreview(value);}
+                                value = newValue;
+                                if(! [null, Selection.get()].includes(value)) {
+                                    listeners.preview(value);}},
+                            unset: () => Preview.set(null)})),
+                        Selection=Module.of((value=null) => ({
+                            get: () => value,
+                            set: newValue => {
+                                if(value === newValue || ! values.includes(newValue)) return;
+                                if(value !== null) {
+                                    listeners.unselect(value);}
+                                value = newValue;
+                                if(value !== null) {
+                                    listeners.select(value);}},
+                            unset: () => Selection.set(null)})),
+                        mouseRegion=SVG.Compositions.MouseRegion({
+                            width: options.width??defaults.width,
+                            height: options.height??defaults.height,
+                            listeners: {
+                                enter: function(e) {
+                                    SVG.Compositions.AbstractEnumInput.closestPreviewed(
+                                        this.parentNode, ...e.position);},
+                                leave: function(e) {
+                                    if(! e.isDragging) {
+                                        SVG.Compositions.AbstractEnumInput.unpreviewed(this.parentNode);}},
+                                move: function(e) {
+                                    SVG.Compositions.AbstractEnumInput[
+                                        `closest${e.isDragging ? "Select" : "Preview"}ed`
+                                        ](this.parentNode, ...e.position);},
+                                down: function(e) {
+                                    Preview.unset();
+                                    SVG.Compositions.AbstractEnumInput.closestSelected(
+                                        this.parentNode, ...e.position);},
+                                up: function(e) {
+                                    const selected = pointToValue(...e.position, values);
+                                    Selection.set(selected);
+                                    listeners.selectComplete(selected);}}})
+                    ) => Objects.Builder(
+                        SVG.Builder(SVG.G())
+                            .withClass("abstract-enum-input")
+                            .withChild(mouseRegion)
+                            .build())
+                        .withFields({
+                            listeners: listeners,
+                            pointToValue: pointToValue})
+                        .withGettersAndSetters({
+                            values: {
+                                get: () => values},
+                            mouseRegion: {
+                                get: () => mouseRegion},
+                            preview: {
+                                get: Preview.get,
+                                set: Preview.set},
+                            selection: {
+                                get: Selection.get,
+                                set: Selection.set}})
+                        .build()))
+                    .withFields({
+                        withValues: (input, values) => {
+                            input.values = values;
+                            return input;},
+                        addValue: (input, ...values) => {
+                            input.values.push(...values);
+                            return input;},
+                        withWidth: (input, width) => {
+                            input.mouseRegion.width = width;
+                            return input;},
+                        withHeight: (input, height) => {
+                            input.mouseRegion.height = height;
+                            return height;},
+                        previewing: (input, value) => {
+                            input.preview = value;
+                            return input;},
+                        unpreviewed: input => SVG.Compositions.AbstractEnumInput.previewing(input, null),
+                        selecting: (input, value) => {
+                            input.selection = value;
+                            return input;},
+                        unselected: input => SVG.Compositions.AbstractEnumInput.selecting(input, null),
+                        closestPreviewed: (input, x, y) => SVG.Compositions.AbstractEnumInput.previewing(
+                            input,
+                            input.pointToValue(x, y, input.values)),
+                        closestSelected: (input, x, y) => SVG.Compositions.AbstractEnumInput.selecting(
+                            input,
+                            input.pointToValue(x, y, input.values))})
+                    .withBuilder()
+                    .withFields({
+                        /**
+                         * Replaces 'width', 'height', and 'pointToValue' fields in options with
+                         *      'cellSize' that may be either a Number or an object with width and height fields, and
+                         *      'columns', the values per row.
+                         */
+                        Grid: Module.of((
+                            defaultCellSize=25,
+                            defaultColumns=5,
+                            rowIndex= (columns, cellIndex)=> Math.floor(cellIndex / columns),
+                            numRows= (columns, numValues)=> rowIndex(columns, Math.max(0, numValues-1)),
+                            calcHeight= (cellHeight, columns, numValues)=> cellHeight * numRows(columns, numValues),
+                            updateSize= grid=> SVG.Compositions.AbstractEnumInput.Builder(grid)
+                                .withWidth(grid.cellSize.width * grid.columns)
+                                .withHeight(calcHeight(grid.cellSize.height, grid.columns, grid.values.length))
+                                .build()
+                        )=> Objects.Builder(
+                            options=> Module.of((
+                                cellSize=parseCellSize(defaultCellSize, options.cellSize),
+                                 columns= options.columns??defaultColumns
+                            ) => Objects.Builder(
+                                SVG.Compositions.AbstractEnumInput(Objects.withFields(options, {
+                                    width: cellSize * columns,
+                                    height: calcHeight(cellSize.height, columns, (options.values??[]).length),
+                                    pointToValue: (x, y, values)=> {
+                                        const row = Functions.binarySearch(
+                                            Numbers.range(0, numRows(columns, values.length)),
+                                            rowIndex=>
+                                                y < rowIndex * cellSize.height ? -1 :
+                                                y >= (rowIndex+1) * cellSize.height ? 1 : 0);
+                                        const column = Functions.binarySearch(
+                                            Numbers.range(0, columns),
+                                            columnIndex=>
+                                                x < columnIndex * cellSize.width ? -1 :
+                                                x >= (columnIndex+1) * cellSize.width ? 1 : 0);
+                                        const index = row * columns + column;
+                                        return index > values.length ? undefined : values[index];}})))
+                                .withGettersAndSetters({
+                                    cellSize: {
+                                        get: () => cellSize,
+                                        set: function(value) {
+                                            cellSize = {
+                                                width: typeof value === "number" ?
+                                                    value :
+                                                    value.width??cellSize.width,
+                                                height: typeof value === "number" ?
+                                                    value :
+                                                    value.height??cellSize.height};
+                                            updateSize(this);}},
+                                    columns: {
+                                        get: () => columns,
+                                        set: function(value) {
+                                            columns = value;
+                                            updateSize(this);}}})
+                                .build()))
+                            .withFields({
+                                withCellSize: (abstractEnumGrid, cellSize)=> {
+                                    abstractEnumGrid.cellSize = cellSize;
+                                    return abstractEnumGrid;},
+                                withColumns: (abstractEnumGrid, columns)=> {
+                                    abstractEnumGrid.columns = columns;
+                                    return abstractEnumGrid;}})
+                            .withBuilder()
+                            .build()),
+                        /**
+                         * Replaces 'width', 'height', and 'pointToValue' fields in options with
+                         *      'layout' that may be either "horizontal" or "vertical", and
+                         *      'cellSize' that may be either a Number or an object with width and height fields
+                         */
+                        Strip: Module.of((
+                            defaultCellSize=25,
+                            defaultLayout = "horizontal",
+                            calcWidth= (layout, cellSize, numValues)=> cellSize.width * (
+                                layout==="vertical" ? 1 : numValues),
+                            calcHeight= (layout, cellSize, numValues)=> cellSize.height * (
+                                layout==="vertical" ? numValues : 1),
+                        ) => Objects.Builder(
+                            options=> Module.of((
+                                cellSize= parseCellSize(defaultCellSize, options.cellSize),
+                                layout= ["horizontal", "vertical"].includes(options.layout) ?
+                                    options.layout : defaultLayout
+                            ) => Objects.Builder(
+                                SVG.Compositions.AbstractEnumInput(Objects.withFields(options, {
+                                    width: calcWidth(layout, cellSize, (options.values??[]).length),
+                                    height: calcHeight(layout, cellSize, (options.values??[]).length),
+                                    pointToValue: (x, y, values)=> Functions.binarySearch(
+                                        values,
+                                        layout === "vertical" ?
+                                            (value, i)=>
+                                                y < i * cellSize.height ? -1 :
+                                                y >= (i+1) * cellSize.height ? 1 : 0 :
+                                            (value, i)=>
+                                                x < i * cellSize.width ? -1 :
+                                                x >= (i+1) * cellSize.width ? 1 : 0)})))
+                                .withGettersAndSetters({
+                                    cellSize: {
+                                        get: ()=> cellSize,
+                                        set: function(value) {
+                                            cellSize = {
+                                                width: typeof value === "number" ?
+                                                    value :
+                                                    value.width??cellSize.width,
+                                                height: typeof value === "number" ?
+                                                    value :
+                                                    value.height??cellSize.height};
+                                            SVG.Compositions.AbstractEnumInput.Builder(this)
+                                                .withWidth(calcWidth(layout, cellSize, this.values.length))
+                                                .withHeight(calcHeight(layout, cellSize, this.values.length))
+                                                .build();}},
+                                    layout: {
+                                        get: ()=> layout,
+                                        set: function(value) {
+                                            layout = value;
+                                            SVG.Compositions.AbstractEnumInput.Builder(this)
+                                                .withWidth(calcWidth(layout, cellSize, this.values.length))
+                                                .withHeight(calcHeight(layout, cellSize, this.values.length))
+                                                .build();}}})
+                                .build()))
+                            .withFields({
+                                withCellSize: (abstractEnumStrip, cellSize)=> {
+                                    abstractEnumStrip.cellSize = cellSize;
+                                    return abstractEnumStrip;},
+                                withCellWidth: (abstractEnumStrip, cellWidth)=> {
+                                    abstractEnumStrip.cellSize = {
+                                        width: cellWidth,
+                                        height: abstractEnumStrip.cellSize.height};
+                                    return abstractEnumStrip;},
+                                withCellHeight: (abstractEnumStrip, cellHeight)=> {
+                                    abstractEnumStrip.cellSize = {
+                                        width: abstractEnumStrip.cellSize.width,
+                                        height: cellHeight};
+                                    return abstractEnumStrip;},
+                                withLayout: (abstractEnumStrip, layout)=> {
+                                    abstractEnumStrip.layout = layout;
+                                    return abstractEnumStrip;}})
+                            .withBuilder()
+                            .build())})
+                    .build()),
                 ActionText: Module.of((
                     defaults= {
                         text: "action text",
@@ -973,6 +1301,190 @@ const ChordJogApp = (() => {
                             return actionText;}})
                     .withBuilder()
                     .build()),
+                EnumInput: Module.of((
+                    Layout=Objects.sameKeyValues("horizontal", "vertical"),
+                    LabelPosition=Objects.sameKeyValues("left", "right", "above", "below", "none"),
+                    EnumInputStyle={
+                        cells: {
+                            stroke: Style.colors.black,
+                            unselected: {
+                                fill: Style.colors.white,
+                                strokeWidth: 1},
+                            preview: {
+                                fill: Style.colors.white,
+                                strokeWidth: 2},
+                            selected: {
+                                fill: Style.colors.black,
+                                strokeWidth: 1}}},
+                    defaults={
+                        values: Numbers.range(1, 11),
+                        value: null,
+                        layout: Layout.horizontal,
+                        labelPosition: LabelPosition.above,
+                        labelMargin: 5,
+                        cellSize: 25,
+                        changeListener: Functions.noop},
+                    calcColumns=(layout, numValues)=> layout === Layout.horizontal ? numValues : 1,
+                    positionLabels= (labels, labelPosition, labelMargin, cellSize)=> SVG.Builder(labels)
+                        .moveTo(
+                            labelPosition === LabelPosition.left ? -labelMargin :
+                                labelPosition === LabelPosition.right ? cellSize.width + labelMargin :
+                                .5 * cellSize.width,
+                            labelPosition === LabelPosition.above ? -labelMargin :
+                                labelPosition === LabelPosition.below ? cellSize.height + labelMargin :
+                                .5 * cellSize.height)
+                        .withDominantBaseline(
+                            labelPosition === LabelPosition.above ? "auto" :
+                                labelPosition === LabelPosition.below ? "hanging" : "middle")
+                        .withTextAnchor(
+                            labelPosition === LabelPosition.left ? "end" :
+                                labelPosition === LabelPosition.right ? "start" : "middle")
+                        .withDisplay(labelPosition === LabelPosition.none ? "none" : null)
+                        .build(),
+                    createCellModules= (cellSize, values)=> Numbers.range(0, values.length)
+                        .map(()=>SVG.withAttributes(
+                            SVG.Rect({
+                                width: cellSize.width,
+                                height: cellSize.height}),
+                            Objects.withField(
+                                EnumInputStyle.cells.unselected, "stroke", EnumInputStyle.cells.stroke))),
+                    createLabelModules= values=> values.map(SVG.Text)
+                )=> Objects
+                    .Builder((options={})=> Module.of((
+                        values=options.values??defaults.values,
+                        layout=options.layout??defaults.layout,
+                        labelPosition=options.labelPosition??defaults.labelPosition,
+                        labelMargin=options.labelMargin??defaults.labelMargin,
+                        cellSize=parseCellSize(defaults.cellSize, options.cellSize),
+                        changeListener=options.changeListener??defaults.changeListener,
+                        columns=calcColumns(layout, values.length),
+                        cells=SVG.Compositions.ModularGrid({
+                            modules: createCellModules(cellSize, values),
+                            columns: columns,
+                            moduleSize: cellSize,
+                            padding: 0}),
+                        labels= positionLabels(
+                            SVG.Compositions.ModularGrid({
+                                modules: createLabelModules(values),
+                                columns: columns,
+                                moduleSize: cellSize,
+                                padding: 0}),
+                            labelPosition, labelMargin, cellSize),
+                        controller=SVG.Compositions.AbstractEnumInput.Strip({
+                            layout: layout,
+                            cellSize: cellSize,
+                            values: Numbers.range(0, values.length),
+                            listeners: {
+                                preview: value=> SVG.withAttributes(cells.modules[value], EnumInputStyle.cells.preview),
+                                unpreview: value=> SVG.withAttributes(cells.modules[value],
+                                    value === controller.selection ?
+                                        EnumInputStyle.cells.selected :
+                                        EnumInputStyle.cells.unselected),
+                                select: value=> {
+                                    SVG.withAttributes(cells.modules[value], EnumInputStyle.cells.selected);
+                                    changeListener(cells.modules[value], value);},
+                                unselect: value=> SVG.withAttributes(
+                                    cells.modules[value], EnumInputStyle.cells.unselected)}})
+                    ) => SVG.Compositions.EnumInput.withValue(
+                        Objects.Builder(
+                            SVG.Builder(SVG.G())
+                                .withClass("enum-input")
+                                .withChildren(cells, labels, controller)
+                                .build())
+                            .withGettersAndSetters({
+                                values: {
+                                    get: () => values,
+                                    set: value=> {
+                                        values = value;
+                                        columns = calcColumns(layout, values.length);
+                                        cells.columns = columns;
+                                        cells.modules = createCellModules(cellSize, values);
+                                        labels.columns = columns;
+                                        labels.modules = createLabelModules(values);
+                                        controller.values= Numbers.range(0, values.length);}},
+                                layout: {
+                                    get: () => layout,
+                                    set: value=> {
+                                        layout = value;
+                                        columns= calcColumns(layout, values.length);
+                                        cells.columns = columns;
+                                        labels.columns = columns;
+                                        controller.layout = layout;}},
+                                labelPosition: {
+                                    get: () => labelPosition,
+                                    set: value=> {
+                                        labelPosition = value;
+                                        labels= positionLabels(labels, labelPosition, labelMargin, cellSize);}},
+                                labelMargin: {
+                                    get: () => labelMargin,
+                                    set: value=> {
+                                        labelMargin = value;
+                                        labels= positionLabels(labels, labelPosition, labelMargin, cellSize);}},
+                                cellSize: {
+                                    get: () => cellSize,
+                                    set: value=> {
+                                        cellSize = parseCellSize(defaults.cellSize, value);
+                                        cells.modules.forEach(cell=>
+                                            SVG.Rect.resize(cell, cellSize.width, cellSize.height));
+                                        cells.moduleSize = cellSize;
+                                        labels= positionLabels(labels, labelPosition, labelMargin, cellSize);
+                                        labels.moduleSize = cellSize;
+                                        controller.cellSize = cellSize;}},
+                                changeListener: {
+                                    get: () => changeListener,
+                                    set: value=> changeListener = value},
+                                value: {
+                                    get: ()=> values[controller.selection],
+                                    set: value=> controller.selection = values.indexOf(value)},
+                                valueIndex: {
+                                    get: () => controller.selection,
+                                    set: index=> controller.selection = index}})
+                            .withGetters({
+                                cells: () => cells,
+                                labels: () => labels,
+                                controller: () => controller})
+                            .build(),
+                        options.value??values[0])))
+                    .withSimpleBuilderSetters(
+                        "layout", "labelPosition", "labelMargin", "cellSize", "changeListener", "value")
+                    .withBuilder()
+                    .withFields({
+                        Number: Module.of((
+                            defaults={
+                                min: 1,
+                                max: 10},
+                            values= (min, max) => Numbers.range(min, 1+max)
+                        ) => Objects.Builder(options=> Module.of((
+                            min= options.min??defaults.min,
+                            max= options.max??defaults.max
+                        ) => Objects.Builder(
+                            SVG.withClass(
+                                SVG.Compositions.EnumInput(Objects.withField(options, "values", values(min, max))),
+                                "number-input"))
+                            .withGettersAndSetters({
+                                min: {
+                                    get: () => min,
+                                    set: function(value) {
+                                        min = value;
+                                        this.values = values(min, max);}},
+                                max: {
+                                    get: () => max,
+                                    set: function(value) {
+                                        max = value;
+                                        this.values = values(min, max);}}})
+                            .withGetterAndSetter("value",
+                                function() {
+                                    return min + this.controller.selection;},
+                                function(value) {
+                                    const number = Number.parseInt(value);
+                                    if(Number.isNaN(number)) {
+                                        return;}
+                                    this.controller.selection = value - min;})
+                            .build()))
+                        .withSimpleBuilderSetters("min", "max")
+                        .withBuilder()
+                        .build())})
+                    .build()),
                 /**
                  * A container for arranging elements in a grid.
                  */
@@ -1021,7 +1533,7 @@ const ChordJogApp = (() => {
                                 typeof options.moduleSize === "number" ?
                                     Numbers.nCopies(options.moduleSize, 2) :
                                 Objects.isNil(options.moduleSize) ?
-                                    [defaults.moduleSize, defaults.moduleSize] :
+                                    [defaults.moduleSize.width, defaults.moduleSize.height] :
                                     [options.moduleSize.width, options.moduleSize.height])),
                         padding= Module.of(
                             (horizontal, vertical) => Objects.withGettersAndSetters({}, {
@@ -1184,15 +1696,15 @@ const ChordJogApp = (() => {
                             .withChild(SVG.Builder(SVG.G())
                                 .moveTo(.5 * (Style.width - options.width), .5 * (Style.height - options.height))
                                 .withChild(SVG.withFill(
-                                    SVG.Rect(
-                                        -contentPadding,
-                                        -contentPadding,
-                                        Objects.isNil(options.width) ?
+                                    SVG.Rect({
+                                        x: -contentPadding,
+                                        y: -contentPadding,
+                                        width: Objects.isNil(options.width) ?
                                             options.content.getBoundingClientRect().width :
                                             options.width + 2*contentPadding,
-                                        Objects.isNil(options.height) ?
+                                        height: Objects.isNil(options.height) ?
                                             options.content.getBoundingClientRect().height :
-                                            options.height + 2*contentPadding),
+                                            options.height + 2*contentPadding}),
                                     Style.colors.white))
                                 .withChild(options.content)
                                 .build())
@@ -1221,9 +1733,7 @@ const ChordJogApp = (() => {
                  *     leave,
                  *     move,
                  *     down,
-                 *     up,
-                 *     drag,
-                 *     dragStop, enable, and disable.
+                 *     up   (passed the element that was initially moused down)
                  *
                  * Listeners are passed object like: {
                  *     position: [2-length array] 'fixed' mouse position relative to element
@@ -1239,36 +1749,28 @@ const ChordJogApp = (() => {
                         isDragging: mouseDownTarget !== null,
                         dragTarget: mouseDownTarget,
                         mouseOverTarget: mouseOverTarget}),
-                    globalDragListener=e=>{
-                        mouseDownTarget.listeners.drag(mouseState(e, mouseDownTarget));},
-                    globalDragUpListener=e=>{
-                        window.removeEventListener("mousemove", globalDragListener);
-                        window.removeEventListener("mouseup", globalDragUpListener);
-                        mouseDownTarget.listeners.dragStop(mouseState(e, mouseDownTarget));
-                        if(mouseOverTarget !== null) {
-                            mouseOverTarget.listeners.up(mouseState(e, mouseOverTarget));}
+                    globalMouseUpListener=e=>{
+                        window.removeEventListener("mouseup", globalMouseUpListener);
+                        mouseDownTarget.listeners.up(mouseState(e, mouseDownTarget));
                         mouseDownTarget = null;},
                     defaults = {
-                        x: 0,
-                        y: 0,
                         width: 10,
                         height: 10,
-                        listeners: {}}
+                        listeners: {}},
+                    EventType=Objects.sameKeyValues(
+                        "enter", "leave", "move", "down", "up", "mouseUp")
                 ) => Objects.Builder((optionsArg={}) => Module.of((
                     options = Objects.withDefaults(optionsArg, defaults),
                     listeners = Objects.withFields( //Write given listeners over Functions.noop defaults
-                        Object.fromEntries(
-                            [
-                                "enter", "leave",
-                                "move",
-                                "down", "up",
-                                "drag", "dragStop",
-                                "enable", "disable"]
-                            .map(key => [key, Functions.noop])),
+                        Object.fromEntries(Object.keys(EventType).map(key => [key, Functions.noop])),
                         options.listeners)
                     ) => SVG.Compositions.MouseRegion.enable(
                         Objects.Builder(
-                            SVG.Builder(SVG.Rect(options.x, options.y, options.width, options.height))
+                            SVG.Builder(SVG.Rect({
+                                x: options.x,
+                                y: options.y,
+                                width: options.width,
+                                height: options.height}))
                                 .withClass("mouse-region")
                                 .withoutFill()
                                 .withoutStroke()
@@ -1286,8 +1788,7 @@ const ChordJogApp = (() => {
                                     mousedown: function(e) {
                                         mouseDownTarget = this;
                                         listeners.down(mouseState(e, this));
-                                        window.addEventListener("mousemove", globalDragListener);
-                                        window.addEventListener("mouseup", globalDragUpListener);}})
+                                        window.addEventListener("mouseup", globalMouseUpListener);}})
                                 .withModification(function(){
                                     Object.keys(options.listeners).forEach(listenerKey =>
                                         listeners[listenerKey] = listeners[listenerKey].bind(this));})
@@ -1310,22 +1811,21 @@ const ChordJogApp = (() => {
                             types.forEach(type => SVG.Compositions.MouseRegion.removeListener(region, type));
                             return region;},
                         /**
-                         * En/dis-able will not affect drag and dragStop, as those events belong to the window.
+                         * En/dis-able will not affect drag and mouseUp, as those events belong to the window.
                          */
                         enable: region => {
                             SVG.withCursor(region, "pointer");
                             SVG.withPointerEvents(region, SVG.Attributes.Presentation.PointerEvents.all);
                             region.isEnabled = true;
-                            region.listeners.enable();
                             return region;},
                         disable: region => {
                             SVG.withCursor(region, "default");
                             region.isEnabled = false;
                             SVG.withoutPointerEvents(region);
-                            region.listeners.disable();
                             return region;}})
                     .withBuilder()
                     .withFields({
+                        EventType: EventType,
                         isEnabled: region => region.getAttribute("pointer-events") !== "none"})
                     .build()),
                 NumberByDigitInput: Module.of((
@@ -1578,7 +2078,7 @@ const ChordJogApp = (() => {
                             .withFontSize(17)
                             .build(),
                         rect=SVG.withClass(
-                            SVG.Rect(0, 0, options.width, options.height),
+                            SVG.Rect(Objects.withOnlyFields(options, "width", "height")),
                             "text-button-outline"),
                         mouseRegion=SVG.Compositions.MouseRegion({
                             width: options.width,
@@ -1592,10 +2092,9 @@ const ChordJogApp = (() => {
                                     SVG.Compositions.TextButton.active(this.parentElement);},
                                 leave: function() {
                                     SVG.Compositions.TextButton.normal(this.parentElement);},
-                                dragStop: function() {
-                                    SVG.Compositions.TextButton.normal(this.parentElement);},
                                 up: function(e) {
-                                    if(e.dragTarget === this) {
+                                    SVG.Compositions.TextButton.normal(this.parentElement);
+                                    if(e.mouseOverTarget === this) {
                                         SVG.Compositions.TextButton.preview(this.parentElement);
                                         this.parentElement.clickListener();}}}})
                     ) => SVG.Compositions.TextButton.enable(
@@ -1639,7 +2138,7 @@ const ChordJogApp = (() => {
                         preview: textButton=>SVG.withStrokeWidth(textButton, 1.5),
                         active: textButton=>SVG.withStrokeWidth(textButton, 2)})
                     .withBuilder()
-                    .build())}})
+                    .build())}))})
         .build());
 
     //A shape defines the sounding of a guitar as an array of six string actions called its schema.
@@ -1805,7 +2304,8 @@ const ChordJogApp = (() => {
                 return shapesString !== null && shapesString.length > 0 ? shapesFromString(shapesString) : [];}),
             downloadStandardLibrary: () => fetch(shapesLibraryUrl)
                 .then(response => response.ok ? response.text() : "")
-                .then(shapesFromString),
+                .catch(Functions.constant(""))
+                .then(string=> shapesFromString(string)),
             existsWithSchema: schema => Shape.all.some(shape =>
                 Schema.equals(shape.schema, schema)),
             getWithSchema: schema => Shape.all.find(shape => Schema.equals(shape.schema, schema)),
@@ -2020,11 +2520,11 @@ const ChordJogApp = (() => {
                 .moveTo(startX + .5 * width, Fretboard.fretToYCoordinate(fingerAction.fret))
                 .withChild(SVG.Builder(
                     SVG.Rect.withRadius(
-                        SVG.Rect(
-                            -(.5*width + FingerIndicator.Style.radius),
-                            -FingerIndicator.Style.radius,
-                            FingerIndicator.Style.diameter + width,
-                            FingerIndicator.Style.diameter),
+                        SVG.Rect({
+                            x: -(.5*width + FingerIndicator.Style.radius),
+                            y: -FingerIndicator.Style.radius,
+                            width: FingerIndicator.Style.diameter + width,
+                            height: FingerIndicator.Style.diameter}),
                         FingerIndicator.Style.radius))
                     .withClass("finger-indicator-outline")
                     .withFill(Style.colors.superHeavy)
@@ -2977,7 +3477,7 @@ const ChordJogApp = (() => {
                                 dragAction = schemaChange.change;
                                 Schema.set(schemaChange.schema, false);
                                 Preview.set(null);},
-                            dragStop: () => {
+                            up: () => {
                                 dragAction = null;
                                 Preview.set(Schema.get());
                                 Schema.callChangeListener();}})),
@@ -3794,7 +4294,7 @@ const ChordJogApp = (() => {
                     shapeChartGrid,
                     ...ShapeItem.shapesToShapeItems(
                         matches.slice(startIndex, startIndex+maxMatches)));},
-            pageSliderMax = () => Numbers.clampLower(Math.ceil(matches.length/maxMatches)-1,0),
+            pageSliderMax = () => Math.max(Math.ceil(matches.length/maxMatches)-1,0),
             updatePageInputRange=() => {
                 if(matches.length === 0) {
                     pageInput.max = 0;
@@ -3804,7 +4304,7 @@ const ChordJogApp = (() => {
                     pageInput.max = pageSliderMax();}
                 SVG.yTo(shapeChartGrid,
                     ShapesPageTopRow.Style.endY + shapeChartMarginTop + pageInputMarginTop +
-                    Numbers.clampLower(pageInput.max.toString().length, 1)*pageInputCellSize);},
+                    Math.max(pageInput.max.toString().length, 1)*pageInputCellSize);},
             updateMatches=(pageNumber=pageInput.selected)=>{
                 matches = Shape.search(shapeFilterInput.schema);
                 updatePageInputRange();
@@ -3932,7 +4432,7 @@ const ChordJogApp = (() => {
                         .withFontFamily("Courier New")
                         .withChild(SVG.Builder(SVG.G())
                             .withClass("upload-buttons-label-container")
-                            .withChild(SVG.Builder(SVG.Rect(0, 0, medianStartX, buttonHeight))
+                            .withChild(SVG.Builder(SVG.Rect({width: medianStartX, height: buttonHeight}))
                                 .withClass("upload-buttons-label-outline")
                                 .withFill("#D0D0D0")
                                 .build())
@@ -3945,7 +4445,7 @@ const ChordJogApp = (() => {
                         .withChild(SVG.Builder(SVG.G())
                             .withClass("upload-buttons-median-container")
                             .moveTo(medianStartX, 0)
-                            .withChild(SVG.Builder(SVG.Rect(0, 0, medianWidth, buttonHeight))
+                            .withChild(SVG.Builder(SVG.Rect({width: medianWidth, height: buttonHeight}))
                                 .withClass("upload-buttons-median-outline")
                                 .withFill("#D0D0D0")
                                 .build())
@@ -4013,14 +4513,14 @@ const ChordJogApp = (() => {
                 "refresh", updateMatches);})}));
 
     const ShapesGenerator = Module.of((
-        defaultNumChords=6,
-        numShapesInputCellSize=25,
+        defaultNumChords=8,
+        numShapesInputCellSize= 30,
         numChordsRange = {
             min: 1,
             max: 12},
         generateButtonSize={
             width: ShapeChart.Fretboard.Style.width,
-            height: 2*numShapesInputCellSize},
+            height: 40},
         shapeChartGridMarginTop = 90,
         shapeChartGridPadding= {
             horizontal: 10,
@@ -4033,16 +4533,21 @@ const ChordJogApp = (() => {
         numChordsKey = "chord-jog-num-chords"
     ) => ({
         new: () => Module.of((
-            numShapesInput = SVG.xTo(
-                SVG.Compositions.NumberByDigitInput({
-                    min: numChordsRange.min,
-                    max: numChordsRange.max,
-                    initial: Module.of((
+            numShapesInput = SVG.moveTo(
+                SVG.Compositions.EnumInput.Number({
+                    min: 1,
+                    max: 12,
+                    value: Module.of((
                         savedNumChords = localStorage.getItem(numChordsKey)
-                    ) => savedNumChords !== null ? Number.parseInt(savedNumChords) : defaultNumChords),
+                    ) => {
+                        if(savedNumChords !== null){
+                            const parsedChords = Number.parseInt(savedNumChords);
+                            return Number.isNaN(parsedChords) ? defaultNumChords : parsedChords;}
+                        return defaultNumChords;}),
                     cellSize: numShapesInputCellSize,
                     changeListener: numChords => localStorage.setItem(numChordsKey, numChords)}),
-                generateButtonSize.width + generateButtonMarginRight),
+                generateButtonSize.width + generateButtonMarginRight,
+                .5 * (generateButtonSize.height - numShapesInputCellSize)),
             shapesGrid = SVG.yTo(
                 SVG.Compositions.ModularGrid({
                     moduleSize: {
@@ -4055,7 +4560,7 @@ const ChordJogApp = (() => {
                 shapeChartGridMarginTop),
             generateChords=()=>{
                 const shapeIndices = [];
-                const numChords = Numbers.clampUpper(numShapesInput.value, Shape.all.length);
+                const numChords = Math.min(numShapesInput.value, Shape.all.length);
                 while(shapeIndices.length < numChords) {
                     const chordIndex = Numbers.randomIntegerInRange(0, Shape.all.length - 1);
                     if(! shapeIndices.includes(chordIndex)) {
