@@ -1261,8 +1261,8 @@ const ChordJogApp = (() => {
                             down: function() {
                                 SVG.Compositions.ActionText.active(this.parentElement);},
                             up: function(e) {
-                                SVG.Compositions.ActionText.preview(this.parentElement);
-                                if(e.dragTarget === this) {
+                                if(e.mouseOverTarget === this) {
+                                    SVG.Compositions.ActionText.preview(this.parentElement);
                                     this.parentElement.clickListener();}}}})
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
@@ -1731,7 +1731,7 @@ const ChordJogApp = (() => {
                  *     leave,
                  *     move,
                  *     down,
-                 *     up   (passed the element that was initially moused down)
+                 *     up   (any mouse-up after this element was mouse-down-ed)
                  *
                  * Listeners are passed object like: {
                  *     position: [2-length array] 'fixed' mouse position relative to element
@@ -4242,11 +4242,10 @@ const ChordJogApp = (() => {
                             Frets.Range.equals(rootFretRange, currentShape.range)))
                         .withoutErrorMessage()])
                     .concat(ShapeValidations.common)
-                reset = () => Module.of((
-                    shapeToResetTo=Shape.all[shape.id]
-                ) => {
+                reset = () => {
+                    const shapeToResetTo = Shape.all[shape.id];
                     shapeInput.schema = shapeToResetTo.schema;
-                    rootFretRangeInput.range = shapeToResetTo.range;});
+                    rootFretRangeInput.range = shapeToResetTo.range;},
                 save = () => {
                     Shape.update(Shape.Builder(shape)
                         .withSchema(shapeInput.schema)
