@@ -42,8 +42,7 @@ const ChordJogApp = (() => {
             value=initialValue,
             validations=[sameAsBeforeValidation],
             observers=[],
-            param=undefined,
-            defineParam=param={
+            param={
                 get: () => value,
                 set: newValue => {
                     const failValidation = validations.find(validation=>validation.condition(newValue, value));
@@ -168,11 +167,16 @@ const ChordJogApp = (() => {
                     get: getter,
                     configurable: true});
                 return object;},
+            withoutGetter: (object, key) => {
+                Object.defineProperty(object, key, {
+                    get: undefined,
+                    configurable: true});
+                return object;},
             withGetters: (object, getters) => {
                 Object.entries(getters).forEach(getter=> Objects.withGetter(object, ...getter));
                 return object;},
             withoutGetters: (object, ...keys) => {
-                getters.forEach(getter=> Objects.withoutGetter(object, getter));
+                keys.forEach(key=> Objects.withoutGetter(object, key));
                 return object;},
             withSetter: (object, key, setter) => {
                 Object.defineProperty(object, key, {
@@ -188,7 +192,7 @@ const ChordJogApp = (() => {
                 Object.entries(setters).forEach(setter => Objects.withSetter(object, ...setter));
                 return object;},
             withoutSetters: (object, ...keys) => {
-                setters.forEach(setter=> Object.withoutSetter(object, setter));
+                keys.forEach(key=> Object.withoutSetter(object, key));
                 return object;},
             withGetterAndSetter: (object, key, getter, setter) => {
                 Object.defineProperty(object, key, {
@@ -711,8 +715,6 @@ const ChordJogApp = (() => {
         .withBuilder({defaultInitial: undefined})
         .withFields({
             getTransform: (element, type)=> {
-                if(typeof element.getAttribute !== "function") {
-                    let sba = 1;}
                 const transformAttribute = element.getAttribute("transform");
                 if(transformAttribute === null) {
                     return SVG.Attributes.Transform[type].identity;}
@@ -871,7 +873,7 @@ const ChordJogApp = (() => {
                     withTextContent: (text, content) => {
                         text.textContent = content;
                         return text;},
-                    withoutTextContent: (text, content) => {
+                    withoutTextContent: text => {
                         text.textContent = null;
                         return text;},
                     withX: (text, x) => SVG.withAttribute(text, "x", x),
@@ -1037,11 +1039,11 @@ const ChordJogApp = (() => {
                                     SVG.Compositions.AbstractEnumInput.closestPreviewed(
                                         this.parentNode, ...e.position);},
                                 leave: function(e) {
-                                    if(! e.isDragging) {
+                                    if(e.dragTarget !== this) {
                                         SVG.Compositions.AbstractEnumInput.unpreviewed(this.parentNode);}},
                                 move: function(e) {
                                     SVG.Compositions.AbstractEnumInput[
-                                        `closest${e.isDragging ? "Select" : "Preview"}ed`
+                                        `closest${e.dragTarget === this ? "Select" : "Preview"}ed`
                                         ](this.parentNode, ...e.position);},
                                 down: function(e) {
                                     Preview.unset();
@@ -1254,16 +1256,22 @@ const ChordJogApp = (() => {
                         width: options.width,
                         height: options.height,
                         listeners: {
-                            enter: function() {
-                                SVG.Compositions.ActionText.preview(this.parentElement);},
-                            leave: function() {
-                                SVG.Compositions.ActionText.inactive(this.parentElement);},
+                            enter: function(e) {
+                                SVG.Compositions.ActionText[
+                                    e.dragTarget === this ? "active" : "preview"
+                                ](this.parentElement);},
+                            leave: function(e) {
+                                SVG.Compositions.ActionText[
+                                    e.dragTarget === this ? "preview" : "inactive"
+                                ](this.parentElement);},
                             down: function() {
                                 SVG.Compositions.ActionText.active(this.parentElement);},
                             up: function(e) {
                                 if(e.mouseOverTarget === this) {
                                     SVG.Compositions.ActionText.preview(this.parentElement);
-                                    this.parentElement.clickListener();}}}})
+                                    this.parentElement.clickListener();}
+                                else {
+                                    SVG.Compositions.ActionText.inactive(this.parentElement);}}}})
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
                             .withClass("action-text")
@@ -1854,6 +1862,7 @@ const ChordJogApp = (() => {
                         cellGrid = Module.of((
                             indexToDigitValue=i=>[numDigits(options.max) - Math.floor(i/10) - 1, i%10],
                             digitValueToIndex=(digit,value)=>10*(numDigits(options.max)-digit-1)+value,
+                            isDragging = false,
                             createCells=() => Numbers
                                 .range(0, 10*numDigits(options.max), 1)
                                 .map(i => Module.of((digitValue = indexToDigitValue(i)) => SVG.withAttributes(
@@ -1861,17 +1870,19 @@ const ChordJogApp = (() => {
                                         width: options.cellSize,
                                         height: options.cellSize,
                                         listeners: {
-                                            enter: function(e) {
-                                                if(e.isDragging === true) {
+                                            enter: function() {
+                                                if(isDragging === true) {
                                                     Selection.setDigit(...digitValue);}
                                                 else {
                                                     Preview.set(...digitValue);}},
                                             down: () => {
+                                                isDragging = true;
                                                 Preview.unset();
                                                 Selection.setDigit(...digitValue);},
-                                            leave: e => {
-                                                if(e.isDragging === false) {
-                                                    Preview.unset();}}}}),
+                                            leave: () => {
+                                                if(isDragging === false) {
+                                                    Preview.unset();}},
+                                            up: ()=> isDragging = false}}),
                                     {
                                         stroke: Style.colors.superHeavy,
                                         strokeWidth: 1})))
@@ -2016,21 +2027,20 @@ const ChordJogApp = (() => {
                                 set: Selection.set},
                             min: {
                                 get: () => options.min,
-                                set: min => min === options.min ? undefined : (
-                                    options.min = min,
+                                set: min => {
+                                    if(min === options.min || min > options.max) return;
+                                    options.min = min;
                                     Selection.get() < options.min ?
                                         Selection.set(options.min) :
-                                        cellGrid.enableDisableAll())},
+                                        Selection.rerender();}},
                             max: {
                                 get: () => options.max,
                                 set: max => {
-                                    if(max === options.max) return;
-                                    const oldNumDigits = numDigits(options.max);
+                                    if(max === options.max || max < options.min) return;
                                     options.max = max;
-                                    if(Selection.get() > options.max) {
-                                        Selection.set(options.max);}
-                                    else {
-                                        Selection.rerender();}}},
+                                    Selection.get() > options.max ?
+                                        Selection.set(options.max) :
+                                        Selection.rerender();}},
                             cellGrid: {
                                 get: () => cellGrid}})
                         .build()))
@@ -4241,11 +4251,11 @@ const ChordJogApp = (() => {
                         ) => Shape.Schema.equals(schema, currentShape.schema) &&
                             Frets.Range.equals(rootFretRange, currentShape.range)))
                         .withoutErrorMessage()])
-                    .concat(ShapeValidations.common)
+                    .concat(ShapeValidations.common);
                 reset = () => {
                     const shapeToResetTo = Shape.all[shape.id];
                     shapeInput.schema = shapeToResetTo.schema;
-                    rootFretRangeInput.range = shapeToResetTo.range;},
+                    rootFretRangeInput.range = shapeToResetTo.range;};
                 save = () => {
                     Shape.update(Shape.Builder(shape)
                         .withSchema(shapeInput.schema)
