@@ -2083,7 +2083,7 @@ const ChordJogApp = (() => {
                             height: options.height,
                             listeners: {
                                 enter: function(e) {
-                                    e.dragTarget = this ?
+                                    e.dragTarget === this ?
                                         SVG.Compositions.TextButton.active(this.parentElement) :
                                         SVG.Compositions.TextButton.preview(this.parentElement);},
                                 down: function() {
