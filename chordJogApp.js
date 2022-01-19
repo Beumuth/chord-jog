@@ -4231,7 +4231,6 @@ const ChordJogApp = (() => {
                     text: "Save",
                     clickListener: () => {
                         save();
-                        reset();
                         output.textContent = "Saved";}}))
                 .withClass("shape-form-save-button")
                 .moveTo(
@@ -4299,7 +4298,8 @@ const ChordJogApp = (() => {
                         .withSchema(shapeInput.schema)
                         .withRange(rootFretRangeInput.range)
                         .build());
-                    doValidations();};
+                    doValidations();
+                    reset();};
                 return shapeFormWithSchemaAndRange(shape.schema, shape.range);},
             forCreation: () => {
                 shapeValidations = ShapeValidations.forCreation
@@ -4308,10 +4308,12 @@ const ChordJogApp = (() => {
                     shapeInput.schema = Shape.Schema.allUnsounded();
                     rootFretRangeInput.range = Frets.Range.roots;
                     output.textContent = null; };
-                save = () => Shape.add(Shape.Builder()
-                    .withSchema(shapeInput.schema)
-                    .withRange(rootFretRangeInput.range)
-                    .build());
+                save = () => {
+                    Shape.add(Shape.Builder()
+                        .withSchema(shapeInput.schema)
+                        .withRange(rootFretRangeInput.range)
+                        .build());
+                    doValidations();};
                 return shapeFormWithSchemaAndRange(Shape.Schema.allUnsounded(), Frets.Range.roots);}}))}));
     
     const ShapesManager = Module.of((
