@@ -819,12 +819,34 @@ const ChordJogApp = (() => {
                 .withField("getD", path => path.getAttribute("d"))
                 .build(),
             Rect: Objects
-                .Builder(options=> SVG.withAttributes(SVG("rect"),
+                .Builder(options=> Objects.withGettersAndSetters(
+                    SVG.withAttributes(SVG("rect"),
+                        {
+                            x: options.x??0,
+                            y: options.y??0,
+                            width: options.width??10,
+                            height: options.height??10}),
                     {
-                        x: options.x??0,
-                        y: options.y??0,
-                        width: options.width??10,
-                        height: options.height??10}))
+                        x: {
+                            get: function() {
+                                return Number.parseInt(this.getAttribute("x"));},
+                            set: function(value) {
+                                this.setAttribute("x", value);}},
+                        y: {
+                            get: function() {
+                                return Number.parseInt(this.getAttribute("y"));},
+                            set: function(value) {
+                                this.setAttribute("y", value);}},
+                        width: {
+                            get: function() {
+                                return Number.parseInt(this.getAttribute("width"));},
+                            set: function(value) {
+                                this.setAttribute("width", value);}},
+                        height: {
+                            get: function() {
+                                return Number.parseInt(this.getAttribute("height"));},
+                            set: function(value) {
+                                this.setAttribute("height", value);}}}))
                 .withFields({
                     withWidth: (rect, width) => SVG.withAttribute(rect, "width", width),
                     withHeight: (rect, height) => SVG.withAttribute(rect, "height", height),
@@ -2114,13 +2136,31 @@ const ChordJogApp = (() => {
                             label: () => label,
                             rect: () => rect,
                             mouseRegion: () => mouseRegion})
-                        .withFields({
-                            clickListener: options.clickListener})
+                        .withGettersAndSetters({
+                            text: {
+                                get: () => options.text,
+                                set: value=> {
+                                    options.text = value;
+                                    label.textContent = value;}},
+                            width: {
+                                get: ()=> options.width,
+                                set: value=> {
+                                    options.width = value;
+                                    SVG.xTo(label, .5*value);
+                                    mouseRegion.width = value;
+                                    rect.width = value;}},
+                            height: {
+                                get: ()=> options.height,
+                                set: value=> {
+                                    options.height= value;
+                                    SVG.yTo(label, .5*value);
+                                    mouseRegion.height = value;
+                                    rect.height = value;}},
+                            clickListener: {
+                                get: ()=> options.clickListener,
+                                set: value=> options.clickListener = value}})
                         .build())))
                     .withFields({
-                        withClickListener: (textButton, listener) => {
-                            textButton.clickListener = listener;
-                            return textButton;},
                         enable: textButton => SVG.Builder(textButton)
                             .withCursor(SVG.Attributes.Presentation.Cursor.pointer)
                             .withPointerEvents("none")
@@ -2135,16 +2175,14 @@ const ChordJogApp = (() => {
                                 SVG.withTextDecoration(this.label, "line-through");
                                 SVG.Compositions.MouseRegion.disable(this.mouseRegion);})
                             .build(),
-                        withText: (textButton, text) => {
-                            textButton.label.textContent = text;
-                            return textButton; },
                         resize: (textButton, width, height) => {
-                            [textButton.rect, textButton.mouseRegion].map(
-                                element => SVG.Rect.resize(element, width, height));
+                            textButton.width = width;
+                            textButton.height = height;
                             return textButton;},
                         normal: textButton=>SVG.withStrokeWidth(textButton, 1),
                         preview: textButton=>SVG.withStrokeWidth(textButton, 1.5),
                         active: textButton=>SVG.withStrokeWidth(textButton, 2)})
+                    .withSimpleBuilderSetters("text", "width", "height", "clickListener")
                     .withBuilder()
                     .build())}))})
         .build());
