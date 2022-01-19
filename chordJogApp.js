@@ -4316,7 +4316,7 @@ const ChordJogApp = (() => {
                     doValidations();};
                 return shapeFormWithSchemaAndRange(Shape.Schema.allUnsounded(), Frets.Range.roots);}}))}));
     
-    const ShapesManager = Module.of((
+    const ShapesLibrary = Module.of((
         shapeFilterMarginRight=32,
         topRowMarginBottom=10,
         shapeChartGridPadding= {
@@ -4554,7 +4554,7 @@ const ChordJogApp = (() => {
             updateMatches(0);
             return Objects.withMethod(
                 SVG.Builder(SVG.G())
-                    .withClass("shapes-manager")
+                    .withClass("shapes-library")
                     .withChildren(ShapesPageTopRow.element, pageInput, shapeChartGrid)
                     .build(),
                 "refresh", updateMatches);})}));
@@ -4744,7 +4744,7 @@ const ChordJogApp = (() => {
         navigationBar = NavigationBar.new(),
         pages={
             Generate: ShapesGenerator.new(),
-            Manage: ShapesManager.new()},
+            Library: ShapesLibrary.new()},
         addPage=(name, content)=>navigationBar
             .withPage(name, SVG.yTo(content, NavigationBar.Style.endY + NavigationBar.Style.marginBottom)),
         addPages=Object.entries(pages).forEach(page => addPage(page[0], page[1]))
@@ -4767,7 +4767,7 @@ const ChordJogApp = (() => {
             Shape.downloadStandardLibrary().then(shapes => {
                 Shape.replaceAll(shapes);
                 pages.Generate.regenerate();
-                pages.Manage.refresh();}) : undefined)
+                pages.Library.refresh();}) : undefined)
         .build());
     return {
         create: () => chordJogApp};})();
