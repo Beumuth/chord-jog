@@ -219,9 +219,7 @@ const ChordJogApp = (() => {
             withFields: (object, fields) => {
                 Object.entries(fields).forEach(field => object[field[0]] = field[1]);
                 return object;},
-            withOnlyField: (object, field) => ({
-                [field]: object[field]}),
-            withOnlyFields: (object, ...fields) => Object.fromEntries(fields.map(field=> [field, object[field]])),
+            withOnly: (object, ...fields) => Object.fromEntries(fields.map(field=> [field, object[field]])),
             withDefaults: (object, defaults) => {
                 Object.entries(defaults).forEach(
                     defaultEntry => Objects.isNil(object[defaultEntry[0]]) ?
@@ -2108,7 +2106,7 @@ const ChordJogApp = (() => {
                             .withFontSize(17)
                             .build(),
                         rect=SVG.withClass(
-                            SVG.Rect(Objects.withOnlyFields(options, "width", "height")),
+                            SVG.Rect(Objects.withOnly(options, "width", "height")),
                             "text-button-outline"),
                         mouseRegion=SVG.Compositions.MouseRegion({
                             width: options.width,
@@ -2334,7 +2332,7 @@ const ChordJogApp = (() => {
     )=> Objects
         .Builder(()=>({
             id: null,
-            schema: Schema.allUnsounded,
+            schema: Schema.allUnsounded(),
             range: Frets.Range.roots}))
         .withFields({
             withId: (shape, id) => Objects.withField(shape, "id", id),
@@ -4327,7 +4325,7 @@ const ChordJogApp = (() => {
         pageInputMarginTop=25,
         pageInputCellSize=25,
         maxMatches=12,
-        pageOfShape=id=>Math.ceil((1+id)/maxMatches) - 1,
+        pageOfShape=id=>Math.max(0, Math.ceil((1+id)/maxMatches) - 1),
         width = shapeChartGridMaxColumns*ShapeChart.Style.width +
             (shapeChartGridMaxColumns-1)*shapeChartGridPadding.horizontal
     ) => ({
@@ -4335,12 +4333,12 @@ const ChordJogApp = (() => {
             width: width},
         new: () => Module.of((
             matches=[],
-            refreshShapesList=selectedPage => {
+            refreshShapeItems=selectedPage => {
                 const startIndex = selectedPage*maxMatches;
-                SVG.Compositions.ModularGrid.setModules(
-                    shapeChartGrid,
-                    ...ShapeItem.shapesToShapeItems(
-                        matches.slice(startIndex, startIndex+maxMatches)));},
+                Numbers.range(startIndex, startIndex+maxMatches).forEach((shapeIndex, shapeItemIndex)=>
+                    shapeItems[shapeItemIndex].shape = shapeIndex < matches.length ? matches[shapeIndex] : Shape());
+                SVG.Compositions.ModularGrid.setModules(shapeChartGrid,
+                    ...shapeItems.slice(0, Math.min(maxMatches, matches.length - startIndex)));},
             pageSliderMax = () => Math.max(Math.ceil(matches.length/maxMatches)-1,0),
             updatePageInputRange=() => {
                 if(matches.length === 0) {
@@ -4356,63 +4354,82 @@ const ChordJogApp = (() => {
                 matches = Shape.search(shapeFilterInput.schema);
                 updatePageInputRange();
                 pageInput.value = pageNumber;
-                refreshShapesList(pageNumber);},
+                refreshShapeItems(pageNumber);},
             ShapeItem=Module.of((
                 deleteButtonWidth=65,
-                editButtonWidth=40,
-                moduleWidth=deleteButtonWidth-10,
-                buttonHeight=18,
-                buttonPadding=3,
-                buttonsContainerOffsetX=-4,
-                buttonsContainerOffsetY=35
-            ) => ({
-                Style: {
+                Style={
+                    deleteButtonWidth: deleteButtonWidth,
+                    editButtonWidth: 40,
+                    moduleWidth: deleteButtonWidth-10,
+                    buttonHeight: 18,
+                    buttonPadding: 3,
+                    buttonsContainerOffsetX: -4,
+                    buttonsContainerOffsetY: 35,
                     width: ShapeChart.Style.width,
-                    height: ShapeChart.Style.height},
-                shapesToShapeItems: shapes => shapes
-                    .slice(0, maxMatches)
-                    .map(shape=>SVG.Builder(SVG.G())
-                        .withClass("shape-item")
-                        .withChild(ShapeChart.Builder
-                            .forSchema(shape.schema)
-                            .unfixed())
-                        .withChild(SVG.Builder(SVG.Compositions.ModularGrid({ //Buttons container
+                    height: ShapeChart.Style.height}
+            ) => Objects.Builder(shape=>
+                Module.of((
+                    shapeChart= ShapeChart.Builder
+                        .forSchema(shape.schema)
+                        .unfixed(),
+                    editButton= SVG.Compositions.ActionText({
+                        text: "edit",
+                        width: Style.editButtonWidth,
+                        height: Style.buttonHeight,
+                        clickListener: () => {
+                            shapeFilterInput.unfocus();
+                            SVG.withChild(chordJogApp, SVG.Compositions.Modal({
+                                content: ShapeForm.Builder().forEditing(Shape.all[shape.id]),
+                                width: ShapeForm.Style.width,
+                                height: ShapeForm.Style.height,
+                                closeListener: () => {
+                                    shapeFilterInput.focus();
+                                    updateMatches();}}))}}),
+                    deleteButton= SVG.Compositions.ActionText({
+                        text: "delete",
+                        width: Style.deleteButtonWidth,
+                        height: Style.buttonHeight,
+                        clickListener: () => {
+                            if(true===confirm("Are you sure you want to delete this shape?")) {
+                                Shape.delete(shape.id);
+                                updateMatches(pageOfShape(shape.id < Shape.all.length ?
+                                    shape.id :
+                                    shape.id - 1));}}}),
+                    buttons= SVG.Builder(
+                        SVG.Compositions.ModularGrid({
                             moduleSize: {
-                                width: moduleWidth,
-                                height: buttonHeight},
-                            padding: buttonPadding,
+                                width: Style.moduleWidth,
+                                height: Style.buttonHeight},
+                            padding: Style.buttonPadding,
                             columns: 2,
-                            modules: [
-                                SVG.Compositions.ActionText({
-                                    text: "edit",
-                                    width: editButtonWidth,
-                                    height: buttonHeight,
-                                    clickListener: () => {
-                                        shapeFilterInput.unfocus();
-                                        SVG.withChild(chordJogApp, SVG.Compositions.Modal({
-                                            content: ShapeForm.Builder().forEditing(Shape.all[shape.id]),
-                                            width: ShapeForm.Style.width,
-                                            height: ShapeForm.Style.height,
-                                            closeListener: () => {
-                                                shapeFilterInput.focus();
-                                                updateMatches();}}))}}),
-                                SVG.Compositions.ActionText({
-                                    text: "delete",
-                                    width: deleteButtonWidth,
-                                    height: buttonHeight,
-                                    clickListener: () => {
-                                        if(true===confirm("Are you sure you want to delete this shape?")) {
-                                            Shape.delete(shape.id);
-                                            updateMatches(pageOfShape(shape.id < Shape.all.length ?
-                                                shape.id :
-                                                shape.id - 1));}}})]}))
-                            .moveTo(
-                                ShapeChart.RootFretLabel.Style.x + buttonsContainerOffsetX,
-                                ShapeChart.Style.height - buttonsContainerOffsetY)
-                            .withClass("shape-item-buttons-container")
-                            .rotateTo(270)
-                            .build())
-                        .build())})),
+                            modules: [editButton, deleteButton]}))
+                        .moveTo(
+                            ShapeChart.RootFretLabel.Style.x + Style.buttonsContainerOffsetX,
+                            ShapeChart.Style.height - Style.buttonsContainerOffsetY)
+                        .withClass("shape-item-buttons")
+                        .rotateTo(270)
+                        .build()
+                ) => Objects.Builder(
+                    SVG.Builder(SVG.G())
+                        .withClass("shape-item")
+                        .withChild(shapeChart)
+                        .withChild(buttons)
+                        .build())
+                    .withGetters({
+                        buttons: ()=> buttons,
+                        editButton: ()=> editButton,
+                        deleteButton: ()=> deleteButton,
+                        shapeChart: ()=> shapeChart})
+                    .withGetterAndSetter("shape",
+                        ()=> shape,
+                        value=> {
+                            shape = value;
+                            shapeChart.schema = shape.schema;})
+                    .build()))
+                .withSimpleBuilderSetters("shape")
+                .withBuilder()
+                .withField("Style", Objects.withOnly(Style, "width", "height"))
+                .build()),
             ShapesPageTopRow=Module.of((
                 setupShapeFilterInput=shapeFilterInput=ShapeInput.Builder
                     .withWildcards()
@@ -4535,19 +4552,21 @@ const ChordJogApp = (() => {
                     .withChild(shapesFilterContainer)
                     .withChild(shapesButtonContainer)
                     .build()})),
+            shapeItems = Numbers.range(0, maxMatches).map(i=> ShapeItem(matches.length > i ? matches[i] : Shape())),
             shapeChartGrid=SVG.withClass(
                 SVG.Compositions.ModularGrid({
                     moduleSize: {
                         width: ShapeChart.Style.width,
                         height: ShapeItem.Style.height},
                     columns: 4,
-                    padding: shapeChartGridPadding.horizontal + shapeChartGridPadding.vertical}),
+                    padding: shapeChartGridPadding.horizontal + shapeChartGridPadding.vertical,
+                    modules: shapeItems.slice(0, matches.length)}),
                 "shape-chart-grid"),
             pageInput = SVG.moveTo(
                 SVG.Compositions.NumberByDigitInput({
                     cellSize: pageInputCellSize,
                     max: pageSliderMax(),
-                    changeListener: refreshShapesList}),
+                    changeListener: refreshShapeItems}),
                 .5*(Style.width - 10*pageInputCellSize),
                 ShapesPageTopRow.Style.endY + pageInputMarginTop)
         ) => {
