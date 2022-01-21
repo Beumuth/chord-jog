@@ -1855,6 +1855,7 @@ const ChordJogApp = (() => {
                         isEnabled: region => region.getAttribute("pointer-events") !== "none"})
                     .build()),
                 NumberByDigitInput: Module.of((
+                    valueLetterSpacing= 6,
                     defaults = {
                         initial: null,
                         enabled: true,
@@ -1878,6 +1879,15 @@ const ChordJogApp = (() => {
                                 .build()),
                         digitLabelContainer = SVG.Builder(SVG.G())
                             .withChildren(...digitLabels())
+                            .build(),
+                        valueLabelX=()=>options.cellSize * 10 + options.labelMargin,
+                        valueLabelY=()=>.5 * options.cellSize * numDigits(options.max) - .5 * valueLetterSpacing,
+                        valueLabel= SVG.Builder(SVG.Text())
+                            .moveTo(valueLabelX(), valueLabelY())
+                            .rotateTo(270)
+                            .centerAlign()
+                            .bottomAlign()
+                            .withAttribute("letterSpacing", valueLetterSpacing)
                             .build(),
                         cellGrid = Module.of((
                             indexToDigitValue=i=>[numDigits(options.max) - Math.floor(i/10) - 1, i%10],
@@ -2004,6 +2014,7 @@ const ChordJogApp = (() => {
                                 SVG.withChildren(SVG.clearChildren(digitLabelContainer), ...digitLabels());
                                 cellGrid.resetCells();
                                 cellGrid.enableDisableAll();
+                                valueLabel.textContent = selectedNumber??"";
                                 if(selectedNumber !== null && options.enabled === true) {
                                     Numbers.range(0, numDigits(options.max))
                                         .map(digit=>Numbers.digitValue(selectedNumber, digit))
@@ -2028,7 +2039,7 @@ const ChordJogApp = (() => {
                     ) => Objects.Builder(
                         SVG.Builder(SVG.G())
                             .withClass("number-by-digit-input")
-                            .withChildren(digitLabelContainer, cellGrid)
+                            .withChildren(digitLabelContainer, valueLabel, cellGrid)
                             .withFontSize(options.fontSize)
                             .build())
                         .withGettersAndSetters({
@@ -2058,6 +2069,7 @@ const ChordJogApp = (() => {
                                 set: max => {
                                     if(max === options.max || max < options.min) return;
                                     options.max = max;
+                                    SVG.yTo(valueLabel, valueLabelY());
                                     Selection.get() > options.max ?
                                         Selection.set(options.max) :
                                         Selection.rerender();}},
