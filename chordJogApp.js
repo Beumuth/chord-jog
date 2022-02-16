@@ -3533,9 +3533,10 @@ const ChordJogApp = (() => {
                                 dragAction = schemaChange.change;
                                 Schema.set(schemaChange.schema, false);
                                 Preview.set(null);},
-                            up: () => {
+                            up: e => {
                                 dragAction = null;
-                                Preview.set(Schema.get());
+                                Preview.set(e.dragTarget.parentElement.contains(e.mouseOverTarget) ?
+                                    Schema.get() : null);
                                 Schema.callChangeListener();}})),
                         previousFretboardMousePosition=null,
                         fingerlessIndicatorMouseRegion=SVG.withClass(
