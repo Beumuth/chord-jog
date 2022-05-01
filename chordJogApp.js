@@ -4646,12 +4646,9 @@ const ChordJogApp = (() => {
                         shapeIndices.push(chordIndex);}}
                 shapesGrid.modules = shapeIndices.map(shapeIndex => Module.of((
                     shape=Shape.all[shapeIndex]
-                ) => Objects.withModification(
-                    ShapeChart.Builder
-                        .forSchema(shape.schema)
-                        .fixed(Numbers.randomIntegerInRange(shape.range.min, shape.range.max)),
-                    function() {
-                        SVG.withAttribute(this.rootFretLabel, "font-weight", "bold");})))},
+                ) => ShapeChart.Builder
+                    .forSchema(shape.schema)
+                    .fixed(Numbers.randomIntegerInRange(shape.range.min, shape.range.max))))},
             topRow = SVG.Builder(SVG.G())
                 .withClass("num-shapes-row")
                 .withChild(SVG.Builder(SVG.G())
