@@ -114,7 +114,7 @@ const ChordJogApp = (() => {
                 return comparison === 0 ?
                     guess :
                     length === 1 || guess+1 === list.length || guess < 0 ?
-                        resolver(clamp(guess, 0, list.length-1)) :
+                        resolver(Numbers.clamp(guess, 0, list.length-1)) :
                         innerBinarySearch(
                             comparator,
                             Math.floor(.5 * length),
@@ -1368,12 +1368,14 @@ const ChordJogApp = (() => {
                         .withDisplay(labelPosition === LabelPosition.none ? "none" : null)
                         .build(),
                     createCellModules= (cellSize, values)=> Numbers.range(0, values.length)
-                        .map(()=>SVG.withAttributes(
+                        .map(i=>SVG.Builder(
                             SVG.Rect({
                                 width: cellSize.width,
-                                height: cellSize.height}),
-                            Objects.withField(
-                                EnumInputStyle.cells.unselected, "stroke", EnumInputStyle.cells.stroke))),
+                                height: cellSize.height}))
+                            .withAttributes(EnumInputStyle.cells.unselected)
+                            .withStroke(EnumInputStyle.cells.stroke)
+                            .withDataAttribute("value", values[i])
+                            .build()),
                     createLabelModules= values=> values.map(SVG.Text)
                 )=> Objects
                     .Builder((options={})=> Module.of((
@@ -1408,7 +1410,7 @@ const ChordJogApp = (() => {
                                         EnumInputStyle.cells.unselected),
                                 select: value=> {
                                     SVG.withAttributes(cells.modules[value], EnumInputStyle.cells.selected);
-                                    changeListener(cells.modules[value], value);},
+                                    changeListener(cells.modules[value].dataset.value, value);},
                                 unselect: value=> SVG.withAttributes(
                                     cells.modules[value], EnumInputStyle.cells.unselected)}})
                     ) => SVG.Compositions.EnumInput.withValue(
