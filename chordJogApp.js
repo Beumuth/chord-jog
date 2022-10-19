@@ -427,13 +427,15 @@ const ChordJogApp = (() => {
 
     const Strings = Module.of((
         count=6,
-        range=(min, max) => ({
-            min: min,
-            max: max}),
         all=Numbers.range(1, count+1)
     ) => ({
-        count: 6,
-        range: range,
+        count: count,
+        Range: Objects.withFields(
+            (min, max) => ({
+                min: min,
+                max: max}),
+            {
+                size: range => 1 + range.max - range.min}),
         all: all,
         first: all[0],
         last: Arrays.last(all)}));
@@ -474,7 +476,8 @@ const ChordJogApp = (() => {
             ) => ({
                 all: all,
                 count: all.length,
-                first: all[0],
+                root: this.Relative.root,
+                first: this.Relative.root,
                 last: all[all.length - 1]}));
             this.isOpen = fret => ! this.isFretted(fret);
             this.Range.roots = this.Range(this.roots.first, this.roots.last);});
@@ -2266,7 +2269,7 @@ const ChordJogApp = (() => {
                 defaultFingerAction= {
                     finger: Fingers.any,
                     fret: Frets.roots.first,
-                    range: Strings.range(Strings.first, Strings.first)}
+                    range: Strings.Range(Strings.first, Strings.first)}
             ) => fingerAction => Objects.withDefaults(fingerAction, defaultFingerAction)))
             .withFields({
                 withFinger: (fingerAction, finger) => Objects.withField(fingerAction, "finger", finger),
@@ -2295,7 +2298,7 @@ const ChordJogApp = (() => {
                     ((stringActionToFingerAction = stringAction => FingerAction({
                         finger: stringAction.action.finger,
                         fret: stringAction.action.fret,
-                        range: Strings.range(stringAction.string, stringAction.string)})
+                        range: Strings.Range(stringAction.string, stringAction.string)})
                     ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
                         [stringActionToFingerAction(stringAction)] :
                         Module.of((lastRelevantStringAction = Arrays.findLast(
@@ -4171,8 +4174,8 @@ const ChordJogApp = (() => {
                         fingerAction.fret === Frets.roots.first))
                     .withErrorMessage("Fingers are used, but not on the root fret"),
                 ShapeValidationBuilder
-                    .withFailCondition((schema, fingerActions) => Object
-                        .values(fingerActions
+                    .withFailCondition((schema, fingerActions) => Object.entries(
+                        fingerActions
                             .map(fingerAction => ({
                                 fret: fingerAction.fret,
                                 fingerOrder: fingerAction.finger === Fingers.thumb ?
@@ -4184,11 +4187,28 @@ const ChordJogApp = (() => {
                                         fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
                                     return fingersOnFret; },
                                 {}))
-                        .some(fingersOnFret => {
+                        .map(fretFingers => ({
+                            fret: Number.parseInt(fretFingers[0]),
+                            fingers: fretFingers[1]}))
+                        .some(fretFingers => {
                             let previousFinger = undefined;
-                            return fingersOnFret.some(finger => {
+                            return fretFingers.fingers.some(finger => {
                                 const outOfOrder = finger < previousFinger;
                                 previousFinger = finger;
+
+                                //This condition checks for an edge case.
+                                //For some shapes, e.g. 4 2 0 3 1 1,
+                                //crossing the index finger as a bar on the root fret at the uppermost strings
+                                //can be a valid—even exclusive—fingering.
+                                if(fretFingers.fret === Frets.Relative.root && `${finger}` === Fingers.index) {
+                                    const fingersSlicedAtIndex = fretFingers.fingers.slice(
+                                        fretFingers.fingers.indexOf(Fingers.index));
+                                    if(new Set(fingersSlicedAtIndex).size === 1 &&
+                                        1 < Strings.Range.size(
+                                            fingerActions.find(fingerAction=>fingerAction.finger === Fingers.index)
+                                                .range)) {
+                                        return false;}}
+
                                 return outOfOrder;});}))
                     .withErrorMessage("Fingers are crossed on a fret")],
             forCreation: [
