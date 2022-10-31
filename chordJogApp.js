@@ -213,11 +213,38 @@ const ChordJogApp = (() => {
             withoutGettersAndSetters: (object, ...keys) => {
                 keys.forEach(key=> Objects.withoutGetterAndSetter(object, key));
                 return object;},
-            withField: (object, key, value=undefined) => {
+            withField: (object, key, value) => {
                 object[key] = value;
                 return object;},
             withFields: (object, fields) => {
                 Object.entries(fields).forEach(field => object[field[0]] = field[1]);
+                return object;},
+            withoutField: (object, key)=> {
+                object[key] = undefined;
+                return object;},
+            withoutFields: (object, keys)=> {
+                keys.forEach(key=> Object.withoutField(object, key));
+                return object;},
+            copyField: (object, keyFrom, keyTo) => {
+                object[keyFrom] = object[keyTo];
+                return object;},
+            copyFields: (object, keysFrom, keysTo) => {
+                keysFrom.forEach((keyFrom, index)=> Objects.copyField(keyFrom, keysTo[index]));
+                return object;},
+            renameField: (object, keyFrom, keyTo)=> {
+                object[keyTo] = object[keyFrom];
+                object[keyFrom] = undefined;
+                return object;},
+            renameFields: (object, keysFrom, keysTo)=> {
+                keysFrom.forEach((keyFrom, index) => Objects.renameField(object, keyFrom, keysTo[index]));
+                return object;},
+            moveAndReplaceField: (object, keyFrom, keyTo, value)=> {
+                object[keyTo] = object[keyFrom];
+                object[keyFrom] = undefined;
+                return object;},
+            moveAndReplaceFields: (object, keysFrom, keysTo, values) => {
+                keysFrom.forEach((keyFrom, index)=>
+                    Objects.moveAndReplaceField(object, keyFrom, keysTo[index], values[index]));
                 return object;},
             withOnly: (object, ...fields) => Object.fromEntries(fields.map(field=> [field, object[field]])),
             withDefaults: (object, defaults) => {
@@ -440,16 +467,20 @@ const ChordJogApp = (() => {
         first: all[0],
         last: Arrays.last(all)}));
 
-    const Fingers = Objects.withModification({
-        thumb: "T",
-        index: "1",
-        middle: "2",
-        ring: "3",
-        pinky: "4",
-        any: "*" },
-        function() {
-            this.all = Object.values(this);
-            this.count = this.all.length;});
+    const Fingers = Module.of((
+        fingers= Module.of((Finger=(name, symbol) => ({name: name, symbol: symbol})) =>
+            [
+                Finger("thumb", "T"),
+                Finger("index", "1"),
+                Finger("middle", "2"),
+                Finger("ring", "3"),
+                Finger("pinky", "4")]),
+        all= Object.fromEntries(fingers.map(finger=> [finger.name, finger.symbol]))
+    ) => Objects.withFields(all, {
+        any: "*",
+        all: all,
+        count: all.length,
+        order: fingerName=> fingers.findIndex(finger=> finger.name === fingerName)}));
 
     const Frets = Objects.withModification({
         open: "o",
@@ -2269,7 +2300,8 @@ const ChordJogApp = (() => {
                 defaultFingerAction= {
                     finger: Fingers.any,
                     fret: Frets.roots.first,
-                    range: Strings.Range(Strings.first, Strings.first)}
+                    range: Strings.Range(Strings.first, Strings.first),
+                    deadened: [] /*Array of string indices that are deadened relative to range, beginning with 0*/}
             ) => fingerAction => Objects.withDefaults(fingerAction, defaultFingerAction)))
             .withFields({
                 withFinger: (fingerAction, finger) => Objects.withField(fingerAction, "finger", finger),
@@ -2278,6 +2310,7 @@ const ChordJogApp = (() => {
                 withStartString: (fingerAction, startString) => {
                     fingerAction.range.min = startString;
                     return fingerAction;},
+                withDeadened: (fingerAction, deadened)=> Objects.withField(fingerAction, "deadened", deadened),
                 withEndString: (fingerAction, endString) => {
                     fingerAction.range.max = endString
                     return fingerAction;}})
@@ -2295,10 +2328,11 @@ const ChordJogApp = (() => {
                     action === Shape.StringAction.any ? null : action}))
                 .filter(stringAction => stringAction.action !== null)
                 .reduce(Module.of(
-                    ((stringActionToFingerAction = stringAction => FingerAction({
+                    (stringActionToFingerAction = stringAction => FingerAction({
                         finger: stringAction.action.finger,
                         fret: stringAction.action.fret,
-                        range: Strings.Range(stringAction.string, stringAction.string)})
+                        range: Strings.Range(stringAction.string, stringAction.string),
+                        deadened: StringAction.isDeadened(stringAction.action) ? [0] : []})
                     ) => (fingerActions, stringAction) => fingerActions.length === 0 ?
                         [stringActionToFingerAction(stringAction)] :
                         Module.of((lastRelevantStringAction = Arrays.findLast(
@@ -2315,7 +2349,10 @@ const ChordJogApp = (() => {
                                     fingerActions,
                                     Arrays.lastIndexOf(fingerActions,
                                         fingerAction => fingerAction.finger === stringAction.action.finger),
-                                    fingerAction => fingerAction.range.max = stringAction.string)))),
+                                    fingerAction => {
+                                        fingerAction.range.max = stringAction.string;
+                                        if(StringAction.isDeadened(stringAction.action)) {
+                                            fingerAction.deadened.push(Strings.Range.size(fingerAction.range) - 1);}}))),
                     []),
             equals: (a, b) => Schema.toString(a) === Schema.toString(b)}),
         clickTempElement = element => {
@@ -4179,28 +4216,40 @@ const ChordJogApp = (() => {
                             .map(fingerAction => ({
                                 fret: fingerAction.fret,
                                 fingerOrder: fingerAction.finger === Fingers.thumb ?
-                                    0 : Number.parseInt(fingerAction.finger)}))
+                                    0 : Number.parseInt(fingerAction.finger),
+                                allDeadened: fingerAction.deadened.length === Strings.Range.size(fingerAction.range)}))
                             .reduce(
                                 (fingersOnFret, fingerAction) => {
+                                    const fretlessAction = {
+                                        order: fingerAction.fingerOrder,
+                                        allDeadened: fingerAction.allDeadened};
                                     undefined === fingersOnFret[fingerAction.fret] ?
-                                        fingersOnFret[fingerAction.fret] = [fingerAction.fingerOrder] :
-                                        fingersOnFret[fingerAction.fret].push(fingerAction.fingerOrder);
+                                        fingersOnFret[fingerAction.fret] = [fretlessAction] :
+                                        fingersOnFret[fingerAction.fret].push(fretlessAction);
                                     return fingersOnFret; },
                                 {}))
                         .map(fretFingers => ({
                             fret: Number.parseInt(fretFingers[0]),
                             fingers: fretFingers[1]}))
                         .some(fretFingers => {
-                            let previousFinger = undefined;
-                            return fretFingers.fingers.some(finger => {
-                                const outOfOrder = finger < previousFinger;
+                            let previousFinger = fretFingers.fingers[0];
+                            return fretFingers.fingers.slice(1).some(finger => {
+                                const outOfOrder = finger.order < previousFinger.order;
+                                const wasAllDeadened = previousFinger.allDeadened === true;
                                 previousFinger = finger;
 
-                                //This condition checks for an edge case.
+                                //Edge case exception:
+                                //If the previous finger's deadened then it's possibly playable, e.g. o,x34,o,33,22,11
+                                //(May be worth allowing crossed fingers when not deadened sometimes,
+                                //though would be hard to define as a validation rule.)
+                                if(wasAllDeadened === true && finger.allDeadened === false) {
+                                    return false;}
+
+                                //Edge case exception:
                                 //For some shapes, e.g. 4 2 0 3 1 1,
                                 //crossing the index finger as a bar on the root fret at the uppermost strings
                                 //can be a valid—even exclusive—fingering.
-                                if(fretFingers.fret === Frets.Relative.root && `${finger}` === Fingers.index) {
+                                if(fretFingers.fret === Frets.Relative.root && `${finger.order}` === Fingers.index) {
                                     const fingersSlicedAtIndex = fretFingers.fingers.slice(
                                         fretFingers.fingers.indexOf(Fingers.index));
                                     if(new Set(fingersSlicedAtIndex).size === 1 &&
