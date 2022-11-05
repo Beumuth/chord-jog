@@ -480,7 +480,7 @@ const ChordJogApp = (() => {
         any: "*",
         all: all,
         count: all.length,
-        order: fingerName=> fingers.findIndex(finger=> finger.name === fingerName)}));
+        order: fingerSymbol=> fingers.findIndex(finger=> finger.symbol === fingerSymbol)}));
 
     const Frets = Objects.withModification({
         open: "o",
@@ -4236,28 +4236,37 @@ const ChordJogApp = (() => {
                             return fretFingers.fingers.slice(1).some(finger => {
                                 const outOfOrder = finger.order < previousFinger.order;
                                 const wasAllDeadened = previousFinger.allDeadened === true;
-                                previousFinger = finger;
 
-                                //Edge case exception:
+                                //Previous finger deadened exception:
                                 //If the previous finger's deadened then it's possibly playable, e.g. o,x34,o,33,22,11
                                 //(May be worth allowing crossed fingers when not deadened sometimes,
                                 //though would be hard to define as a validation rule.)
                                 if(wasAllDeadened === true && finger.allDeadened === false) {
                                     return false;}
 
-                                //Edge case exception:
-                                //For some shapes, e.g. 4 2 0 3 1 1,
-                                //crossing the index finger as a bar on the root fret at the uppermost strings
-                                //can be a valid—even exclusive—fingering.
-                                if(fretFingers.fret === Frets.Relative.root && `${finger.order}` === Fingers.index) {
-                                    const fingersSlicedAtIndex = fretFingers.fingers.slice(
-                                        fretFingers.fingers.indexOf(Fingers.index));
-                                    if(new Set(fingersSlicedAtIndex).size === 1 &&
-                                        1 < Strings.Range.size(
-                                            fingerActions.find(fingerAction=>fingerAction.finger === Fingers.index)
-                                                .range)) {
-                                        return false;}}
+                                //Root-fret exceptions
+                                if(fretFingers.fret === Frets.Relative.root) {
+                                    //2–1 root-fret exception:
+                                    //For some shapes, e.g. 1 x 5 1 3 0,
+                                    //crossing the middle & index fingers on the root fret
+                                    //can be a valid—even exclusive—fingering.
+                                    if(previousFinger.order === Fingers.order(Fingers.middle) &&
+                                        finger.order === Fingers.order(Fingers.index)) {
+                                        return false;}
 
+                                    //Uppermost index finger-bar exception:
+                                    //For some shapes, e.g. 4 2 0 3 1 1,
+                                    //crossing the index finger as a bar on the root fret at the uppermost strings
+                                    //can be a valid—even exclusive—fingering.
+                                    if(finger.order === Fingers.order(Fingers.index)) {
+                                        const fingersSlicedAtIndex = fretFingers.fingers.slice(
+                                            fretFingers.fingers.indexOf(Fingers.index));
+                                        if(new Set(fingersSlicedAtIndex).size === 1 &&
+                                            1 < Strings.Range.size(
+                                                fingerActions.find(fingerAction=>fingerAction.finger === Fingers.index)
+                                                    .range)) {
+                                            return false;}}}
+                                previousFinger = finger;
                                 return outOfOrder;});}))
                     .withErrorMessage("Fingers are crossed on a fret")],
             forCreation: [
