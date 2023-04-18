@@ -2,7 +2,7 @@ const ChordJogApp = (() => {
     let chordJogApp=undefined;
     const Style = {
         width: 725,
-        height: 875,
+        height: 885,
         stroke: {
             width: 1},
         colors: {
@@ -1246,7 +1246,8 @@ const ChordJogApp = (() => {
                                                 y >= (i+1) * cellSize.height ? 1 : 0 :
                                             (value, i)=>
                                                 x < i * cellSize.width ? -1 :
-                                                x >= (i+1) * cellSize.width ? 1 : 0)})))
+                                                x >= (i+1) * cellSize.width ? 1 : 0,
+                                        closest=>closest)})))
                                 .withGettersAndSetters({
                                     cellSize: {
                                         get: ()=> cellSize,
