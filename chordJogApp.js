@@ -2896,32 +2896,32 @@ const ChordJogApp = (() => {
                         StaticRegionBuilder
                             .withValue(Fingers.thumb)
                             .withPosition([37.8, 188])
-                            .withTextOffset([-.5, -.5])
+                            .withTextOffset([-.5, 2])
                             .withLineSegmentModel([[11, 137],[48, 209]]),
                         StaticRegionBuilder
                             .withValue(Fingers.index)
                             .withPosition([91, 110])
-                            .withTextOffset([.5, -.5])
+                            .withTextOffset([.5, 0])
                             .withLineSegmentModel([[82, 25], [94, 141]]),
                         StaticRegionBuilder
                             .withValue(Fingers.middle)
                             .withPosition([135.75, 94])
-                            .withTextOffset([0, -.5])
+                            .withTextOffset([0, 1])
                             .withLineSegmentModel([[131, 7], [139, 133]]),
                         StaticRegionBuilder
                             .withValue(Fingers.ring)
                             .withPosition([177.5, 104])
-                            .withTextOffset([-1, 0])
+                            .withTextOffset([-1, 1])
                             .withLineSegmentModel([[181, 29], [175, 141]]),
                         StaticRegionBuilder
                             .withValue(Fingers.pinky)
                             .withPosition([217.3, 130])
-                            .withTextOffset([-1.75, -1])
+                            .withTextOffset([-1.75, .5])
                             .withLineSegmentModel([[219, 63], [217, 158]])],
                     anyFingerRegion=StaticRegionBuilder
                         .withValue(Fingers.any)
                         .withPosition([145, 225])
-                        .withTextOffset([0, 4.5])
+                        .withTextOffset([-.5, 9])
                         .withPointModel([150, 230]),
                     allRegions=fingerRegions.concat(anyFingerRegion)
                 ) => ({
